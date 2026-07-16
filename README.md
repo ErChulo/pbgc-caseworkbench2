@@ -1,3 +1,3 @@
 # pbgc-caseworkbench2
 Segunda version del workbench
-[work in progress]
+[<p style="color:red">work in progress</p>]
