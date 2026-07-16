@@ -1,3 +1,3 @@
 # pbgc-caseworkbench2
 Segunda version del workbench
-<p style="{color:red;}">work in progress</p>
+<p style="color: blue;">This text will be blue.</p>
