@@ -60,3 +60,8 @@ For all development work in this repository:
 - If either tool is unavailable or cannot answer the required query, fall back to ordinary repository inspection and note the reason.
 
 This policy applies to all future tasks unless explicitly overridden by the user.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
