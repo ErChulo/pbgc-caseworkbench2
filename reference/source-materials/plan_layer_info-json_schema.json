@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/plan-layer-extraction.schema.json",
+  "title": "Plan Layer Extraction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["document_set", "plan_layer"],
+  "properties": {
+    "document_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_id", "documents"],
+      "properties": {
+        "bundle_id": { "type": "string", "minLength": 1 },
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/document_meta" }
+        }
+      }
+    },
+    "plan_layer": { "$ref": "#/$defs/plan_layer" }
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": ["known", "unknown", "na", "conflict"]
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "page"],
+      "properties": {
+        "document_id": { "type": "string", "minLength": 1 },
+        "page": { "type": "integer", "minimum": 1 },
+        "section_label": { "type": "string" },
+        "locator_note": { "type": "string" },
+        "quote_excerpt": { "type": "string", "maxLength": 300 }
+      }
+    },
+    "extracted_base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "references"],
+      "properties": {
+        "status": { "$ref": "#/$defs/status" },
+        "references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/reference" }
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "extracted_string": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": { "value": { "type": "string" } }
+        }
+      ]
+    },
+    "extracted_date": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": {
+            "value": { "type": "string", "format": "date" }
+          }
+        }
+      ]
+    },
+    "extracted_number": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": { "value": { "type": "number" } }
+        }
+      ]
+    },
+    "extracted_boolean": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": { "value": { "type": "boolean" } }
+        }
+      ]
+    },
+    "extracted_integer": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": { "value": { "type": "integer" } }
+        }
+      ]
+    },
+    "extracted_object": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": { "value": { "type": "object" } }
+        }
+      ]
+    },
+    "extracted_array": {
+      "allOf": [
+        { "$ref": "#/$defs/extracted_base" },
+        {
+          "type": "object",
+          "properties": { "value": { "type": "array" } }
+        }
+      ]
+    },
+    "document_meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "file_name", "document_type"],
+      "properties": {
+        "document_id": { "type": "string", "minLength": 1 },
+        "file_name": { "type": "string", "minLength": 1 },
+        "document_type": {
+          "type": "string",
+          "enum": [
+            "plan_document",
+            "plan_amendment",
+            "summary_plan_description",
+            "collective_bargaining_agreement",
+            "administrative_manual",
+            "data_dictionary",
+            "other"
+          ]
+        },
+        "effective_date": { "type": "string", "format": "date" },
+        "execution_date": { "type": "string", "format": "date" },
+        "plan_year_start_month_day": { "type": "string", "pattern": "^[0-1][0-9][0-3][0-9]$" },
+        "notes": { "type": "string" }
+      }
+    },
+    "rule_expression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "expression"],
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["natural_language", "excel_formula", "sql_predicate", "pseudo_math"]
+        },
+        "expression": { "type": "string", "minLength": 1 }
+      }
+    },
+    "benefit_formula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formula_id", "effective_start", "applicability", "algebraic_form"],
+      "properties": {
+        "formula_id": { "type": "string", "minLength": 1 },
+        "effective_start": { "$ref": "#/$defs/extracted_date" },
+        "effective_end": { "$ref": "#/$defs/extracted_date" },
+        "applicability": {
+          "allOf": [
+            { "$ref": "#/$defs/extracted_object" },
+            {
+              "properties": {
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["predicate"],
+                  "properties": {
+                    "predicate": { "$ref": "#/$defs/rule_expression" }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "algebraic_form": {
+          "allOf": [
+            { "$ref": "#/$defs/extracted_object" },
+            {
+              "properties": {
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["formula"],
+                  "properties": {
+                    "formula": { "$ref": "#/$defs/rule_expression" },
+                    "parameters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": ["name", "type"],
+                        "properties": {
+                          "name": { "type": "string", "minLength": 1 },
+                          "type": {
+                            "type": "string",
+                            "enum": ["number", "date", "string", "boolean", "table"]
+                          },
+                          "description": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "payment_form": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["form_code", "meaning"],
+      "properties": {
+        "form_code": { "$ref": "#/$defs/extracted_string" },
+        "meaning": { "$ref": "#/$defs/extracted_string" },
+        "requires_survivor_percent": { "$ref": "#/$defs/extracted_boolean" },
+        "requires_months_certain": { "$ref": "#/$defs/extracted_boolean" },
+        "default_if_married": { "$ref": "#/$defs/extracted_boolean" },
+        "default_if_not_married": { "$ref": "#/$defs/extracted_boolean" }
+      }
+    },
+    "plan_layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plan_identity",
+        "plan_calendar",
+        "key_case_dates",
+        "key_plan_dates",
+        "eligibility_and_vesting",
+        "service_rules",
+        "compensation_rules",
+        "benefit_formulas",
+        "payment_forms",
+        "actuarial_equivalence",
+        "legal_limits",
+        "valuation_basis"
+      ],
+      "properties": {
+        "plan_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plan_id"],
+          "properties": {
+            "plan_id": { "$ref": "#/$defs/extracted_string" },
+            "plan_version_scope": { "$ref": "#/$defs/extracted_string" }
+          }
+        },
+        "plan_calendar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plan_year_start_month_day"],
+          "properties": {
+            "plan_year_start_month_day": { "$ref": "#/$defs/extracted_string" },
+            "plan_year_end_month_day": { "$ref": "#/$defs/extracted_string" }
+          }
+        },
+        "key_case_dates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["plan_termination_date"],
+          "properties": {
+            "plan_termination_date": { "$ref": "#/$defs/extracted_date" },
+            "trusteeship_date": { "$ref": "#/$defs/extracted_date" }
+          }
+        },
+        "key_plan_dates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "benefit_freeze_flag": { "$ref": "#/$defs/extracted_boolean" },
+            "benefit_freeze_date": { "$ref": "#/$defs/extracted_date" },
+            "accrual_stop_rule": {
+              "allOf": [
+                { "$ref": "#/$defs/extracted_object" },
+                {
+                  "properties": {
+                    "value": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["rule"],
+                      "properties": { "rule": { "$ref": "#/$defs/rule_expression" } }
+                    }
+                  }
+                }
+              ]
+            },
+            "compensation_stop_rule": {
+              "allOf": [
+                { "$ref": "#/$defs/extracted_object" },
+                {
+                  "properties": {
+                    "value": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["rule"],
+                      "properties": { "rule": { "$ref": "#/$defs/rule_expression" } }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "eligibility_and_vesting": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "normal_retirement_age": { "$ref": "#/$defs/extracted_integer" },
+            "normal_retirement_date_definition": {
+              "allOf": [
+                { "$ref": "#/$defs/extracted_object" },
+                {
+                  "properties": {
+                    "value": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["rule"],
+                      "properties": { "rule": { "$ref": "#/$defs/rule_expression" } }
+                    }
+                  }
+                }
+              ]
+            },
+            "early_retirement_flag": { "$ref": "#/$defs/extracted_boolean" },
+            "early_retirement_eligibility_rule": { "$ref": "#/$defs/extracted_object" },
+            "early_retirement_reduction_rule": { "$ref": "#/$defs/extracted_object" },
+            "late_retirement_increase_rule": { "$ref": "#/$defs/extracted_object" },
+            "required_beginning_age": { "$ref": "#/$defs/extracted_integer" },
+            "required_beginning_date_rule": { "$ref": "#/$defs/extracted_object" },
+            "participation_eligibility_rule": { "$ref": "#/$defs/extracted_object" },
+            "vesting_schedule_rule": { "$ref": "#/$defs/extracted_object" }
+          }
+        },
+        "service_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "benefit_service_definition": { "$ref": "#/$defs/extracted_object" },
+            "vesting_service_definition": { "$ref": "#/$defs/extracted_object" },
+            "service_crediting_method": { "$ref": "#/$defs/extracted_object" },
+            "break_in_service_rule": { "$ref": "#/$defs/extracted_object" },
+            "rehire_rule": { "$ref": "#/$defs/extracted_object" },
+            "hours_of_service_requirement_flag": { "$ref": "#/$defs/extracted_boolean" },
+            "hours_of_service_rules": { "$ref": "#/$defs/extracted_object" },
+            "union_or_classification_flag": { "$ref": "#/$defs/extracted_boolean" },
+            "classification_codes_dictionary": { "$ref": "#/$defs/extracted_object" },
+            "classification_transfer_rules": { "$ref": "#/$defs/extracted_object" }
+          }
+        },
+        "compensation_rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "compensation_definition": { "$ref": "#/$defs/extracted_object" },
+            "compensation_inclusions": { "$ref": "#/$defs/extracted_array" },
+            "compensation_exclusions": { "$ref": "#/$defs/extracted_array" },
+            "average_compensation_flag": { "$ref": "#/$defs/extracted_boolean" },
+            "average_compensation_window_length_months": { "$ref": "#/$defs/extracted_integer" },
+            "average_compensation_window_type": { "$ref": "#/$defs/extracted_string" },
+            "average_compensation_consecutive_rule": { "$ref": "#/$defs/extracted_object" },
+            "average_compensation_partial_year_rule": { "$ref": "#/$defs/extracted_object" },
+            "average_compensation_less_than_window_rule": { "$ref": "#/$defs/extracted_object" }
+          }
+        },
+        "benefit_formulas": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/benefit_formula" }
+        },
+        "payment_forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/payment_form" }
+        },
+        "actuarial_equivalence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "interest_basis": { "$ref": "#/$defs/extracted_object" },
+            "mortality_basis": { "$ref": "#/$defs/extracted_object" },
+            "method": { "$ref": "#/$defs/extracted_object" }
+          }
+        },
+        "legal_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "compensation_cap_application_rule": { "$ref": "#/$defs/extracted_object" },
+            "maximum_benefit_application_rule": { "$ref": "#/$defs/extracted_object" },
+            "greater_of_or_minimum_benefit_flag": { "$ref": "#/$defs/extracted_boolean" },
+            "greater_of_or_minimum_benefit_rule": { "$ref": "#/$defs/extracted_object" }
+          }
+        },
+        "valuation_basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "valuation_interest_basis": { "$ref": "#/$defs/extracted_object" },
+            "valuation_mortality_basis": { "$ref": "#/$defs/extracted_object" }
+          }
+        }
+      }
+    }
+  }
+}

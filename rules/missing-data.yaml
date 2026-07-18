@@ -1,0 +1,2 @@
+default: validation_error
+zero_fill: prohibited_unless_authorized

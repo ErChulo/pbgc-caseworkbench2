@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>PBGC §436 Evaluation — v0.2.0</title>
+  <link rel="stylesheet" href="styles.css"/>
+
+  <!-- CDN libs (works from file:// as long as internet access is available) -->
+  <script src="https://cdn.jsdelivr.net/npm/pizzip@3.2.0/dist/pizzip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docxtemplater/3.66.4/docxtemplater.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>PBGC §436 Evaluation</h1>
+    <div class="sub">v0.2.0 — Header + table scaffolding + DOCX generation (template via file picker)</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1) Load the template DOCX</h2>
+      <p class="hint">Select <code>436_Evaluation_Template_v0.2.0.docx</code> (derived from your shell; your original shell stays untouched).</p>
+      <div class="row">
+        <label class="file">
+          <span>Template (.docx)</span>
+          <input id="templateFile" type="file" accept=".docx"/>
+        </label>
+      </div>
+      <details>
+        <summary>Where is the included template?</summary>
+        <p class="hint">If you unzipped this package, the template is in the same folder as this HTML file. Because you're running from <code>file://</code>, the browser cannot auto-load it; you must select it here.</p>
+      </details>
+    </section>
+
+    <section class="card">
+      <h2>2) Case header inputs</h2>
+
+      <div class="grid">
+        <label>To (name)<input id="toName" placeholder=""/></label>
+        <label>To (ASD section)<input id="toSection" placeholder=""/></label>
+        <label>From (name)<input id="fromName" placeholder=""/></label>
+        <label>From (ASD section)<input id="fromSection" placeholder=""/></label>
+
+        <label>Memo date<input id="memoDate" type="date"/></label>
+        <label>Subject<input id="subject" value="§436 Evaluation"/></label>
+
+        <label>Plan name<input id="planName" placeholder=""/></label>
+        <label>EIN/PN<input id="einPin" placeholder=""/></label>
+        <label>PBGC case #<input id="caseNumber" placeholder=""/></label>
+
+        <label>DOPT<input id="dopt" type="date"/></label>
+        <label>DOTR<input id="dotr" type="date"/></label>
+        <label>BPD<input id="bpd" type="date"/></label>
+        <label>DOBF<input id="dobf" type="date"/></label>
+
+        <label>Plan year start (MM-DD)
+          <input id="pyStart" placeholder="01-01"/>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="btnGenerate">Generate DOCX</button>
+        <button id="btnDownloadInputs" class="secondary">Download inputs JSON</button>
+      </div>
+
+      <p class="hint">This version does not compute AFTAP tables yet; those populate starting v0.4.0–v0.5.0.</p>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="card">
+      <h2>3) Output</h2>
+      <p class="hint">The generated file will download to your device. Name includes version.</p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="sub">Runs from <code>file://</code>. All local files must be chosen via the file picker.</div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

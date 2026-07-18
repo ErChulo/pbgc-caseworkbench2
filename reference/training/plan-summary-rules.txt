@@ -1,0 +1,109 @@
+Plan Summary
+08/03/2023
+
+In General 
+
+Plan Summary must be completed for all cases. The Plan Summary not only describes the plan in general, but it also indicates the most relevant sections of the plan for specific provisions. The Plan Summary must be easy to read 10 or more years after the actuarial valuation has been completed.  Actuaries may need to complete Actuarial Service Requests (ASRs) and to support audit and appeal reviews for many years from the actuarial valuation’s completion.
+
+A Preliminary Plan Summary should be completed soon after the trusteeship of a plan so that it can be used for estimated benefit administration and to assist auditors in understanding the data requested in the Data Elements Listing.  The Preliminary Plan Summary is completed using the plan documents available at the time and may be updated as more documents become available or as the case actuary develops a more detailed understanding of the plan.
+
+A Final version of the Plan Summary is included in the Actuarial Case Report prepared when the actuarial valuation is final.  The Final Plan Summary is based on the plan documents as described in the Plan Document List prepared by the Data Management Division (DMD).  The Final Plan Summary may, on occasion, also include plan documents obtained after the completion of the Plan Document List.
+
+Provisions Which Must Appear on the Plan Summary
+
+Provisions In Effect During the Last Five Years
+
+All provisions in effect at some time during the last 5 years before the earlier of BPD and DOPT must be documented in the Plan Summary. It is permissible to just note changes in the plan starting with the provisions of the plan in effect 5 years before the earlier of BPD and DOPT.
+
+Provisions In Effect Prior To the Last Five Years
+
+The provisions of the plan in effect prior to the five years immediately preceding the earlier of BPD and DOPT must be documented in the Plan Summary if they affect a separated vested employee or a majority owner included in the plan population at DOPT for the actuarial valuation.
+
+Completing the Plan Summary
+
+Cover Page
+
+Use CMS for obtaining the case name, case number, and asset information.
+
+Use the Trusteeship Agreement/Trusteeship Working Group (TWG) Memo to obtain DOPT, DOTR, BPD, NOD, NOIT, Employer status, Facility Closing Date(s), and Successor Plan status.  (Please note that Technical Procedure 61 must be followed to determine if the plan is a successor plan.)
+
+Use a plan document to obtain the Date of Benefit Freeze (DOBF).  The preferred plan document is the plan amendment which adopted the benefit freeze in accordance with 204(h) regulations.  If unavailable, subsequent plan documents which list the DOBF can be used. It is best practice not to enter a date that accruals ceased due to the 436(e) limitation here.
+
+The SPARR can be found in Appendix H.1. of the OBA Operations Manual.
+
+Use the Actuarial Technical Manual, NPVF Calculator, PBGC.gov, or IRS.gov to obtain PBGC Lump Sum and PBGC Annuity rates.
+
+Documents in the Plan Summary
+
+Start with plan documents listed in the Plan Document List or, if necessary, those acquired subsequently.
+
+Complete the first column of the Plan Summary with the oldest (based on effective date) full plan document with provisions in effect at least five years before the earlier of BPD and DOPT.
+
+Include the page number and plan section number for each provision listed in the plan summary.  Include citations from all relevant sections in the plan document.
+
+If a plan document does not include a provision listed in the Plan Summary, enter “N/A” in the Plan Summary for that provision.  For example, if a plan does not contain a Cash Balance formula, enter “N/A” into all fields in section D.1. of the Plan Summary.
+
+Cite provisions accurately; the Plan Summary should not result in changes to the meaning of the plan provision.  Ambiguous provisions should be clarified in the Interpretations of Note section of the Actuarial Case Memo.
+
+Subsequent columns should be completed with amendments that result in significant changes to plan provisions.  Amendments which make minor changes can be summarized in footnotes.  Full restatements should generally be summarized for the benefit of future users; even if plan provisions are similar, page and section numbers may change.
+
+Non-standard documents such as Summaries of Plan Documents (SPDs) for participants, Actuarial Valuation Reports (AVRs), Collective Bargaining Agreements (CBAs), and corporate meeting minutes for the plan sponsor may be included as needed to clarify plan provisions and to establish adoption or effective dates of certain provisions.
+
+Each column of the Plan Summary should include the summarized document’s Effective Date, Adoption Date, and Phase-In percentage.  Please also note the Image Viewer Document Number(s) for the summarized document.
+
+Some pension plans use a Prototype Plan Document (also referred to as a Pre-Approved or Basic Plan Document), which is a master plan document which includes the main plan requirements and has been qualified by the IRS.  Plan sponsors then complete an Adoption Agreement with specific provisions, such as the benefit formula and retirement ages, that are selected for the individual pension plan.  For such plans, it is best practice to cite both documents in the Plan Summary for each applicable plan provision.
+
+Notes on Sections of the Plan Summary
+
+Section A-Participant Requirements: Please note that the Date of Participation is not always the date immediately following the completion of eligibility requirements.  It may be a subsequent plan anniversary or half-anniversary date, for example.  The eligibility requirements establish the persons for whom data should be collected.  Resolve any ambiguities about eligibility and participation provisions with the prior plan administrator or prior plan actuary as soon as possible after trusteeship.
+
+Section B-Retirement Eligibility: Cells B.3.a. and B.3.b. are Normal and Early Retirement Provisions for deferred vested employees who are not eligible to retire as of their DOTE.  Some plans provide more favorable provisions for Early Retirement to those participants who attain certain age and/or service requirements while actively employed.  Please consult ASD if a plan provides for a more favorable Normal Retirement provision for actively employed participants.  
+Section C-Service: Don’t use circular definitions of Vesting Service and Credited Service.  Plans are required to provide a year of Vesting Service for any plan year in which a participant completes at least 1,000 hours of service according to section 411(a)(5)(A) of the code.  Plans may use other methods, such as elapsed time worked, to determine Credited Service for benefit accruals.
+
+Section D-Retirement Benefit:  
+
+Understand the difference between a Short Service Factor (SSF) and Accrual Factor (AF).  
+
+A SSF is a fraction, not greater than one, with the numerator equal to the Years of Credited Service the participant would have accrued at the Normal Retirement Date and the denominator equal to a set number. For example, if a participant was hired at age 50 and the SSF denominator is 20, the participant’s SSF would be 15/20 if NRA is age 65.
+
+An AF is a fraction, not greater than one, with the numerator equal to the participant’s total Years of Credited Service and the denominator equal to the Years of Credited Service the participant would have accrued at the Normal Retirement Date. In the above example, if the participant terminated at age 62, the AF would be 12/15.  
+
+In Compensation Used, document the inclusion or exclusion of certain types of salary.  Include the salary limitations under 401(a)(17) when applicable. In Average Compensation, specify all types of compensation and the period over which average compensation is determined.  Describe relevant features of the methodology for computing average compensation, such as the average compensation if a participant has completed less than 5 years when that is the standard period used or if partial years of compensation are annualized.  
+
+For Integrated Plans, specify if the plan used an IRS Table of Covered Compensation table or a plan provided table.  
+
+If the benefit formula includes a Social Security Primary Insurance Amount (PIA) offset, specify how the PIA offset is calculated.  Note which year the PIA offset is calculated under, typically either the year of a participant’s DOTE or the plan’s DOPT.  Specify the assumptions for salaries used before the participant’s DOH and after the participant’s DOTE.
+
+Section E-Supplemental Benefits:  The entry for Duration should clearly specify when the Supplemental Benefit ends.  For example, simply entering age 62 may be ambiguous.  A Supplemental Benefit may end with the payment before a participant becomes eligible to receive Social Security benefits, which are typically paid on the first of the month in which a participant attains age 62 instead of the first of the month coincident or next following in which a participant attains age 62.
+
+Section F-Form of Benefit:  If the plan provides a separate or enhanced form of benefit for different groups of participants or for participants who meet certain eligibility requirements, please be sure that these separate or enhanced forms of benefit are clearly specified along with the group or eligibility requirements.
+
+Section G-Early Retirement Adjustment:  If the plan provides separate adjustment factors for different groups of participants or for participants who qualified for a subsidized early retirement, be sure that these separate adjustment factors are clearly specified.
+
+Section H-Late Retirement Adjustment:  Be sure that the entry describes both the adjustment for participants who work past NRD and the adjustment for participants who terminate before NRD.  The Suspension of Benefit provision is important in determining the net adjustment factor for participants who terminate after NRD.
+
+Section I-Disability Benefit:  The entry should describe both the date when the disability benefit is payable and if the participant receives an unreduced accrued benefit, a benefit adjusted for retirement prior to NRD, or a benefit calculated under an alternative formula for disability.  If the disability benefit is an auxiliary type which converts to the regular plan benefit at NRD, be sure that this conversion is specified.
+
+Section J-Death Benefits:  Note both qualified pre-retirement survivor annuities and pre-retirement lump sum death benefits in section J.1.
+
+Section K-Provisions for Deferred Participants:  Section K.2. should include both provisions that explicitly deem a participant whose benefit is valued at $0 to be cashed out and provisions which provide for an automatic cash out for a de-minimis amount such as $5,000 or $7,000.
+
+Section L-Transfer Provisions:  Completion of this section is necessary if a plan limits participation to a certain group of employees, such as hourly employees, if a plan provides separate provisions for different groups of employees, or if the plan sponsor has separate pension plans for different groups of employees.
+
+Section M-Mandatory Employee Contributions:  This section should be completed even if a plan discontinued Mandatory Employee Contributions in the past.  Contributions may remain in the plan at DOPT or participants may be affected by offsets for the refund of contributions.
+
+Section N-Voluntary Employee Contributions:  This section should be completed even if a plan discontinued Voluntary Employee Contributions in the past and  contributions remain in the plan at DOPT.
+
+Section O-Top Heavy:  Section O.1. is typically completed based on information found in Actuarial Valuation Reports.  Complete subsequent entries in this section with “N/A”  if the plan is known never to have been Top Heavy.
+
+Section P-Default Actuarial Equivalence:  If actuarial equivalence based on 417(e) is used, specify all parameters including the lookback and stability periods.  If the plan explicitly states whether or not mortality is used in the pre-retirement period, note this provision because it affects the calculation of Early and Late Retirement Adjustment Factors.
+
+Section Q-Consensual Lump Sum Provisions:  This section is for non-automatic lump sums that a participant may elect to receive at a Date of Termination of Employment which precedes the Earliest Retirement Date described in Section B.2 or B.3.b.
+
+Section R-Additional Provisions of Note:  Include provisions that are pertinent to the calculation and valuation of benefits but are not mentioned in any of the previous sections in the Plan Summary.  Examples include, but are not limited to, the following: provisions related to 415 when limits apply, provisions for Cost-of-Living Adjustments to benefits, information related to spin-offs, and provisions related to 436 when limits apply.
+
+Section S-Names of Majority Owners:  This information is typically found in the Trusteeship Working Group memo or gathered during interviews with the prior plan sponsor. 
+
+Additional Notes on the Plan Summary
+
+Please use the current version of the plan summary template for both the Preliminary and Final Plan Summaries.  The Final Plan Summary should be reviewed for consistency with the Actuarial Case Memo.  The Plan Summary should contain the provisions as they are stated in the plan document, even if not in full compliance with the law.  ERISAfication issues should be discussed in the Interpretations of Note section of the Actuarial Case Memo and can be included in footnotes in the Plan Summary.  Plan provisions generally should be summarized in the Plan Summary instead of copied verbatim.

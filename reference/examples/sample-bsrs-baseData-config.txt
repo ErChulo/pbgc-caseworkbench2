@@ -1,0 +1,8 @@
+Description	FieldName	TableName	MaskType	Mask	Required	LowerBound	UpperBound	ErrorMessage
+Participant's Last Name:	LNAME	BCV1	CHAR	20	N			
+Participant's First Name:	FNAME	BCV1	CHAR	15	N			
+Participant's Middle Name:	MNAME	BCV1	CHAR	15	N			
+Social Security Number:	SSN	BCV1	MSK	999-99-9999	N			
+Participant's Sex:	PSEX	BCV1	LST	M;F	N			
+Date of Birth:	DOB	BCV1	DATE	mm/dd/yyyy	N	01/01/1900	12/31/1994	The Date of Birth must be a valid date
+Participant's Customer ID:	PCI	BCV9	DEC	0	N			

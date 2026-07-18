@@ -1,0 +1,8 @@
+authority_order:
+  - executed_plan_document_or_amendment
+  - formal_pbgc_legal_or_actuarial_determination
+  - approved_r5_or_plan_summary
+  - certified_case_report
+  - supporting_administrative_report
+  - historical_approved_v1_reference
+  - inferred_rule

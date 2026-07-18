@@ -1,0 +1,9 @@
+PrintCriteria	Line	Description	Detail	DescFormat	DtlFormat
+1		"""A:"" & @CHAR(9) & @IF(((ID = ""4"" AND MTHSNSF = 0) OR (ID <> ""4"" AND MTHSREM_DEATH = 0)),""Straight Life Annuity"",@STRING(@IF(ID <> ""4"",MTHSREM_DEATH,MTHSNSF) / 12, 0) & ""-Year Certain-and-Continuous Annuity"")"	"@IF(ID = ""1"" AND QPSA_INDICATOR = ""Y"",XRD_SURV_MB_TERM,XRD_MB_TERM)"	TL	$2
+"PBGC_OPT_5CC <= @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""B:"" & @CHAR(9) & ""5-year Certain-and-Continuous Annuity"""	"""Annuity form not available"" 'BOLD"	TL	TL
+"PBGC_OPT_5CC > @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""B:"" & @CHAR(9) & ""5-year Certain-and-Continuous Annuity"""	PBGC_OPT_5CC	TL	$2
+"PBGC_OPT_10CC <= @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""C:"" & @CHAR(9) & ""10-year Certain-and-Continuous Annuity"""	"""Annuity form not available"" 'BOLD"	TL	TL
+"PBGC_OPT_10CC > @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""C:"" & @CHAR(9) & ""10-year Certain-and-Continuous Annuity"""	PBGC_OPT_10CC	TL	$2
+"PBGC_OPT_15CC <= @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""D:"" & @CHAR(9) & ""15-year Certain-and-Continuous Annuity"""	"""Annuity form not available"" 'BOLD"	TL	TL
+"PBGC_OPT_15CC > @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""D:"" & @CHAR(9) & ""15-year Certain-and-Continuous Annuity"""	PBGC_OPT_15CC	TL	$2
+1 'HLINE		"""E:"" & @CHAR(9) & ""Straight Life Annuity"""	PBGC_OPT_SLA	TL	$2

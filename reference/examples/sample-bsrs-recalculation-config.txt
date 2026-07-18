@@ -1,0 +1,13 @@
+PrintCriteria	Line	Description	Detail	DescFormat	DtlFormat
+1		"""Participant Data"""		TL	TL
+1		"""----------------"""		TL	TL
+1		"""Name:"""	"FNAME & "" "" & LNAME"	TL	TL
+1		"""Social Security Number:"""	"@left(@IF(ID=""1"",SSN,@IF(ID=""2"",@IF(NON_SPOUSE_BENF=""Y"",BSSN,SSSN),APSSN)),3) & ""-"" & @mid(@IF(ID=""1"",SSN,@IF(ID=""2"",@IF(NON_SPOUSE_BENF=""Y"",BSSN,SSSN),APSSN)),4,2) & ""-"" & @Right(@IF(ID=""1"",SSN,@IF(ID=""2"",@IF(NON_SPOUSE_BENF=""Y"",BSSN,SSSN),APSSN)),4)"	TL	TL
+1		"""Sex:"""	"@IF(PSEX=""M"",""Male"",@IF(PSEX=""F"",""Female"",""Unknown""))"	TL	TL
+1		"""Date of Birth:"""	DOB	TL	D4
+1		"""Date of Termination of Employment:"""	"@IF(@ISDATE(DOTE),DOTE,""UNKNOWN"")"	TL	D4
+1		"@IF(@ISDATE(DOD),""Benefit Commencement Date:"",""Actual Retirement Date:"")"	DOR	TL	D4
+1		"""Normal Retirement Date:"""	"@IF(id=""1"",NRD,BDEUAS)"	TL	D4
+1		"""Earliest Unreduced Retirement Date:"""	BDEUAS	TL	D4
+1		"""Earliest Retirement Date:"""	BDERDLEV	TL	D4
+1		"""Credited Service (CS)"""	"@IF(RETSTAT<>""1"",CS,CSPA)"	TL	F4

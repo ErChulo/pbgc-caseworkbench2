@@ -1,0 +1,225 @@
+{
+  "meta": {
+    "schema_version": "0.7.0",
+    "generated_at_utc": "2026-04-01T01:08:08.148632Z",
+    "source": "derived from uploaded V1 samples"
+  },
+  "runs": [
+    {
+      "run_id": "DEFAULT",
+      "description": "Base row / default context for the sheet.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "XRD",
+      "description": "Evaluate at earliest retirement (XRD) commencement context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "QPSA",
+      "description": "Qualified pre-retirement survivor annuity context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "PRDBVAL",
+      "description": "Auxiliary run to support QPSA death-benefit present values where required.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "DORDOTR",
+      "description": "Auxiliary run for commencement/valuation aligned to date of trusteeship (DOTR) when used.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "NRD",
+      "description": "Evaluate at normal retirement commencement context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "EURD",
+      "description": "Evaluate at earliest unreduced retirement date context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "ERD",
+      "description": "Evaluate at early retirement date commencement context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "RBD",
+      "description": "Evaluate at required beginning date context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "DORNSF",
+      "description": "Auxiliary run variant of DOR used in samples (exact meaning to be documented).",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "DOR",
+      "description": "Evaluate using actual date of retirement / annuity start (DOR/ARD) context.",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    },
+    {
+      "run_id": "RETRO",
+      "description": "Retroactive/backpay computation context (used in samples).",
+      "inputs": [
+        "as_of_date",
+        "commencement_date",
+        "status_role",
+        "form_code",
+        "calc_indicator"
+      ],
+      "applicability": "TBD: boolean expression over entitlement + plan; if false, outputs are zero/blank and RUN_APPLICABLE=false",
+      "zero_fill_policy": {
+        "numeric": 0,
+        "date": "",
+        "text": "",
+        "boolean": false
+      }
+    }
+  ]
+}

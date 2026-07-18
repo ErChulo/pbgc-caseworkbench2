@@ -1,0 +1,752 @@
+{
+  "document": {
+    "doc_id": "1976 Plan Document",
+    "file_name": "1976 Plan Document -- First Amendment.pdf",
+    "source_type": "plan_document",
+    "scrape_basis": "R5_Scrape_Prompt_v2.txt",
+    "item_list": "r5-items.txt",
+    "rules": "plan-summary-rules.txt"
+  },
+  "items": [
+    {
+      "item_id": 1,
+      "item_text": "What is the Adoption Date of the document?",
+      "status": "value",
+      "answer": "Effective July 1, 1976; Original Instrument Executed July 1, 1978.",
+      "citation_note": "(Article 1; pdf p1)",
+      "references": [
+        {
+          "section": "Article 1",
+          "page_pdf": 1,
+          "page_printed": "",
+          "excerpt": "Effective July 1, 1976, the College adopted the Plan."
+        }
+      ]
+    },
+    {
+      "item_id": 2,
+      "item_text": "What is the Plan Anniversary?",
+      "status": "value",
+      "answer": "July 1 Plan Year.",
+      "citation_note": "(§2.1(u); pdf p6)",
+      "references": [
+        {
+          "section": "§2.1(u)",
+          "page_pdf": 6,
+          "page_printed": "",
+          "excerpt": "Plan Year: The 12-Month Period Commencing On July 1."
+        }
+      ]
+    },
+    {
+      "item_id": 3,
+      "item_text": "What are the groups of employees covered under the plan?",
+      "status": "value",
+      "answer": "Non-Contract Employees Excluding Faculty And Administrative Employees Covered Under Another Pension Plan.",
+      "citation_note": "(§2.1(g); pdf p3)",
+      "references": [
+        {
+          "section": "§2.1(g)",
+          "page_pdf": 3,
+          "page_printed": "",
+          "excerpt": "Employee: Any Person, Exclusive Of Faculty And Administrative Employees Who Are Included In Another Pension Plan."
+        }
+      ]
+    },
+    {
+      "item_id": 4,
+      "item_text": "What are the participation eligibility requirements in the plan?",
+      "status": "value",
+      "answer": "Attained Age 25 And Completed A 12-Month Period With At Least 1,000 Hours Of Service; Excludes Hires After The First Of The Month Coincident With Or Following Age 60.",
+      "citation_note": "(§3.1; pdf p7)",
+      "references": [
+        {
+          "section": "§3.1",
+          "page_pdf": 7,
+          "page_printed": "",
+          "excerpt": "An Employee Shall Become A Participant... Both Attained Age 25 And Completed A 12-Month Period... Not Less Than 1,000 Hours Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 5,
+      "item_text": "What is the participation date after attainment of eligibility in the plan?",
+      "status": "value",
+      "answer": "Earliest January 1 Or July 1 On Which Age 25 And 1,000 Hours In The Applicable 12-Month Period Are Satisfied.",
+      "citation_note": "(§3.1(c); pdf p7)",
+      "references": [
+        {
+          "section": "§3.1(c)",
+          "page_pdf": 7,
+          "page_printed": "",
+          "excerpt": "Participation... Shall Commence As Of The Earliest January 1 Or July 1 As Of Which He Had Both Attained Age 25 And Completed... 1,000 Hours."
+        }
+      ]
+    },
+    {
+      "item_id": 6,
+      "item_text": "What is the Age/Service retirement eligibility for normal retirement in the plan?",
+      "status": "value",
+      "answer": "Age 65.",
+      "citation_note": "(§2.1(t); pdf p6)",
+      "references": [
+        {
+          "section": "§2.1(t)",
+          "page_pdf": 6,
+          "page_printed": "",
+          "excerpt": "Normal Retirement Date: The First Day Of The Calendar Month Coincident With Or Next Following The Participant's 65th Birthday."
+        }
+      ]
+    },
+    {
+      "item_id": 7,
+      "item_text": "What is the Start Date for normal retirement in the plan?",
+      "status": "value",
+      "answer": "First Day Of The Month Coincident With Or Next Following Retirement After Normal Retirement Date.",
+      "citation_note": "(§4.1; pdf p11)",
+      "references": [
+        {
+          "section": "§4.1",
+          "page_pdf": 11,
+          "page_printed": "",
+          "excerpt": "Payment Of A Normal Retirement Pension Shall Commence As Of The First Day Of The Month Coinciding With Or Next Following The Date Of Retirement."
+        }
+      ]
+    },
+    {
+      "item_id": 8,
+      "item_text": "What is the Age/Service retirement eligibility for Early Unreduced benefit retirement in the plan?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 9,
+      "item_text": "What is the Age/Service retirement eligibility for Early Reduced benefit retirement in the plan?",
+      "status": "value",
+      "answer": "Age 60 And 10 Years Of Service.",
+      "citation_note": "(§4.2; pdf p11)",
+      "references": [
+        {
+          "section": "§4.2",
+          "page_pdf": 11,
+          "page_printed": "",
+          "excerpt": "Terminated On Or After His 60th Birthday And After He Has Completed 10 Or More Years Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 10,
+      "item_text": "What is the Start Date for early retirement in the plan?",
+      "status": "value",
+      "answer": "Normal Retirement Date Unless Committee Permits Earlier First Of Month Coincident With Or Next Following Retirement Or Later Requested Month Before Normal Retirement Date.",
+      "citation_note": "(§4.2; pdf p11)",
+      "references": [
+        {
+          "section": "§4.2",
+          "page_pdf": 11,
+          "page_printed": "",
+          "excerpt": "Payment... Shall Commence As Of The Participant's Normal Retirement Date... Or As Of The First Day Of Any Subsequent Month Which Precedes His Normal Retirement Date."
+        }
+      ]
+    },
+    {
+      "item_id": 11,
+      "item_text": "For Deferred vested, not eligible to retire as of date of termination, what is the Age/Service retirement eligibility for normal retirement in the plan?",
+      "status": "value",
+      "answer": "Age 65.",
+      "citation_note": "(§5.3; pdf p13)",
+      "references": [
+        {
+          "section": "§5.3",
+          "page_pdf": 13,
+          "page_printed": "",
+          "excerpt": "Deferred Vested Pension... Commencing As Of His Normal Retirement Date."
+        }
+      ]
+    },
+    {
+      "item_id": 12,
+      "item_text": "For Deferred vested, not eligible to retire as of date of termination, what is the Age/Service retirement eligibility for early retirement in the plan?",
+      "status": "value",
+      "answer": "With 10 Years Of Service, May Request Commencement During The 5-Year Period Before Normal Retirement Date, Reduced Under §5.2.",
+      "citation_note": "(§5.3; pdf p14)",
+      "references": [
+        {
+          "section": "§5.3",
+          "page_pdf": 14,
+          "page_printed": "",
+          "excerpt": "Such A Participant Who Has Credit For 10 Or More Years Of Service May Request... Any Calendar Month Within The 5-Year Period Preceding His Normal Retirement Date."
+        }
+      ]
+    },
+    {
+      "item_id": 13,
+      "item_text": "What is the retirement eligibility for late retirement in the plan?",
+      "status": "value",
+      "answer": "Employment May Continue After Age 65 By Agreement; No Pension Payments During Continued Employment After Age 65.",
+      "citation_note": "(§4.1 / §6.5; pdf p11)",
+      "references": [
+        {
+          "section": "§4.1 / §6.5",
+          "page_pdf": 11,
+          "page_printed": "",
+          "excerpt": "Participant Shall Cease To Be An Employee On His Normal Retirement Date Unless He And The Employer Agree That He Shall Continue His Employment After Attaining Age 65."
+        }
+      ]
+    },
+    {
+      "item_id": 14,
+      "item_text": "What is the eligibility requirement for disability under the plan?",
+      "status": "value",
+      "answer": "N/A; No Disability Benefits.",
+      "citation_note": "(§4.4; pdf p12)",
+      "references": [
+        {
+          "section": "§4.4",
+          "page_pdf": 12,
+          "page_printed": "",
+          "excerpt": "There Shall Be No Disability Benefits Under The Plan."
+        }
+      ]
+    },
+    {
+      "item_id": 15,
+      "item_text": "How the plan defines Eligibility/Participation service?",
+      "status": "value",
+      "answer": "A Year Of Service Is A Plan Year, Including Initial Eligibility Period, With At Least 1,000 Hours Of Service.",
+      "citation_note": "(§3.2(b); pdf p8)",
+      "references": [
+        {
+          "section": "§3.2(b)",
+          "page_pdf": 8,
+          "page_printed": "",
+          "excerpt": "Participant Shall Accrue A Year Of Service For Each Plan Year Including The Initial Eligibility Period In Which He Has 1,000 Or More Hours Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 16,
+      "item_text": "How the plan defines vesting service?",
+      "status": "value",
+      "answer": "A Year Of Service For Vesting Is Credited For A Plan Year Or Initial Eligibility Period With At Least 1,000 Hours; Eligibility Year Also Counts For Vesting.",
+      "citation_note": "(§3.2(b); pdf p8)",
+      "references": [
+        {
+          "section": "§3.2(b)",
+          "page_pdf": 8,
+          "page_printed": "",
+          "excerpt": "Employee Shall Receive Credit For A Year Of Service For Vesting Purposes If He Completes A Year Of Service For Eligibility Purposes."
+        }
+      ]
+    },
+    {
+      "item_id": 17,
+      "item_text": "How the plan defines benefit service?",
+      "status": "value",
+      "answer": "Same Service Definition Used For Eligibility And Benefit Amount; A Year Is Credited For Each Plan Year With At Least 1,000 Hours, Subject To Break-In-Service Rules.",
+      "citation_note": "(§3.2; pdf p8)",
+      "references": [
+        {
+          "section": "§3.2",
+          "page_pdf": 8,
+          "page_printed": "",
+          "excerpt": "Eligibility For Benefits Under The Plan And The Amount Of The Benefit... Shall Be Determined By His Period Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 18,
+      "item_text": "Does the plan defines other type of service besides eligibility/participation, vesting and benefit service?",
+      "status": "value",
+      "answer": "Military Service Leave Does Not Constitute A Break In Service If Return Requirements Are Met.",
+      "citation_note": "(§3.4; pdf p10)",
+      "references": [
+        {
+          "section": "§3.4",
+          "page_pdf": 10,
+          "page_printed": "",
+          "excerpt": "An Authorized Leave Of Absence Due To Service In The Armed Forces... Shall Not Constitute A Break In Service."
+        }
+      ]
+    },
+    {
+      "item_id": 19,
+      "item_text": "What is the accrued benefit formula under the plan?",
+      "status": "value",
+      "answer": "Monthly Life Pension Equals 1% Of Average Monthly Compensation Times Actual Years Of Service.",
+      "citation_note": "(§5.1; pdf p13)",
+      "references": [
+        {
+          "section": "§5.1",
+          "page_pdf": 13,
+          "page_printed": "",
+          "excerpt": "Monthly Amount... For Life Shall Be Equal To 1% Of The Participant's Average Monthly Compensation Multiplied By His Actual Number Of Years Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 20,
+      "item_text": "What is the Accrual factor in the accrued benefit formula?",
+      "status": "value",
+      "answer": "1% Of Average Monthly Compensation Per Year Of Service.",
+      "citation_note": "(§5.1; pdf p13)",
+      "references": [
+        {
+          "section": "§5.1",
+          "page_pdf": 13,
+          "page_printed": "",
+          "excerpt": "Equal To 1% Of The Participant's Average Monthly Compensation Multiplied By His Actual Number Of Years Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 21,
+      "item_text": "What is the Short service factor in the accrued benefit formula?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 22,
+      "item_text": "What compensation is used in the accrued benefit formula?",
+      "status": "value",
+      "answer": "Total Salary And Wages Paid By The Employer For Personal Services Rendered During Service.",
+      "citation_note": "(§2.1(m); pdf p4)",
+      "references": [
+        {
+          "section": "§2.1(m)",
+          "page_pdf": 4,
+          "page_printed": "",
+          "excerpt": "Compensation: The Total Salary And Wages Paid To A Participant By The Employer For Personal Services Rendered During The Period Considered As Service."
+        }
+      ]
+    },
+    {
+      "item_id": 23,
+      "item_text": "How the plan defines average compensation to use in the accrued benefit formula?",
+      "status": "value",
+      "answer": "Average Monthly Compensation Equals Highest 5 Consecutive Years Of Compensation Before Retirement Or Earlier Termination Divided By 60.",
+      "citation_note": "(§2.1(n); pdf p5)",
+      "references": [
+        {
+          "section": "§2.1(n)",
+          "page_pdf": 5,
+          "page_printed": "",
+          "excerpt": "Dividing The Total Compensation... During The 5 Consecutive Years Which Will Produce The Highest Total Salary... By 60."
+        }
+      ]
+    },
+    {
+      "item_id": 24,
+      "item_text": "What is the Covered Compensation for Integrated Plans?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 25,
+      "item_text": "What is the Primary Insurance Amount (PIA) Offset in the plan?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 26,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Initial Account Balance in the plan?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 27,
+      "item_text": "If the plan is a Cash-Balance plan, How the the plan defines Benefit Credit in the Cash Balance Account?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 28,
+      "item_text": "If the plan is a Cash-Balance plan, How the the plan defines Interest Credit in the Cash Balance Account?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 29,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Timing of Interest Credit in the Cash Balance Account?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 30,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Annuity Conversion Factor in the Cash Balance Account?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 31,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Annuity Conversion Method in the Cash Balance Account?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 32,
+      "item_text": "If there are Supplemental Benefits in the plan, What is the eligibility for those?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 33,
+      "item_text": "If there are Supplemental Benefits in the plan, What is the amount?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 34,
+      "item_text": "If there are Supplemental Benefits in the plan, What is the Duration?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 35,
+      "item_text": "What is the Normal Single Form of benefit as defined in the plan?",
+      "status": "value",
+      "answer": "Life Annuity For Deferred Vested Or Unmarried Participants; Married Normal Or Early Retirees Default To 50% Joint And Survivor Pension.",
+      "citation_note": "(§6.1; pdf p18)",
+      "references": [
+        {
+          "section": "§6.1",
+          "page_pdf": 18,
+          "page_printed": "",
+          "excerpt": "If... Married For At Least One Year... Pension Shall Be Paid In The Form Of A 50% Joint And Survivor Pension."
+        }
+      ]
+    },
+    {
+      "item_id": 36,
+      "item_text": "What is the Normal Married Form of benefit as defined in the plan?",
+      "status": "value",
+      "answer": "50% Joint And Survivor Pension For Participant Married At Least One Year At Commencement And Entitled To Normal Or Early Retirement At Or After Age 60.",
+      "citation_note": "(§6.1; pdf p18)",
+      "references": [
+        {
+          "section": "§6.1",
+          "page_pdf": 18,
+          "page_printed": "",
+          "excerpt": "Paid In The Form Of A 50% Joint And Survivor Pension."
+        }
+      ]
+    },
+    {
+      "item_id": 37,
+      "item_text": "What is the Basis for Form Conversion Factors as defined in the plan?",
+      "status": "value",
+      "answer": "Optional Forms Are Actuarial Equivalent Based On Committee-Approved Assumptions.",
+      "citation_note": "(§2.1(o); pdf p5)",
+      "references": [
+        {
+          "section": "§2.1(o)",
+          "page_pdf": 5,
+          "page_printed": "",
+          "excerpt": "Actuarial Equivalent... Based On Actuarial Assumptions Approved From Time To Time By The Committee."
+        }
+      ]
+    },
+    {
+      "item_id": 38,
+      "item_text": "How the plan calculates the Early Retirement Adjustment?",
+      "status": "value",
+      "answer": "Reduced By 1/15 For Each Year Early Before Normal Retirement Date, With Pro Rata Reduction For Fractional Years.",
+      "citation_note": "(§5.2; pdf p13)",
+      "references": [
+        {
+          "section": "§5.2",
+          "page_pdf": 13,
+          "page_printed": "",
+          "excerpt": "Reduced By 1/15th For Each Year That The Commencement Date... Precedes The Participant's Normal Retirement Date."
+        }
+      ]
+    },
+    {
+      "item_id": 39,
+      "item_text": "How the plan calculates the Late Retirement Adjustment?",
+      "status": "value",
+      "answer": "No Payments During Continued Employment After Age 65; Prior Payments On Reemployment Before Normal Retirement Date Offset On An Actuarial Equivalent Basis.",
+      "citation_note": "(§6.5 / §6.6; pdf p23)",
+      "references": [
+        {
+          "section": "§6.5 / §6.6",
+          "page_pdf": 23,
+          "page_printed": "",
+          "excerpt": "No Pension Payments Shall Be Made During The Period Of Continued Employment."
+        }
+      ]
+    },
+    {
+      "item_id": 40,
+      "item_text": "What are, if any, the Suspension of Benefit Provisions?",
+      "status": "value",
+      "answer": "No Pension Payments During Employment After Age 65 Or Reemployment Before Normal Retirement Date.",
+      "citation_note": "(§6.5 / §6.6; pdf p23)",
+      "references": [
+        {
+          "section": "§6.5 / §6.6",
+          "page_pdf": 23,
+          "page_printed": "",
+          "excerpt": "If A Participant Continues In The Employer's Employ After He Attains Age 65, No Pension Payments Shall Be Made."
+        }
+      ]
+    },
+    {
+      "item_id": 41,
+      "item_text": "What are, if any, the Disability Benefit Provisions?",
+      "status": "value",
+      "answer": "N/A; No Disability Benefits.",
+      "citation_note": "(§4.4; pdf p12)",
+      "references": [
+        {
+          "section": "§4.4",
+          "page_pdf": 12,
+          "page_printed": "",
+          "excerpt": "There Shall Be No Disability Benefits Under The Plan."
+        }
+      ]
+    },
+    {
+      "item_id": 42,
+      "item_text": "What are, if any, the Pre-Retirement Death Benefits?",
+      "status": "value",
+      "answer": "Pre-Retirement 50% Joint And Survivor Coverage For Eligible Spouse If Participant Dies Before Retirement And Normal Retirement Date After Coverage Effective Date.",
+      "citation_note": "(§6.2; pdf p19)",
+      "references": [
+        {
+          "section": "§6.2",
+          "page_pdf": 19,
+          "page_printed": "",
+          "excerpt": "If He Dies Prior To Retirement And Prior To His Normal Retirement Date But After The Coverage Effective Date, His Eligible Spouse Will Be Entitled To Receive A Pension."
+        }
+      ]
+    },
+    {
+      "item_id": 43,
+      "item_text": "What are, if any, the Post-Retirement Death Benefits?",
+      "status": "value",
+      "answer": "Post-Retirement Death Benefits Follow The Elected Form; 50% Joint And Survivor, Period Certain And Life, Or Contingent Annuitant Options May Continue Payments.",
+      "citation_note": "(§6.1 / §6.3; pdf p18)",
+      "references": [
+        {
+          "section": "§6.1 / §6.3",
+          "page_pdf": 18,
+          "page_printed": "",
+          "excerpt": "Eligible Spouse... Lifetime Survivorship Pension... Equal To 50% Of The Reduced Monthly Amount."
+        }
+      ]
+    },
+    {
+      "item_id": 44,
+      "item_text": "What is the Vesting Schedule included in the Provisions for Deferred Participants?",
+      "status": "value",
+      "answer": "5 Years 25%, 6 30%, 7 35%, 8 40%, 9 45%, 10 50%, 11 60%, 12 70%, 13 80%, 14 90%, 15 Or More 100%.",
+      "citation_note": "(§5.3; pdf p14)",
+      "references": [
+        {
+          "section": "§5.3",
+          "page_pdf": 14,
+          "page_printed": "",
+          "excerpt": "Vested Percentage... 5 25%, 6 30%, 7 35%, 8 40%, 9 45%, 10 50%, 11 60%, 12 70%, 13 80%, 14 90%, 15 100%."
+        }
+      ]
+    },
+    {
+      "item_id": 45,
+      "item_text": "What is the Cash-out Provisions included in the Provisions for Deferred Participants?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 46,
+      "item_text": "What is the One-Year Break In Service included in the Provisions for Deferred Participants?",
+      "status": "value",
+      "answer": "One-Year Break In Service Means A Plan Year With Not More Than 500 Hours Of Service; Nonvested Pre-Break Service May Be Disregarded If Consecutive Breaks Equal Or Exceed Prior Service.",
+      "citation_note": "(§3.3; pdf p9)",
+      "references": [
+        {
+          "section": "§3.3",
+          "page_pdf": 9,
+          "page_printed": "",
+          "excerpt": "One-Year Break In Service Means A Plan Year During Which The Participant Has Not Completed More Than 500 Hours Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 47,
+      "item_text": "What are the Transfer Provisions defined in the plan?",
+      "status": "value",
+      "answer": "Plan Merger Or Asset Transfer Requires Each Participant To Receive A Benefit At Least Equal To The Pre-Transfer Benefit, Authorized Resolutions, And Qualified Receiving Plan And Trust.",
+      "citation_note": "(§11.2; pdf p38)",
+      "references": [
+        {
+          "section": "§11.2",
+          "page_pdf": 38,
+          "page_printed": "",
+          "excerpt": "Assets... Shall Be Transferred... Only If Each Participant Would... Receive A Benefit... Equal To Or Greater Than... Before The Merger."
+        }
+      ]
+    },
+    {
+      "item_id": 48,
+      "item_text": "If the plan has Mandatory Employee Contributions (EEC), How the plan defines its Contributions?",
+      "status": "value",
+      "answer": "No Participant Contributions Are Required Or Permitted.",
+      "citation_note": "(§7.1; pdf p25)",
+      "references": [
+        {
+          "section": "§7.1",
+          "page_pdf": 25,
+          "page_printed": "",
+          "excerpt": "No Contributions Shall Be Required Or Permitted Under The Plan From Any Participant."
+        }
+      ]
+    },
+    {
+      "item_id": 49,
+      "item_text": "If the plan has Mandatory Employee Contributions (EEC), How the plan defines its Interest?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 50,
+      "item_text": "If the plan has Mandatory Employee Contributions (EEC), What provisions are in place  If EEC Withdrawn?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 51,
+      "item_text": "What are the Voluntary Provisions defined in the plan, if any?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 52,
+      "item_text": "Was the plan Top-Heavy?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 53,
+      "item_text": "Top-Heavy Minimum Benefit applies to key employees in addition to non-key employees?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 54,
+      "item_text": "How plan defines Top-Heavy Service?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 55,
+      "item_text": "How plan defines Top-Heavy Average Compensation?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 56,
+      "item_text": "How plan defines Top-Heavy Minimum Benefit Formula?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 57,
+      "item_text": "How plan defines Top-Heavy Vesting?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 58,
+      "item_text": "How plan defines Default Actuarial Equivalence?",
+      "status": "value",
+      "answer": "Equality In Value Of Aggregate Amounts Expected Under Different Forms Of Payment Based On Committee-Approved Actuarial Assumptions.",
+      "citation_note": "(§2.1(o); pdf p5)",
+      "references": [
+        {
+          "section": "§2.1(o)",
+          "page_pdf": 5,
+          "page_printed": "",
+          "excerpt": "Actuarial Equivalent... Equality In Value... Based On Actuarial Assumptions Approved From Time To Time By The Committee."
+        }
+      ]
+    },
+    {
+      "item_id": 59,
+      "item_text": "How plan defines Consensual Lump Sum Provisions?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 60,
+      "item_text": "Are there any Additional Provisions of Note?",
+      "status": "value",
+      "answer": "Benefit Limits For 25 Highest-Paid Employees Apply If Anticipated Annual Pension Exceeds $1,500 And Certain Termination Or Funding Conditions Occur.",
+      "citation_note": "(Article 12; pdf p40)",
+      "references": [
+        {
+          "section": "Article 12",
+          "page_pdf": 40,
+          "page_printed": "",
+          "excerpt": "Restrictions On Benefits Payable To Highly Compensated Participants."
+        }
+      ]
+    },
+    {
+      "item_id": 61,
+      "item_text": "What are the Names Of Majority Owners, if any?",
+      "status": "na",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    }
+  ]
+}
