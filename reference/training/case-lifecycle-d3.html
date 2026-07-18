@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Life Cycle of a Case – D3.js</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+```
+body {
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: #f4f6f9;
+  color: #222;
+}
+
+header {
+  background: #1e2a3a;
+  color: #fff;
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+header h1 { font-size: 1.3rem; font-weight: 600; }
+header span { font-size: 0.85rem; opacity: .6; }
+
+#legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 12px 32px;
+  background: #fff;
+  border-bottom: 1px solid #dde3ec;
+}
+.leg { display: flex; align-items: center; gap: 6px; font-size: .78rem; }
+.leg-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+#chart {
+  overflow: auto;
+  padding: 24px 32px 40px;
+}
+
+/* ── SVG elements ── */
+.node rect {
+  rx: 8;
+  ry: 8;
+  stroke-width: 2;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.12));
+  transition: opacity .15s;
+}
+.node rect:hover { opacity: .85; cursor: default; }
+
+.node text {
+  font-size: 11.5px;
+  fill: #111;
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.group-label {
+  font-size: 12px;
+  font-weight: 700;
+  fill: #555;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.link {
+  fill: none;
+  stroke: #7a8ea8;
+  stroke-width: 1.8;
+  marker-end: url(#arrow);
+}
+.link.dashed {
+  stroke-dasharray: 6 4;
+  stroke: #aab8c8;
+}
+
+.group-bg {
+  rx: 12;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-dasharray: 5 3;
+}
+```
+
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Life Cycle of a Case</h1>
+    <span>Workflow diagram – D3.js v7</span>
+  </div>
+</header>
+
+<div id="legend">
+  <div class="leg"><div class="leg-dot" style="background:#f9c4c4;border:2px solid #c0392b"></div> Upfront Work</div>
+  <div class="leg"><div class="leg-dot" style="background:#c4def9;border:2px solid #2980b9"></div> Data</div>
+  <div class="leg"><div class="leg-dot" style="background:#c4f9ca;border:2px solid #27ae60"></div> Actuarial Work</div>
+  <div class="leg"><div class="leg-dot" style="background:#f9eac4;border:2px solid #e67e22"></div> Reviews</div>
+  <div class="leg"><div class="leg-dot" style="background:#e4c4f9;border:2px solid #8e44ad"></div> Closeout</div>
+</div>
+
+<div id="chart"></div>
+
+<script>
+/* ── palette ─────────────────────────────────────────────────────────────── */
+const PHASE = {
+  upfront:   { fill: "#fde8e8", stroke: "#c0392b" },
+  data:      { fill: "#e8f4fd", stroke: "#2980b9" },
+  actuarial: { fill: "#eafde8", stroke: "#27ae60" },
+  review:    { fill: "#fdf6e8", stroke: "#e67e22" },
+  closeout:  { fill: "#f0e8fd", stroke: "#8e44ad" },
+};
+
+/* ── node data  (cx, cy = centre; w, h = box size) ─────────────────────── */
+const NW = 150, NH = 52;   // default node width / height
+
+const nodes = [
+  // Upfront Work
+  { id:"planSum",   label:"Plan\nSummary",                       phase:"upfront",   x:260, y:80,  w:130, h:NH },
+  { id:"planCheck", label:"Plan Checklist from\nAuditor Report", phase:"upfront",   x:620, y:50,  w:180, h:NH },
+  { id:"del",       label:"DEL\n(data elements listing)",        phase:"upfront",   x:500, y:150, w:NW,  h:NH },
+  { id:"ebams",     label:"EBAMs\nin ATM",                       phase:"upfront",   x:760, y:150, w:130, h:NH },
+  { id:"ebamsNote", label:"• Adjustments\n• Administration\n• Preliminary 406", phase:"upfront", x:960, y:150, w:160, h:68 },
+
+  // Data
+  { id:"leo",       label:"LEO / Database",                      phase:"data",      x:500, y:270, w:NW,  h:NH },
+
+  // Actuarial Work
+  { id:"excelVal",  label:"Excel\nValuation",                    phase:"actuarial", x:280, y:390, w:130, h:NH },
+  { id:"stmts",     label:"Draft Statement\nRecalc / CSRS\nStatement Recalc", phase:"actuarial", x:500, y:390, w:NW, h:68 },
+  { id:"drs",       label:"DRS\nListings",                       phase:"actuarial", x:720, y:390, w:130, h:NH },
+  { id:"caseMemo",  label:"Case Memo being written\nduring this time", phase:"actuarial", x:500, y:490, w:220, h:NH },
+
+  // Reviews
+  { id:"blueBook",  label:"Put Together\nBlue Book",             phase:"review",    x:500, y:600, w:NW,  h:NH },
+  { id:"gs13",      label:"GS-13 Review",                        phase:"review",    x:500, y:690, w:NW,  h:NH },
+  { id:"david",     label:"David's Review",                      phase:"review",    x:500, y:780, w:NW,  h:NH },
+  { id:"gs14",      label:"GS-14 Review",                        phase:"review",    x:500, y:870, w:NW,  h:NH },
+  { id:"jarrod",    label:"Jarrod's Review",                      phase:"review",    x:500, y:960, w:NW,  h:NH },
+
+  // Closeout
+  { id:"closeout",  label:"Software Closeout\nin Archile",       phase:"closeout",  x:760, y:960, w:NW,  h:NH },
+];
+
+const edges = [
+  { s:"planSum",   t:"del" },
+  { s:"planCheck", t:"del" },
+  { s:"del",       t:"ebams" },
+  { s:"ebams",     t:"ebamsNote", dashed: true },
+  { s:"del",       t:"leo" },
+  { s:"leo",       t:"stmts" },
+  { s:"excelVal",  t:"stmts" },
+  { s:"stmts",     t:"drs" },
+  { s:"excelVal",  t:"caseMemo", dashed: true },
+  { s:"drs",       t:"blueBook" },
+  { s:"caseMemo",  t:"blueBook" },
+  { s:"blueBook",  t:"gs13" },
+  { s:"gs13",      t:"david" },
+  { s:"david",     t:"gs14" },
+  { s:"gs14",      t:"jarrod" },
+  { s:"jarrod",    t:"closeout" },
+];
+
+/* ── build index ─────────────────────────────────────────────────────────── */
+const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+/* ── SVG canvas ─────────────────────────────────────────────────────────── */
+const W = 1160, H = 1060;
+
+const svg = d3.select("#chart")
+  .append("svg")
+  .attr("viewBox", `0 0 ${W} ${H}`)
+  .attr("width",  W)
+  .attr("height", H);
+
+/* arrowhead marker */
+svg.append("defs").append("marker")
+  .attr("id","arrow")
+  .attr("viewBox","0 -5 10 10")
+  .attr("refX", 9)
+  .attr("markerWidth", 7)
+  .attr("markerHeight", 7)
+  .attr("orient","auto")
+  .append("path")
+    .attr("d","M0,-5L10,0L0,5")
+    .attr("fill","#7a8ea8");
+
+/* ── group background bands ──────────────────────────────────────────────── */
+const groups = [
+  { label:"Upfront Work",  phase:"upfront",   ids:["planSum","planCheck","del","ebams","ebamsNote"], pad:20 },
+  { label:"Data",          phase:"data",      ids:["leo"],                                            pad:20 },
+  { label:"Actuarial Work",phase:"actuarial", ids:["excelVal","stmts","drs","caseMemo"],              pad:20 },
+  { label:"Reviews",       phase:"review",    ids:["blueBook","gs13","david","gs14","jarrod"],        pad:20 },
+  { label:"Closeout",      phase:"closeout",  ids:["closeout"],                                       pad:20 },
+];
+
+groups.forEach(g => {
+  const ns = g.ids.map(id => byId[id]);
+  const x1 = d3.min(ns, n => n.x - n.w/2) - g.pad;
+  const y1 = d3.min(ns, n => n.y - n.h/2) - g.pad - 14;
+  const x2 = d3.max(ns, n => n.x + n.w/2) + g.pad;
+  const y2 = d3.max(ns, n => n.y + n.h/2) + g.pad;
+
+  svg.append("rect")
+    .attr("class","group-bg")
+    .attr("x", x1).attr("y", y1)
+    .attr("width",  x2 - x1)
+    .attr("height", y2 - y1)
+    .attr("stroke", PHASE[g.phase].stroke)
+    .attr("fill",   PHASE[g.phase].fill)
+    .attr("opacity", .35);
+
+  svg.append("text")
+    .attr("class","group-label")
+    .attr("x", x1 + 10)
+    .attr("y", y1 + 12)
+    .attr("fill", PHASE[g.phase].stroke)
+    .text(g.label);
+});
+
+/* ── edges ───────────────────────────────────────────────────────────────── */
+function portPoint(n, other) {
+  /* pick top/bottom/left/right exit point closest to target */
+  const dx = other.x - n.x, dy = other.y - n.y;
+  if (Math.abs(dy) >= Math.abs(dx)) {
+    return dy > 0
+      ? [n.x, n.y + n.h/2]
+      : [n.x, n.y - n.h/2];
+  } else {
+    return dx > 0
+      ? [n.x + n.w/2, n.y]
+      : [n.x - n.w/2, n.y];
+  }
+}
+
+edges.forEach(e => {
+  const s = byId[e.s], t = byId[e.t];
+  const [sx, sy] = portPoint(s, t);
+  const [tx, ty] = portPoint(t, s);
+
+  /* Shorten end point so arrow tip sits on node border, not inside */
+  const dx = tx - sx, dy = ty - sy;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  const ex = tx - (dx/len)*2, ey = ty - (dy/len)*2;
+
+  const path = d3.linkVertical()({
+    source: [sx, sy],
+    target: [ex, ey],
+  });
+
+  svg.append("path")
+    .attr("class", "link" + (e.dashed ? " dashed" : ""))
+    .attr("d", `M${sx},${sy} C${sx},${(sy+ey)/2} ${ex},${(sy+ey)/2} ${ex},${ey}`);
+});
+
+/* ── nodes ───────────────────────────────────────────────────────────────── */
+const nodeG = svg.selectAll(".node")
+  .data(nodes)
+  .join("g")
+  .attr("class","node")
+  .attr("transform", d => `translate(${d.x - d.w/2},${d.y - d.h/2})`);
+
+nodeG.append("rect")
+  .attr("width",  d => d.w)
+  .attr("height", d => d.h)
+  .attr("rx", 8)
+  .attr("fill",   d => PHASE[d.phase].fill)
+  .attr("stroke", d => PHASE[d.phase].stroke)
+  .attr("stroke-width", 2)
+  .style("filter","drop-shadow(0 2px 4px rgba(0,0,0,.12))");
+
+/* multi-line text via tspan */
+nodeG.each(function(d) {
+  const lines = d.label.split("\n");
+  const g = d3.select(this);
+  const lineH = 14;
+  const startY = d.h/2 - ((lines.length - 1) * lineH) / 2;
+  lines.forEach((line, i) => {
+    g.append("text")
+      .attr("x", d.w / 2)
+      .attr("y", startY + i * lineH)
+      .attr("font-size", lines.length > 2 ? "10.5px" : "11.5px")
+      .attr("text-anchor","middle")
+      .attr("dominant-baseline","central")
+      .attr("fill","#111")
+      .attr("pointer-events","none")
+      .text(line);
+  });
+});
+</script>
+
+</body>
+</html>

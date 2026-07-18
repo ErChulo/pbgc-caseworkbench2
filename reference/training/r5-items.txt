@@ -1,0 +1,61 @@
+1) What is the Adoption Date of the document?
+2) What is the Plan Anniversary?
+3) What are the groups of employees covered under the plan?
+4) What are the participation eligibility requirements in the plan?
+5) What is the participation date after attainment of eligibility in the plan?
+6) What is the Age/Service retirement eligibility for normal retirement in the plan?
+7) What is the Start Date for normal retirement in the plan?
+8) What is the Age/Service retirement eligibility for Early Unreduced benefit retirement in the plan?
+9) What is the Age/Service retirement eligibility for Early Reduced benefit retirement in the plan?
+10) What is the Start Date for early retirement in the plan?
+11) For Deferred vested, not eligible to retire as of date of termination, what is the Age/Service retirement eligibility for normal retirement in the plan?
+12) For Deferred vested, not eligible to retire as of date of termination, what is the Age/Service retirement eligibility for early retirement in the plan?
+13) What is the retirement eligibility for late retirement in the plan?
+14) What is the eligibility requirement for disability under the plan?
+15) How the plan defines Eligibility/Participation service?
+16) How the plan defines vesting service?
+17) How the plan defines benefit service?
+18) Does the plan defines other type of service besides eligibility/participation, vesting and benefit service?
+19) What is the accrued benefit formula under the plan?
+20) What is the Accrual factor in the accrued benefit formula?
+21) What is the Short service factor in the accrued benefit formula?
+22) What compensation is used in the accrued benefit formula?
+23) How the plan defines average compensation to use in the accrued benefit formula?
+24) What is the Covered Compensation for Integrated Plans?
+25) What is the Primary Insurance Amount (PIA) Offset in the plan?
+26) If the plan is a Cash-Balance plan, What is the Initial Account Balance in the plan?
+27) If the plan is a Cash-Balance plan, How the the plan defines Benefit Credit in the Cash Balance Account?
+28) If the plan is a Cash-Balance plan, How the the plan defines Interest Credit in the Cash Balance Account?
+29) If the plan is a Cash-Balance plan, What is the Timing of Interest Credit in the Cash Balance Account?
+30) If the plan is a Cash-Balance plan, What is the Annuity Conversion Factor in the Cash Balance Account?
+31) If the plan is a Cash-Balance plan, What is the Annuity Conversion Method in the Cash Balance Account?
+32) If there are Supplemental Benefits in the plan, What is the eligibility for those?
+33) If there are Supplemental Benefits in the plan, What is the amount?
+34) If there are Supplemental Benefits in the plan, What is the Duration?
+35) What is the Normal Single Form of benefit as defined in the plan?
+36) What is the Normal Married Form of benefit as defined in the plan?
+37) What is the Basis for Form Conversion Factors as defined in the plan?
+38) How the plan calculates the Early Retirement Adjustment?
+39) How the plan calculates the Late Retirement Adjustment?
+40) What are, if any, the Suspension of Benefit Provisions?
+41) What are, if any, the Disability Benefit Provisions?
+42) What are, if any, the Pre-Retirement Death Benefits?
+43) What are, if any, the Post-Retirement Death Benefits?
+44) What is the Vesting Schedule included in the Provisions for Deferred Participants?
+45) What is the Cash-out Provisions included in the Provisions for Deferred Participants?
+46) What is the One-Year Break In Service included in the Provisions for Deferred Participants?
+47) What are the Transfer Provisions defined in the plan?
+48) If the plan has Mandatory Employee Contributions (EEC), How the plan defines its Contributions?
+49) If the plan has Mandatory Employee Contributions (EEC), How the plan defines its Interest?
+50) If the plan has Mandatory Employee Contributions (EEC), What provisions are in place  If EEC Withdrawn?
+51) What are the Voluntary Provisions defined in the plan, if any?
+52) Was the plan Top-Heavy?
+53) Top-Heavy Minimum Benefit applies to key employees in addition to non-key employees?
+54) How plan defines Top-Heavy Service?
+55) How plan defines Top-Heavy Average Compensation?
+56) How plan defines Top-Heavy Minimum Benefit Formula?
+57) How plan defines Top-Heavy Vesting?
+58) How plan defines Default Actuarial Equivalence?
+59) How plan defines Consensual Lump Sum Provisions?
+60) Are there any Additional Provisions of Note?
+61) What are the Names Of Majority Owners, if any?

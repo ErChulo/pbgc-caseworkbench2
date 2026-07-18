@@ -1,0 +1,577 @@
+{
+  "document": {
+    "doc_id": "1978 Plan Amendment",
+    "file_name": "1978 Plan Amendment -- Second Amendment.pdf",
+    "source_type": "plan_amendment",
+    "scrape_basis": "R5_Scrape_Prompt_v2.txt",
+    "item_list": "r5-items.txt",
+    "rules": "plan-summary-rules.txt"
+  },
+  "items": [
+    {
+      "item_id": 1,
+      "item_text": "What is the Adoption Date of the document?",
+      "status": "value",
+      "answer": "First Amendment Executed October 13, 1978; Second Amendment Effective January 1, 1978 And Executed November 6, 1979.",
+      "citation_note": "(Recitals / Certification; pdf p1)",
+      "references": [
+        {
+          "section": "Recitals / Certification",
+          "page_pdf": 1,
+          "page_printed": "",
+          "excerpt": "Original Instrument July 1, 1978; First Amendment October 13, 1978."
+        }
+      ]
+    },
+    {
+      "item_id": 2,
+      "item_text": "What is the Plan Anniversary?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 3,
+      "item_text": "What are the groups of employees covered under the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 4,
+      "item_text": "What are the participation eligibility requirements in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 5,
+      "item_text": "What is the participation date after attainment of eligibility in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 6,
+      "item_text": "What is the Age/Service retirement eligibility for normal retirement in the plan?",
+      "status": "value",
+      "answer": "Normal Retirement Date Changed To Participant's 65th Birthday.",
+      "citation_note": "(§2.1(t); pdf p11)",
+      "references": [
+        {
+          "section": "§2.1(t)",
+          "page_pdf": 11,
+          "page_printed": "",
+          "excerpt": "Normal Retirement Date: The Participant's 65th Birthday."
+        }
+      ]
+    },
+    {
+      "item_id": 7,
+      "item_text": "What is the Start Date for normal retirement in the plan?",
+      "status": "value",
+      "answer": "Pension Payments Commence First Day Of Calendar Month Coincident With Or Next Following Participant's 65th Birthday.",
+      "citation_note": "(§2.1(t); pdf p11)",
+      "references": [
+        {
+          "section": "§2.1(t)",
+          "page_pdf": 11,
+          "page_printed": "",
+          "excerpt": "Pension Payments Shall Commence On The First Day Of The Calendar Month Coincident With Or Next Following Participant's 65th Birthday."
+        }
+      ]
+    },
+    {
+      "item_id": 8,
+      "item_text": "What is the Age/Service retirement eligibility for Early Unreduced benefit retirement in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 9,
+      "item_text": "What is the Age/Service retirement eligibility for Early Reduced benefit retirement in the plan?",
+      "status": "value",
+      "answer": "Early Retirement Remains Age 60 And 10 Years Of Service.",
+      "citation_note": "(Article 4.2; pdf p13)",
+      "references": [
+        {
+          "section": "Article 4.2",
+          "page_pdf": 13,
+          "page_printed": "",
+          "excerpt": "Employment Is Terminated On Or After His 60th Birthday And After He Has Completed 10 Or More Years Of Service."
+        }
+      ]
+    },
+    {
+      "item_id": 10,
+      "item_text": "What is the Start Date for early retirement in the plan?",
+      "status": "value",
+      "answer": "Early Retirement Commences At Normal Retirement Date Or Earlier Requested First Day Of Month Before Normal Retirement Date, Reduced As Provided.",
+      "citation_note": "(Article 4.2; pdf p13)",
+      "references": [
+        {
+          "section": "Article 4.2",
+          "page_pdf": 13,
+          "page_printed": "",
+          "excerpt": "Pension Shall Commence As Of The Beginning Of The Month So Requested, But The Amount Thereof Shall Be Reduced."
+        }
+      ]
+    },
+    {
+      "item_id": 11,
+      "item_text": "For Deferred vested, not eligible to retire as of date of termination, what is the Age/Service retirement eligibility for normal retirement in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 12,
+      "item_text": "For Deferred vested, not eligible to retire as of date of termination, what is the Age/Service retirement eligibility for early retirement in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 13,
+      "item_text": "What is the retirement eligibility for late retirement in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 14,
+      "item_text": "What is the eligibility requirement for disability under the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 15,
+      "item_text": "How the plan defines Eligibility/Participation service?",
+      "status": "value",
+      "answer": "Hour Of Service Restated To Include Paid Duty Hours, Paid Non-Duty Hours Under Department Of Labor Regulation 2530.200b-2(c), And Back Pay Hours.",
+      "citation_note": "(§2.1(k); pdf p9)",
+      "references": [
+        {
+          "section": "§2.1(k)",
+          "page_pdf": 9,
+          "page_printed": "",
+          "excerpt": "Each Employee Will Be Credited With An Hour Of Service For..."
+        }
+      ]
+    },
+    {
+      "item_id": 16,
+      "item_text": "How the plan defines vesting service?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 17,
+      "item_text": "How the plan defines benefit service?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 18,
+      "item_text": "Does the plan defines other type of service besides eligibility/participation, vesting and benefit service?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 19,
+      "item_text": "What is the accrued benefit formula under the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 20,
+      "item_text": "What is the Accrual factor in the accrued benefit formula?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 21,
+      "item_text": "What is the Short service factor in the accrued benefit formula?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 22,
+      "item_text": "What compensation is used in the accrued benefit formula?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 23,
+      "item_text": "How the plan defines average compensation to use in the accrued benefit formula?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 24,
+      "item_text": "What is the Covered Compensation for Integrated Plans?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 25,
+      "item_text": "What is the Primary Insurance Amount (PIA) Offset in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 26,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Initial Account Balance in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 27,
+      "item_text": "If the plan is a Cash-Balance plan, How the the plan defines Benefit Credit in the Cash Balance Account?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 28,
+      "item_text": "If the plan is a Cash-Balance plan, How the the plan defines Interest Credit in the Cash Balance Account?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 29,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Timing of Interest Credit in the Cash Balance Account?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 30,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Annuity Conversion Factor in the Cash Balance Account?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 31,
+      "item_text": "If the plan is a Cash-Balance plan, What is the Annuity Conversion Method in the Cash Balance Account?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 32,
+      "item_text": "If there are Supplemental Benefits in the plan, What is the eligibility for those?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 33,
+      "item_text": "If there are Supplemental Benefits in the plan, What is the amount?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 34,
+      "item_text": "If there are Supplemental Benefits in the plan, What is the Duration?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 35,
+      "item_text": "What is the Normal Single Form of benefit as defined in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 36,
+      "item_text": "What is the Normal Married Form of benefit as defined in the plan?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 37,
+      "item_text": "What is the Basis for Form Conversion Factors as defined in the plan?",
+      "status": "value",
+      "answer": "Actuarial Equivalent Changed To 1971 Group Annuity Mortality Table Plus 5% Interest.",
+      "citation_note": "(§2.1(o); pdf p10)",
+      "references": [
+        {
+          "section": "§2.1(o)",
+          "page_pdf": 10,
+          "page_printed": "",
+          "excerpt": "Based On The 1971 Group Annuity Mortality Table Plus 5% Interest."
+        }
+      ]
+    },
+    {
+      "item_id": 38,
+      "item_text": "How the plan calculates the Early Retirement Adjustment?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 39,
+      "item_text": "How the plan calculates the Late Retirement Adjustment?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 40,
+      "item_text": "What are, if any, the Suspension of Benefit Provisions?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 41,
+      "item_text": "What are, if any, the Disability Benefit Provisions?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 42,
+      "item_text": "What are, if any, the Pre-Retirement Death Benefits?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 43,
+      "item_text": "What are, if any, the Post-Retirement Death Benefits?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 44,
+      "item_text": "What is the Vesting Schedule included in the Provisions for Deferred Participants?",
+      "status": "value",
+      "answer": "Deferred Vested Schedule Restated: 5 Years 25%, 6 30%, 7 35%, 8 40%, 9 45%, 10 50%, 11 60%, 12 70%, 13 80%, 14 90%, 15 100%.",
+      "citation_note": "(§5.3; pdf p14)",
+      "references": [
+        {
+          "section": "§5.3",
+          "page_pdf": 14,
+          "page_printed": "",
+          "excerpt": "Vested Percentage... 5 25% ... 15 100%."
+        }
+      ]
+    },
+    {
+      "item_id": 45,
+      "item_text": "What is the Cash-out Provisions included in the Provisions for Deferred Participants?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 46,
+      "item_text": "What is the One-Year Break In Service included in the Provisions for Deferred Participants?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 47,
+      "item_text": "What are the Transfer Provisions defined in the plan?",
+      "status": "value",
+      "answer": "Upon Termination, Accrued Benefits Become Fully Vested To The Extent Funded And Guaranteed By PBGC, With ERISA Priority Categories For Asset Allocation.",
+      "citation_note": "(Article 13.3; pdf p18)",
+      "references": [
+        {
+          "section": "Article 13.3",
+          "page_pdf": 18,
+          "page_printed": "",
+          "excerpt": "Each Such Participant's Accrued Benefit... Shall Become Fully Vested And Nonforfeitable To The Extent Funded And Guaranteed By The Pension Benefit Guaranty Corporation."
+        }
+      ]
+    },
+    {
+      "item_id": 48,
+      "item_text": "If the plan has Mandatory Employee Contributions (EEC), How the plan defines its Contributions?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 49,
+      "item_text": "If the plan has Mandatory Employee Contributions (EEC), How the plan defines its Interest?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 50,
+      "item_text": "If the plan has Mandatory Employee Contributions (EEC), What provisions are in place  If EEC Withdrawn?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 51,
+      "item_text": "What are the Voluntary Provisions defined in the plan, if any?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 52,
+      "item_text": "Was the plan Top-Heavy?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 53,
+      "item_text": "Top-Heavy Minimum Benefit applies to key employees in addition to non-key employees?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 54,
+      "item_text": "How plan defines Top-Heavy Service?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 55,
+      "item_text": "How plan defines Top-Heavy Average Compensation?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 56,
+      "item_text": "How plan defines Top-Heavy Minimum Benefit Formula?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 57,
+      "item_text": "How plan defines Top-Heavy Vesting?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 58,
+      "item_text": "How plan defines Default Actuarial Equivalence?",
+      "status": "value",
+      "answer": "1971 Group Annuity Mortality Table Plus 5% Interest.",
+      "citation_note": "(§2.1(o); pdf p10)",
+      "references": [
+        {
+          "section": "§2.1(o)",
+          "page_pdf": 10,
+          "page_printed": "",
+          "excerpt": "1971 Group Annuity Mortality Table Plus 5% Interest."
+        }
+      ]
+    },
+    {
+      "item_id": 59,
+      "item_text": "How plan defines Consensual Lump Sum Provisions?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    },
+    {
+      "item_id": 60,
+      "item_text": "Are there any Additional Provisions of Note?",
+      "status": "value",
+      "answer": "First Amendment Added Joint And Survivor Election Notice And Revocation Timing; Second Amendment Restated Normal, Early, Deferred Vested, Optional Forms, And Termination Priority Rules.",
+      "citation_note": "(§6.1 / Article 13.3; pdf p2)",
+      "references": [
+        {
+          "section": "§6.1 / Article 13.3",
+          "page_pdf": 2,
+          "page_printed": "",
+          "excerpt": "Committee... Shall Inform A Participant Of His Or Her Right Of Election Within 180 Days."
+        }
+      ]
+    },
+    {
+      "item_id": 61,
+      "item_text": "What are the Names Of Majority Owners, if any?",
+      "status": "blank",
+      "answer": "N/A",
+      "citation_note": "",
+      "references": []
+    }
+  ]
+}

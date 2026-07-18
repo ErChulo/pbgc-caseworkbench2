@@ -1,0 +1,95 @@
+@startuml Life_Cycle_of_a_Case
+title Life Cycle of a Case
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 13
+skinparam ArrowColor #555555
+skinparam ArrowThickness 1.5
+
+' Define styles for stereotypes
+skinparam rectangle<<upfront>> {
+    BackgroundColor #fde8e8
+    BorderColor #c0392b
+    FontColor #000000
+}
+
+skinparam rectangle<<data>> {
+    BackgroundColor #e8f4fd
+    BorderColor #2980b9
+    FontColor #000000
+}
+
+skinparam rectangle<<actuarial>> {
+    BackgroundColor #eafde8
+    BorderColor #27ae60
+    FontColor #000000
+}
+
+skinparam rectangle<<review>> {
+    BackgroundColor #fdf6e8
+    BorderColor #e67e22
+    FontColor #000000
+}
+
+skinparam rectangle<<closeout>> {
+    BackgroundColor #f0e8fd
+    BorderColor #8e44ad
+    FontColor #000000
+}
+
+' ── Upfront Work ─────────────────────────────────────────────
+package "Upfront Work" {
+    rectangle "Plan\nSummary"                                    <<upfront>> as PlanSummary
+    rectangle "Plan Checklist from Auditor\nReport Documents"   <<upfront>> as PlanChecklist
+    rectangle "DEL\n(data elements listing)"                    <<upfront>> as DEL
+    rectangle "EBAMs in ATM"                                    <<upfront>> as EBAMs
+    note right of EBAMs
+        • Adjustments
+        • Administration
+        • Preliminary 406
+    end note
+}
+
+' ── Data ─────────────────────────────────────────────────────
+package "Data" {
+    rectangle "LEO / Database"  <<data>> as LEO
+}
+
+' ── Actuarial Work ────────────────────────────────────────────
+package "Actuarial Work" {
+    rectangle "Excel\nValuation"                                         <<actuarial>> as ExcelVal
+    rectangle "Draft Statement\nRecalculation Statement\nCSRS Statement\nRecalculation" <<actuarial>> as Statements
+    rectangle "DRS\nListings"                                            <<actuarial>> as DRS
+    rectangle "Case Memo being written during this time"                 <<actuarial>> as CaseMemo
+}
+
+' ── Reviews ───────────────────────────────────────────────────
+package "Reviews" {
+    rectangle "Put Together\nBlue Book"  <<review>> as BlueBook
+    rectangle "GS-13 Review"            <<review>> as GS13
+    rectangle "David's Review"          <<review>> as David
+    rectangle "GS-14 Review"            <<review>> as GS14
+    rectangle "Jarrod's Review"         <<review>> as Jarrod
+}
+
+' ── Closeout ──────────────────────────────────────────────────
+rectangle "Software Closeout\nin Archile"  <<closeout>> as Closeout
+
+' ── Relationships ─────────────────────────────────────────────
+PlanSummary   --> DEL
+PlanChecklist --> DEL
+DEL           --> EBAMs
+DEL           --> LEO
+LEO           --> Statements
+ExcelVal      --> Statements
+Statements    --> DRS
+ExcelVal      .right.> CaseMemo : runs in parallel
+DRS           --> BlueBook
+CaseMemo      --> BlueBook
+BlueBook      --> GS13
+GS13          --> David
+David         --> GS14
+GS14          --> Jarrod
+Jarrod        --> Closeout
+
+@enduml

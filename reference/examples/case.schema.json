@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc.local/schemas/case.schema.json",
+  "title": "CaseInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["caseNumber", "planName", "dateOfPlanTermination", "normalRetirementAge"],
+  "properties": {
+    "caseNumber": {
+      "type": "string",
+      "pattern": "^[0-9]+$"
+    },
+    "planName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dateOfPlanTermination": {
+      "type": "string",
+      "format": "date"
+    },
+    "normalRetirementAge": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 120
+    }
+  }
+}

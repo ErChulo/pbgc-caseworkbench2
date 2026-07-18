@@ -1,0 +1,65 @@
+flowchart TD
+%% ── Upfront Work ──────────────────────────────────────────
+subgraph UW["📋 Upfront Work"]
+    A["Plan\nSummary"]
+    B["Plan Checklist from Auditor\nReport Documents"]
+    C["DEL\n(data elements listing)"]
+    D["EBAMs\nin ATM"]
+    E["• Adjustments\n• Administration\n• Preliminary 406"]
+end
+
+%% ── Data ──────────────────────────────────────────────────
+subgraph DA["🗄️ Data"]
+    F["LEO / Database"]
+end
+
+%% ── Actuarial Work ────────────────────────────────────────
+subgraph AW["📊 Actuarial Work"]
+    G1["Draft Statement\nRecalculation Statement\nCSRS Statement\nRecalculation"]
+    G2["Excel\nValuation"]
+    G3["DRS\nListings"]
+    G4["Case Memo being written during this time"]
+end
+
+%% ── Review ────────────────────────────────────────────────
+subgraph RV["🔍 Reviews"]
+    H["Put Together\nBlue Book"]
+    I["GS-13 Review"]
+    J["David's Review"]
+    K["GS-14 Review"]
+    L["Jarrod's Review"]
+end
+
+%% ── Close ─────────────────────────────────────────────────
+M["Software Closeout\nin Archile"]
+
+%% ── Edges ─────────────────────────────────────────────────
+A --> C
+B --> C
+C --> D
+D --> E
+C --> F
+F --> G1
+G2 --> G1
+G1 --> G3
+G2 -.->|"runs in parallel"| G4
+G3 --> H
+G4 --> H
+H --> I
+I --> J
+J --> K
+K --> L
+L --> M
+
+%% ── Styles ────────────────────────────────────────────────
+classDef upfront  fill:#fde8e8,stroke:#c0392b,color:#000
+classDef data     fill:#e8f4fd,stroke:#2980b9,color:#000
+classDef actuarial fill:#eafde8,stroke:#27ae60,color:#000
+classDef review   fill:#fdf6e8,stroke:#e67e22,color:#000
+classDef closeout fill:#f0e8fd,stroke:#8e44ad,color:#000
+
+class A,B,C,D,E upfront
+class F data
+class G1,G2,G3,G4 actuarial
+class H,I,J,K,L review
+class M closeout

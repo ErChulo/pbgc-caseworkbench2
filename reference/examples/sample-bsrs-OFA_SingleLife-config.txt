@@ -1,0 +1,17 @@
+PrintCriteria	Line	Description	Detail	DescFormat	DtlFormat
+1		"""A:"" & @CHAR(9) & ""Plan's Automatic Form for Unmarried Participant:"""		TL	TH
+1		"@CHAR(9) & @IF(FORM_CODE_NSF = ""2"",""Straight Life Annuity"",@STRING(MTHSNSF / 12, 0) & ""-year Certain-and-Continuous Annuity"")"	XRD_MB_TERM	TL	$2
+1 'HLINE		"""B:"" & @CHAR(9) & ""Plan's Automatic Form for Married Participant:"""	"""Joint life amounts not requested"" 'BOLD"	TL	TL
+1 'HLINE		"""C:"" & @CHAR(9) & ""Straight Life Annuity"""	PBGC_OPT_SLA	TL	$2
+1 'HLINE		"""D:"" & @CHAR(9) & ""Joint-and-50% Survivor Annuity"""	"""Joint life amounts not requested"" 'BOLD"	TL	TL
+1 'HLINE		"""E:"" & @CHAR(9) & ""Joint-and-75% Survivor Annuity"""	"""Joint life amounts not requested"" 'BOLD"	TL	TL
+1 'HLINE		"""F:"" & @CHAR(9) & ""Joint-and-100% Survivor Annuity"""	"""Joint life amounts not requested"" 'BOLD"	TL	TL
+1 'HLINE		"""G:"" & @CHAR(9) & ""Joint-and-50% Survivor 'Pop-up' Annuity"""	"""Joint life amounts not requested"" 'BOLD"	TL	TL
+1		"@CHAR(9) & ""* If the beneficiary dies first, the participant's benefit"""		TL	TH
+1		"@CHAR(9) & ""   increases to the amount in Line C."""		TL	TH
+"PBGC_OPT_5CC <= @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""H:"" & @CHAR(9) & ""5-year Certain-and-Continuous Annuity"""	"""Annuity form not available"" 'BOLD"	TL	TL
+"PBGC_OPT_5CC > @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""H:"" & @CHAR(9) & ""5-year Certain-and-Continuous Annuity"""	PBGC_OPT_5CC	TL	$2
+"PBGC_OPT_10CC <= @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""I:"" & @CHAR(9) & ""10-year Certain-and-Continuous Annuity"""	"""Annuity form not available"" 'BOLD"	TL	TL
+"PBGC_OPT_10CC > @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""I:"" & @CHAR(9) & ""10-year Certain-and-Continuous Annuity"""	PBGC_OPT_10CC	TL	$2
+"PBGC_OPT_15CC <= @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""J:"" & @CHAR(9) & ""15-year Certain-and-Continuous Annuity"""	"""Annuity form not available"" 'BOLD"	TL	TL
+"PBGC_OPT_15CC > @ROUND(.5*PBGC_OPT_SLA,2) 'HLINE"		"""J:"" & @CHAR(9) & ""15-year Certain-and-Continuous Annuity"""	PBGC_OPT_15CC	TL	$2

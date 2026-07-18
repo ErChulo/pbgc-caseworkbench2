@@ -1,0 +1,5 @@
+“I” indicates an input field. Data element is pulled from database upon calculation.
+“O” indicates an output field. Requires a formula and is updated back to the database upon an update in ValTool. Data element is recalculated in Runtime.
+“B” indicates a field that is an output field in ValTool and an input field in Runtime.
+“N” indicates a field that is calculated but not updated back to the database in ValTool. Useful for intermediate steps.
+“P” indicates a field that is an output on the first pass in Runtime and an input on the second pass when a married or non-spouse recalculation is run.
