@@ -54,7 +54,7 @@
 ### Contract and deterministic-core implementation
 
 - [x] T018 Copy all approved schemas without semantic drift into `web/src/contracts/schemas/`, resolve cross-schema references offline, and add a source-to-runtime drift check in `web/tools/validate-contracts.mjs`
-- [ ] T019 Implement versioned Ajv validation with structured blocking and nonblocking results in `web/src/contracts/schema-validator.ts`
+- [x] T019 Implement versioned Ajv validation with structured blocking and nonblocking results in `web/src/contracts/schema-validator.ts`
 - [ ] T020 Implement shared branded IDs, SHA-256, UTC timestamp, decimal-string, result, and exhaustive-state types in `web/src/domain/shared/types.ts`
 - [ ] T021 Implement recursive canonical JSON serialization and deterministic-payload hashing for manifests and acquisition request/package/proposal payloads, applying exact-path registered array rules and an order-significant fallback to every otherwise-unregistered nested array while explicitly excluding all operational metadata, in `web/src/domain/manifests/canonical-json.ts`
 - [ ] T022 Implement append-only audit/review/provenance event validation and JSONL encoding/decoding in `web/src/domain/lineage/audit-log.ts`
