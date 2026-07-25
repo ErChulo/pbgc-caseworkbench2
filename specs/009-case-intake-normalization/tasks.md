@@ -64,7 +64,7 @@
 - [x] T026 Implement the worker pool, bounded queue, cancellation, crash recovery, and deterministic result ordering in `web/src/adapters/workers/worker-pool.ts`
 - [x] T027 Implement the File System Access capability gate and clearly labeled non-production fallback mode in `web/src/adapters/filesystem/capability.ts`
 - [x] T028 Implement the restrictive production CSP and runtime guard that disables network/service-worker paths in `web/index.html` and `web/src/app/security-boundary.ts`
-- [ ] T029 Add foundational tests proving contract validation, canonical serialization, JSONL history, worker cancellation, capability gating, and zero-network guards pass in `web/tests/unit/` and `web/tests/integration/foundation.test.ts`
+- [x] T029 Add foundational tests proving contract validation, canonical serialization, JSONL history, worker cancellation, capability gating, and zero-network guards pass in `web/tests/unit/` and `web/tests/integration/foundation.test.ts`
 
 **Checkpoint**: Shared contracts and deterministic primitives pass without React UI or case-specific defaults, and the production runtime has no usable network adapter.
 
