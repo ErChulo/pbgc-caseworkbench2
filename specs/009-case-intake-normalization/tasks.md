@@ -62,7 +62,7 @@
 - [x] T024 [P] Define structured error, limitation, validation, unresolved-item, and partial-package outcome types in `web/src/domain/shared/outcomes.ts`
 - [x] T025 Define the typed worker request/progress/result/cancellation protocol with transferable chunk support in `web/src/workers/protocol.ts`
 - [x] T026 Implement the worker pool, bounded queue, cancellation, crash recovery, and deterministic result ordering in `web/src/adapters/workers/worker-pool.ts`
-- [ ] T027 Implement the File System Access capability gate and clearly labeled non-production fallback mode in `web/src/adapters/filesystem/capability.ts`
+- [x] T027 Implement the File System Access capability gate and clearly labeled non-production fallback mode in `web/src/adapters/filesystem/capability.ts`
 - [ ] T028 Implement the restrictive production CSP and runtime guard that disables network/service-worker paths in `web/index.html` and `web/src/app/security-boundary.ts`
 - [ ] T029 Add foundational tests proving contract validation, canonical serialization, JSONL history, worker cancellation, capability gating, and zero-network guards pass in `web/tests/unit/` and `web/tests/integration/foundation.test.ts`
 
