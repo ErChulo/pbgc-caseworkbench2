@@ -452,3 +452,111 @@ textarea {
     animation-iteration-count: 1 !important;
   }
 }
+
+.package-panel {
+  margin-top: 1.5rem;
+}
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.25rem;
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--color-primary);
+  border-radius: 0.75rem;
+  background: var(--color-primary-soft);
+  font-weight: 700;
+}
+
+.file-picker input {
+  max-width: 16rem;
+  font: inherit;
+}
+
+.progress-row,
+.package-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 1rem 0;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  background: #eef5ff;
+  color: var(--color-text);
+}
+
+.package-summary code {
+  width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+}
+
+.inventory-table-wrap {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.inventory-table {
+  width: 100%;
+  min-width: 44rem;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.inventory-table caption {
+  padding-bottom: 0.75rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.inventory-table td span,
+.inventory-table td code {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.inventory-table code {
+  max-width: 22rem;
+  overflow-wrap: anywhere;
+  color: var(--color-muted-text);
+  font-size: 0.7rem;
+}
+
+.inventory-status {
+  display: inline-flex !important;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.inventory-status-failed,
+.inventory-status-interrupted {
+  border-color: #a72c2c;
+  color: #8d2020;
+}
+
+@media (max-width: 640px) {
+  .file-picker {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .file-picker input {
+    max-width: 100%;
+  }
+}

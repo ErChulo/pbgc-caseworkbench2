@@ -12,6 +12,11 @@ import {
 } from "../components/case-intake/CaseCreation";
 import { FeasibilityStatus } from "../components/FeasibilityStatus";
 import {
+  PackageIntake,
+  type PackageIntakeResult,
+} from "../components/case-intake/PackageIntake";
+import type { ArtifactInventoryItem } from "../components/inventory/ArtifactInventory";
+import {
   caseIndexEntry,
   type CaseRecord,
   type WorkspaceCatalog,
@@ -25,8 +30,23 @@ import {
   validateCaseIdentifier,
   type CaseIdentifierRule,
 } from "../domain/case/case-identifier";
-import { parseUtcTimestamp, parseUuid } from "../domain/shared/types";
+import {
+  parseUtcTimestamp,
+  parseUuid,
+  type Uuid,
+} from "../domain/shared/types";
 import { canonicalize } from "../domain/manifests/canonical-json";
+import { preserveContent } from "../adapters/filesystem/content-store";
+import {
+  createPackageSnapshot,
+  compareSnapshots,
+} from "../domain/attempts/snapshot";
+import type { PackageSnapshot, SnapshotEntry } from "../domain/attempts/models";
+import { hashChunkReader } from "../workers/hash.worker";
+import type { BrowserWorkspaceError } from "../adapters/filesystem/case-workspace";
+import type { ChunkReaderPort } from "../domain/ports";
+import type { ArtifactRecord, ReceiptRecord } from "../domain/artifacts/models";
+import { reconcileInventory } from "../domain/manifests/reconciliation";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -55,6 +75,11 @@ const dependencies = {
   },
 };
 
+interface InventoryCheckpointReference {
+  readonly attemptId: Uuid;
+  readonly snapshot: PackageSnapshot;
+}
+
 export function App() {
   const workspace = useRef<BrowserDirectoryWorkspace | null>(null);
   const catalog = useRef<WorkspaceCatalog | null>(null);
@@ -67,6 +92,21 @@ export function App() {
   const [view, setView] = useState<CaseCreationView>({ kind: "ready" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeCase, setActiveCase] = useState<CaseRecord | null>(null);
+  const priorSnapshot = useRef<PackageSnapshot | null>(null);
+  const inventoryCheckpoints = useRef(
+    new Map<string, InventoryCheckpointReference>(),
+  );
+  const lastCheckpoint = useRef<InventoryCheckpointReference | null>(null);
+
+  const activateCase = (caseRecord: CaseRecord) => {
+    if (activeCase?.caseId !== caseRecord.caseId) {
+      priorSnapshot.current = null;
+      inventoryCheckpoints.current.clear();
+      lastCheckpoint.current = null;
+    }
+    setActiveCase(caseRecord);
+  };
 
   const selectWorkspace = async (): Promise<void> => {
     setBusy(true);
@@ -159,6 +199,7 @@ export function App() {
         message: "Production case created",
         collisionDecisionRecorded: false,
       });
+      activateCase(result.caseRecord);
     }
     setBusy(false);
   };
@@ -193,6 +234,7 @@ export function App() {
         caseRecord: collision.existingCase,
         message: "Resume decision recorded",
       });
+      activateCase(collision.existingCase);
     } else if (await persistCreatedCase(resolution.value.caseRecord)) {
       setView({
         kind: "created",
@@ -200,6 +242,7 @@ export function App() {
         message: `${purposeLabel(resolution.value.caseRecord)} case created`,
         collisionDecisionRecorded: true,
       });
+      activateCase(resolution.value.caseRecord);
     } else {
       registry.current = new CaseRegistry(dependencies, before);
     }
@@ -293,9 +336,292 @@ export function App() {
             setView({ kind: "ready" });
           }}
         />
+        <PackageIntake
+          enabled={workspaceReady && activeCase !== null}
+          onProcess={processPackage}
+        />
       </main>
     </div>
   );
+
+  async function processPackage(
+    files: readonly File[],
+    signal: AbortSignal,
+    update: (items: readonly ArtifactInventoryItem[]) => void,
+  ): Promise<PackageIntakeResult> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null || activeCase === null) {
+      throw new Error("Controlled workspace is unavailable.");
+    }
+    let items: ArtifactInventoryItem[] = files
+      .map((file, index) => ({
+        id: `${String(index)}:${file.name}`,
+        path: file.webkitRelativePath || file.name,
+        sizeBytes: file.size,
+        sha256: null,
+        status: "queued" as const,
+        message: "Awaiting deterministic hash.",
+      }))
+      .sort((left, right) => left.path.localeCompare(right.path));
+    const fileByItemId = new Map(
+      files.map((file, index) => [`${String(index)}:${file.name}`, file]),
+    );
+    update(items);
+    const entries: SnapshotEntry[] = [];
+    const seenHashes = new Set<string>();
+    let failures = 0;
+    for (const item of items) {
+      if (signal.aborted) {
+        items = items.map((candidate) =>
+          candidate.status === "queued" || candidate.status === "hashing"
+            ? {
+                ...candidate,
+                status: "interrupted",
+                message: "Work stopped at a durable boundary.",
+              }
+            : candidate,
+        );
+        update(items);
+        return {
+          items,
+          snapshotId: null,
+          resumeKind: "first",
+          packageStatus: "interrupted",
+        };
+      }
+      const file = fileByItemId.get(item.id);
+      if (!file) continue;
+      items = replaceItem(items, item.id, {
+        status: "hashing",
+        message: "Reading fixed-size local chunks.",
+      });
+      update(items);
+      const reader = fileReader(file);
+      const hashed = await hashChunkReader(reader, { signal });
+      if (!hashed.ok) {
+        items = replaceItem(items, item.id, {
+          status:
+            hashed.error.code === "HASH_CANCELLED" ? "interrupted" : "failed",
+          message: hashed.error.safeMessage,
+        });
+        update(items);
+        if (hashed.error.code === "HASH_CANCELLED") {
+          return {
+            items,
+            snapshotId: null,
+            resumeKind: "first",
+            packageStatus: "interrupted",
+          };
+        }
+        failures += 1;
+        continue;
+      }
+      const preserved = await preserveContent(
+        activeWorkspace,
+        fileReader(file),
+        hashed.value.sha256,
+        dependencies.clock,
+      );
+      if (!preserved.ok) {
+        failures += 1;
+        items = replaceItem(items, item.id, {
+          status: "failed",
+          sha256: hashed.value.sha256,
+          message: preserved.error.safeMessage,
+        });
+        update(items);
+        continue;
+      }
+      const duplicate = seenHashes.has(hashed.value.sha256);
+      seenHashes.add(hashed.value.sha256);
+      entries.push({
+        observedRelativePath: item.path,
+        normalizedDisplayPath: item.path.normalize("NFC"),
+        sha256: hashed.value.sha256,
+        sizeBytes: file.size,
+        declaredMediaType: file.type || null,
+        lastModifiedObserved: null,
+      });
+      items = replaceItem(items, item.id, {
+        status: duplicate ? "duplicate" : "preserved",
+        sha256: hashed.value.sha256,
+        message: duplicate
+          ? "Exact bytes linked to a separate receipt; no approval conferred."
+          : "Immutable copy verified; downstream use remains blocked.",
+      });
+      update(items);
+    }
+    const snapshot = await createPackageSnapshot(entries, dependencies);
+    const difference =
+      priorSnapshot.current === null
+        ? null
+        : compareSnapshots(priorSnapshot.current, snapshot);
+    const resumeKind =
+      difference === null
+        ? "first"
+        : difference === "unchanged"
+          ? "unchanged-resume"
+          : "linked-divergence";
+    const existingCheckpoint = inventoryCheckpoints.current.get(
+      snapshot.snapshotId,
+    );
+    priorSnapshot.current = snapshot;
+    await activeWorkspace.createDirectory(
+      `cases/${activeCase.caseId}/snapshots`,
+    );
+    const snapshotBytes = new TextEncoder().encode(
+      `${canonicalize(snapshot)}\n`,
+    );
+    const snapshotPath = `cases/${activeCase.caseId}/snapshots/${snapshot.snapshotId}.json`;
+    const snapshotStored = await activeWorkspace.stat(snapshotPath);
+    if (!snapshotStored.ok) {
+      const saved = await activeWorkspace.createImmutable(
+        snapshotPath,
+        bytesReader(snapshotBytes),
+      );
+      if (!saved.ok) throw new Error("Snapshot could not be preserved.");
+    }
+    if (existingCheckpoint === undefined) {
+      const receipts: ReceiptRecord[] = [];
+      const artifacts: ArtifactRecord[] = [];
+      const attemptId = dependencies.uuid.generate();
+      for (const entry of entries) {
+        const receiptId = dependencies.uuid.generate();
+        receipts.push({
+          receiptId,
+          attemptId,
+          caseId: activeCase.caseId,
+          sha256: entry.sha256,
+          originalFilename:
+            entry.observedRelativePath.split("/").at(-1) ??
+            entry.observedRelativePath,
+          observedRelativePath: entry.observedRelativePath,
+          submittedBy: null,
+          submittedAt: null,
+          sourceLocation: "user-selected-local-package",
+          transferContext: null,
+          declaredDescription: null,
+          parentArtifactId: null,
+        });
+        artifacts.push({
+          artifactId: dependencies.uuid.generate(),
+          receiptId,
+          sha256: entry.sha256,
+          attemptId,
+          caseId: activeCase.caseId,
+          artifactRole: "submitted-file",
+          signatureMediaType: null,
+          processingStatus: "preserved",
+          downstreamEligibility: "blocked",
+          statusHistory: Object.freeze([]),
+        });
+      }
+      const seenHashes = new Set<string>();
+      const reconciliation = reconcileInventory(
+        artifacts.map((artifact) => artifact.artifactId),
+        artifacts.map((artifact) => ({
+          recordId: artifact.artifactId,
+          category: "source-artifact",
+        })),
+        artifacts.map((artifact) => {
+          const duplicate = seenHashes.has(artifact.sha256);
+          seenHashes.add(artifact.sha256);
+          return {
+            recordId: artifact.artifactId,
+            category: duplicate
+              ? ("duplicate" as const)
+              : ("pending-human-disposition" as const),
+          };
+        }),
+      );
+      const checkpoint = Object.freeze({
+        attemptId,
+        priorAttemptId:
+          resumeKind === "linked-divergence"
+            ? (lastCheckpoint.current?.attemptId ?? null)
+            : null,
+        divergenceReason:
+          resumeKind === "linked-divergence" ? difference : null,
+        snapshot,
+        receipts: Object.freeze(receipts),
+        artifacts: Object.freeze(artifacts),
+        reconciliation,
+        downstreamBlocked: true,
+      });
+      inventoryCheckpoints.current.set(snapshot.snapshotId, checkpoint);
+      lastCheckpoint.current = checkpoint;
+      await activeWorkspace.createDirectory(
+        `cases/${activeCase.caseId}/manifests`,
+      );
+      const manifestBytes = new TextEncoder().encode(
+        `${canonicalize(checkpoint)}\n`,
+      );
+      const saved = await activeWorkspace.createImmutable(
+        `cases/${activeCase.caseId}/manifests/${snapshot.snapshotId}.json`,
+        bytesReader(manifestBytes),
+      );
+      if (!saved.ok)
+        throw new Error("Inventory checkpoint could not be preserved.");
+    } else {
+      lastCheckpoint.current = existingCheckpoint;
+    }
+    return {
+      items,
+      snapshotId: snapshot.snapshotId,
+      resumeKind,
+      packageStatus: failures === 0 ? "completed" : "partial",
+    };
+  }
+}
+
+function replaceItem(
+  items: readonly ArtifactInventoryItem[],
+  id: string,
+  change: Partial<ArtifactInventoryItem>,
+): ArtifactInventoryItem[] {
+  return items.map((item) => (item.id === id ? { ...item, ...change } : item));
+}
+
+function fileReader(file: File): ChunkReaderPort<BrowserWorkspaceError> {
+  return {
+    sizeBytes: file.size,
+    read: async ({ offsetBytes, lengthBytes }) => {
+      try {
+        const bytes = new Uint8Array(
+          await file
+            .slice(offsetBytes, offsetBytes + lengthBytes)
+            .arrayBuffer(),
+        );
+        return {
+          ok: true,
+          value: {
+            offsetBytes,
+            bytes,
+            endOfSource: offsetBytes + bytes.length >= file.size,
+          },
+        };
+      } catch {
+        return { ok: false, error: { code: "READ_FAILED" } };
+      }
+    },
+  };
+}
+
+function bytesReader(
+  bytes: Uint8Array,
+): ChunkReaderPort<BrowserWorkspaceError> {
+  return {
+    sizeBytes: bytes.byteLength,
+    read: ({ offsetBytes, lengthBytes }) =>
+      Promise.resolve({
+        ok: true,
+        value: {
+          offsetBytes,
+          bytes: bytes.slice(offsetBytes, offsetBytes + lengthBytes),
+          endOfSource: offsetBytes + lengthBytes >= bytes.byteLength,
+        },
+      }),
+  };
 }
 
 function purposeLabel(caseRecord: CaseRecord): string {

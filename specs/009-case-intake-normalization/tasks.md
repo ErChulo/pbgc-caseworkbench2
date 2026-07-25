@@ -104,27 +104,27 @@
 
 ### Fixtures and tests for User Story 2
 
-- [ ] T040 [P] [US2] Create deterministic synthetic same-bytes/different-name, same-name/different-bytes, zero-byte, Unicode-name, large-stream, corrupt, unsupported, and mutable-source fixtures in `web/tests/fixtures/generators/artifacts.ts`
-- [ ] T041 [P] [US2] Create deterministic ZIP/GZIP fixtures for nested members, partial corruption, traversal, absolute paths, duplicate normalized paths, excessive depth/count/ratio/expanded bytes, and unsupported compression in `web/tests/fixtures/generators/archives.ts`
-- [ ] T042 [P] [US2] Add failing SHA-256 tests using published vectors, independent Web Crypto checks, chunk-boundary matrices, cancellation, and simulated large files in `web/tests/unit/workers/hash-worker.test.ts`
-- [ ] T043 [P] [US2] Add failing content-store tests for create-once paths, post-write verification, same-hash reuse, changed stored bytes, and no silent overwrite in `web/tests/integration/content-store.test.ts`
-- [ ] T044 [P] [US2] Add failing snapshot/resume tests proving lowercase SHA-256 snapshot identity, separate operational `snapshotRecordId`, and correct behavior for unchanged, added, removed, renamed, changed, and mid-read-mutated artifacts in `web/tests/unit/domain/attempts/snapshot.test.ts`
-- [ ] T045 [P] [US2] Add failing archive tests for container-first preservation, member hashing, parent-child lineage, limits, partial extraction, and zero invented members in `web/tests/integration/archive-intake.test.ts`
-- [ ] T046 [P] [US2] Add failing browser tests for folder intake, worker progress, interruption, unchanged resume, changed-snapshot linkage, and partial continuation in `web/tests/browser/package-intake.spec.ts`
+- [x] T040 [P] [US2] Create deterministic synthetic same-bytes/different-name, same-name/different-bytes, zero-byte, Unicode-name, large-stream, corrupt, unsupported, and mutable-source fixtures in `web/tests/fixtures/generators/artifacts.ts`
+- [x] T041 [P] [US2] Create deterministic ZIP/GZIP fixtures for nested members, partial corruption, traversal, absolute paths, duplicate normalized paths, excessive depth/count/ratio/expanded bytes, and unsupported compression in `web/tests/fixtures/generators/archives.ts`
+- [x] T042 [P] [US2] Add failing SHA-256 tests using published vectors, independent Web Crypto checks, chunk-boundary matrices, cancellation, and simulated large files in `web/tests/unit/workers/hash-worker.test.ts`
+- [x] T043 [P] [US2] Add failing content-store tests for create-once paths, post-write verification, same-hash reuse, changed stored bytes, and no silent overwrite in `web/tests/integration/content-store.test.ts`
+- [x] T044 [P] [US2] Add failing snapshot/resume tests proving lowercase SHA-256 snapshot identity, separate operational `snapshotRecordId`, and correct behavior for unchanged, added, removed, renamed, changed, and mid-read-mutated artifacts in `web/tests/unit/domain/attempts/snapshot.test.ts`
+- [x] T045 [P] [US2] Add failing archive tests for container-first preservation, member hashing, parent-child lineage, limits, partial extraction, and zero invented members in `web/tests/integration/archive-intake.test.ts`
+- [x] T046 [P] [US2] Add failing browser tests for folder intake, worker progress, interruption, unchanged resume, changed-snapshot linkage, and partial continuation in `web/tests/browser/package-intake.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T047 [P] [US2] Implement ReceiptRecord, ArtifactRecord, ContentObject, PackageSnapshot, SnapshotEntry, IntakeAttempt, and ContainmentEdge models in `web/src/domain/artifacts/models.ts` and `web/src/domain/attempts/models.ts`
-- [ ] T048 [P] [US2] Implement fixed-chunk incremental SHA-256 and progress/cancellation handling in `web/src/workers/hash.worker.ts`
-- [ ] T049 [US2] Implement content-addressed `objects/sha256/<prefix>/<hash>` create-once storage, post-copy hashing, and integrity-failure quarantine signal in `web/src/adapters/filesystem/content-store.ts`
-- [ ] T050 [P] [US2] Implement folder/file discovery with stable submitted paths and mutation detection in `web/src/adapters/filesystem/package-discovery.ts`
-- [ ] T051 [US2] Implement canonical package snapshots whose identity is lowercase SHA-256, separate operational `snapshotRecordId`, snapshot comparison, linked-attempt divergence reasons, and unchanged-work reuse in `web/src/domain/attempts/snapshot.ts` and `web/src/domain/attempts/resume.ts`
-- [ ] T052 [US2] Implement exact-duplicate finalization strictly on matching SHA-256 while preserving separate receipts in `web/src/domain/artifacts/exact-duplicates.ts`
-- [ ] T053 [P] [US2] Implement archive path canonicalization and traversal/absolute/control-character/collision rejection in `web/src/adapters/parsers/archive-path.ts`
-- [ ] T054 [US2] Implement bounded streaming ZIP/GZIP extraction, recursion/count/ratio/size limits, partial outcomes, and member sequencing in `web/src/adapters/parsers/archive-parser.ts`
-- [ ] T055 [US2] Implement the artifact pipeline coordinator with durable per-stage events, unaffected-artifact continuation, and a mandatory provisional/downstream-blocked state until the US3 minimum screening and quarantine gate passes in `web/src/domain/attempts/intake-pipeline.ts`
-- [ ] T056 [US2] Implement intake selection, discovery preview, hashing/preservation progress, interruption, resume, and per-artifact outcome UI in `web/src/components/case-intake/PackageIntake.tsx` and `web/src/components/inventory/ArtifactInventory.tsx`
-- [ ] T057 [US2] Reconcile every discovered artifact exactly once using origin and accounting-only terminal categories, prove both ledgers balance while all governed records remain provisional, prove ledger categories cannot grant release/final status, verify independent hashes and containment lineage, and make T040–T046 pass in `web/src/domain/manifests/reconciliation.ts`
+- [x] T047 [P] [US2] Implement ReceiptRecord, ArtifactRecord, ContentObject, PackageSnapshot, SnapshotEntry, IntakeAttempt, and ContainmentEdge models in `web/src/domain/artifacts/models.ts` and `web/src/domain/attempts/models.ts`
+- [x] T048 [P] [US2] Implement fixed-chunk incremental SHA-256 and progress/cancellation handling in `web/src/workers/hash.worker.ts`
+- [x] T049 [US2] Implement content-addressed `objects/sha256/<prefix>/<hash>` create-once storage, post-copy hashing, and integrity-failure quarantine signal in `web/src/adapters/filesystem/content-store.ts`
+- [x] T050 [P] [US2] Implement folder/file discovery with stable submitted paths and mutation detection in `web/src/adapters/filesystem/package-discovery.ts`
+- [x] T051 [US2] Implement canonical package snapshots whose identity is lowercase SHA-256, separate operational `snapshotRecordId`, snapshot comparison, linked-attempt divergence reasons, and unchanged-work reuse in `web/src/domain/attempts/snapshot.ts` and `web/src/domain/attempts/resume.ts`
+- [x] T052 [US2] Implement exact-duplicate finalization strictly on matching SHA-256 while preserving separate receipts in `web/src/domain/artifacts/exact-duplicates.ts`
+- [x] T053 [P] [US2] Implement archive path canonicalization and traversal/absolute/control-character/collision rejection in `web/src/adapters/parsers/archive-path.ts`
+- [x] T054 [US2] Implement bounded streaming ZIP/GZIP extraction, recursion/count/ratio/size limits, partial outcomes, and member sequencing in `web/src/adapters/parsers/archive-parser.ts`
+- [x] T055 [US2] Implement the artifact pipeline coordinator with durable per-stage events, unaffected-artifact continuation, and a mandatory provisional/downstream-blocked state until the US3 minimum screening and quarantine gate passes in `web/src/domain/attempts/intake-pipeline.ts`
+- [x] T056 [US2] Implement intake selection, discovery preview, hashing/preservation progress, interruption, resume, and per-artifact outcome UI in `web/src/components/case-intake/PackageIntake.tsx` and `web/src/components/inventory/ArtifactInventory.tsx`
+- [x] T057 [US2] Reconcile every discovered artifact exactly once using origin and accounting-only terminal categories, prove both ledgers balance while all governed records remain provisional, prove ledger categories cannot grant release/final status, verify independent hashes and containment lineage, and make T040–T046 pass in `web/src/domain/manifests/reconciliation.ts`
 
 **Checkpoint**: US2 preserves every original and successful member, resumes unchanged snapshots deterministically, and continues around isolated artifact failures, but every output remains explicitly provisional and blocked from production downstream use until US3 screening is complete.
 
