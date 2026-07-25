@@ -99,8 +99,15 @@ export default tseslint.config(
     },
   },
   {
-    files: ["web/tools/**/*.mjs"],
-    languageOptions: { ecmaVersion: 2023, globals: globals.node },
+    files: ["web/tools/**/*.{mjs,ts}"],
+    languageOptions: {
+      ecmaVersion: 2023,
+      globals: globals.node,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
     rules: {
       "no-eval": "error",
       "no-implied-eval": "error",

@@ -29,6 +29,7 @@
     "src",
     "spikes",
     "tests",
+    "tools",
     "../vite.config.ts",
     "../vitest.config.ts",
     "../playwright.config.ts"

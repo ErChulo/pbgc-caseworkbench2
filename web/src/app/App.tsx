@@ -87,6 +87,21 @@ import {
   extractDateCandidates,
   validateDateSelection,
 } from "../domain/classification/date-candidates";
+import {
+  PopulationReview,
+  type PopulationReviewItem,
+} from "../components/review/PopulationReview";
+import { adaptTabularExtraction } from "../domain/population/tabular-adapter";
+import { adaptWorkbookExtraction } from "../domain/population/workbook-adapter";
+import {
+  detectTabularPopulation,
+  detectWorkbookPopulation,
+} from "../domain/population/population-detector";
+import {
+  populationDecisionContentHash,
+  replayPopulationCandidateDecisions,
+  type PopulationCandidateDecision,
+} from "../domain/population/population-profile";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -154,6 +169,12 @@ export function App() {
   >([]);
   const [relationshipItems, setRelationshipItems] = useState<
     readonly RelationshipReviewItem[]
+  >([]);
+  const populationHistory = useRef(
+    new Map<string, PopulationCandidateDecision[]>(),
+  );
+  const [populationItems, setPopulationItems] = useState<
+    readonly PopulationReviewItem[]
   >([]);
 
   const activateCase = (caseRecord: CaseRecord) => {
@@ -411,6 +432,10 @@ export function App() {
           items={relationshipItems}
           onDecision={recordRelationshipDecision}
         />
+        <PopulationReview
+          items={populationItems}
+          onDecision={recordPopulationDecision}
+        />
       </main>
     </div>
   );
@@ -554,6 +579,44 @@ export function App() {
           : []),
       ];
       if (blockingFindings.length === 0 && passive?.status === "success") {
+        const population =
+          passive.parserId === "workbook-passive"
+            ? await detectWorkbookPopulation(
+                hashed.value.sha256,
+                adaptWorkbookExtraction(passive),
+                "unknown",
+              )
+            : passive.mediaType === "text/csv" ||
+                passive.mediaType === "text/tab-separated-values" ||
+                passive.mediaType === "application/json" ||
+                passive.mediaType.startsWith("text/")
+              ? await detectTabularPopulation(
+                  hashed.value.sha256,
+                  adaptTabularExtraction(passive),
+                  "unknown",
+                )
+              : null;
+        if (population !== null) {
+          setPopulationItems((current) => [
+            ...current.filter(
+              (candidate) =>
+                candidate.candidate.artifactSha256 !== hashed.value.sha256,
+            ),
+            {
+              displayName: item.path,
+              candidate: population.candidate,
+              projection: {
+                status: "provisional",
+                effectiveDecisionId: null,
+                provenance: [],
+              },
+              structuralFinding:
+                population.candidate.candidateStatus === "proposed"
+                  ? "Likely population structure detected; governed use remains blocked pending human review."
+                  : "Structure is ambiguous or incomplete; route to unresolved review.",
+            },
+          ]);
+        }
         const proposals = await proposeClassifications({
           artifactSha256: hashed.value.sha256,
           filename: item.path,
@@ -1048,6 +1111,62 @@ export function App() {
                   ? reviewer
                   : candidate.reviewer,
             }
+          : candidate,
+      ),
+    );
+  }
+
+  async function recordPopulationDecision(
+    item: PopulationReviewItem,
+    action: "approve" | "reject" | "revoke" | "supersede",
+    reviewer: string,
+    rationale: string,
+  ): Promise<void> {
+    const key = item.candidate.candidateKey;
+    const history = populationHistory.current.get(key) ?? [];
+    const prior = history.at(-1) ?? null;
+    const resultingStatus =
+      action === "approve"
+        ? ("approved" as const)
+        : action === "reject"
+          ? ("rejected" as const)
+          : action === "revoke"
+            ? ("revoked" as const)
+            : ("superseded" as const);
+    const base = {
+      appendOrdinal: history.length + 1,
+      priorDecisionId: prior?.decisionId ?? null,
+      priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
+      candidateKey: item.candidate.candidateKey,
+      artifactSha256: item.candidate.artifactSha256,
+      decisionType: action,
+      resultingStatus,
+      ruleSetVersion: "feature-009-population-v1",
+      schemaVersion: "1.0.0",
+    } as const;
+    const decision: PopulationCandidateDecision = {
+      ...base,
+      decisionId: dependencies.uuid.generate(),
+      decisionContentSha256: await populationDecisionContentHash(base),
+      humanActor: {
+        actorType: "human",
+        actorId: reviewer,
+        displayName: reviewer,
+      },
+      rationale,
+      decisionTimestamp: dependencies.clock.now(),
+    };
+    const replay = await replayPopulationCandidateDecisions(item.candidate, [
+      ...history,
+      decision,
+    ]);
+    if (!replay.ok) throw new Error(replay.error.safeMessage);
+    await appendReviewEvent(decision);
+    populationHistory.current.set(key, [...history, decision]);
+    setPopulationItems((current) =>
+      current.map((candidate) =>
+        candidate.candidate.candidateKey === key
+          ? { ...candidate, projection: replay.value }
           : candidate,
       ),
     );

@@ -34,7 +34,12 @@ test("reviews classification and relationship proposals with immutable human his
   await expect(
     page.getByRole("heading", { name: "Classification review" }),
   ).toBeVisible();
-  await expect(page.getByText("Human approval required")).toBeVisible();
+  const classification = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Classification review" }),
+  });
+  await expect(
+    classification.getByText("Human approval required"),
+  ).toBeVisible();
   await expect(
     page.getByText("proposed", { exact: true }).first(),
   ).toBeVisible();
