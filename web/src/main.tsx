@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-import { BootstrapApp } from "./app/BootstrapApp";
+import { App } from "./app/App";
 import { installProductionSecurityBoundary } from "./app/security-boundary";
 import "./styles/index.css";
 
@@ -17,6 +17,6 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <BootstrapApp />
+    <App />
   </StrictMode>,
 );

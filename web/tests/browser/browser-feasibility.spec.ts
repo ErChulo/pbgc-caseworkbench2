@@ -18,16 +18,16 @@ test("static-origin bootstrap is self-contained and makes no outbound requests",
   expect(localWorkspacePath).toContain("synthetic-local-workspace");
 });
 
-test("bootstrap labels the implementation maturity and data boundary", async ({
+test("application labels the implementation maturity and data boundary", async ({
   page,
 }) => {
   await page.goto("/");
 
   await expect(
-    page.getByLabel("Current implementation maturity: setup only"),
+    page.getByLabel("Current implementation maturity: controlled case intake"),
   ).toBeVisible();
-  await expect(page.getByRole("status").last()).toContainText(
-    "No participant data",
+  await expect(page.getByRole("main")).toContainText(
+    "No case data leaves this device",
   );
 });
 

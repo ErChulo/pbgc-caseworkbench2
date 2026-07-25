@@ -78,19 +78,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T030 [P] [US1] Add failing unit tests for case UUID immutability, required production identifier, allowed purposes, and absence of case-specific defaults in `web/tests/unit/domain/case/case.test.ts`
-- [ ] T031 [P] [US1] Add failing unit tests for identifier collision, closed-case presentation, resume-existing linkage, and authorized non-production override history in `web/tests/unit/domain/case/case-registry.test.ts`
-- [ ] T032 [P] [US1] Add failing workspace integration tests for atomic `case-index.json` and `case.json` persistence and reopening in `web/tests/integration/case-workspace.test.ts`
-- [ ] T033 [P] [US1] Add failing browser tests for the complete case-creation and duplicate-decision journey in `web/tests/browser/case-creation.spec.ts`
+- [x] T030 [P] [US1] Add failing unit tests for case UUID immutability, required production identifier, allowed purposes, and absence of case-specific defaults in `web/tests/unit/domain/case/case.test.ts`
+- [x] T031 [P] [US1] Add failing unit tests for identifier collision, closed-case presentation, resume-existing linkage, and authorized non-production override history in `web/tests/unit/domain/case/case-registry.test.ts`
+- [x] T032 [P] [US1] Add failing workspace integration tests for atomic `case-index.json` and `case.json` persistence and reopening in `web/tests/integration/case-workspace.test.ts`
+- [x] T033 [P] [US1] Add failing browser tests for the complete case-creation and duplicate-decision journey in `web/tests/browser/case-creation.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T034 [P] [US1] Implement immutable Case, CasePurpose, CaseStatus, and creation-provenance models in `web/src/domain/case/case.ts`
-- [ ] T035 [P] [US1] Implement identifier syntax validation as a configurable non-case-specific rule in `web/src/domain/case/case-identifier.ts`
-- [ ] T036 [US1] Implement local authoritative-identifier uniqueness, duplicate decisions, and collision review events in `web/src/domain/case/case-registry.ts`
-- [ ] T037 [US1] Implement atomic local case-index and case-record persistence with read-back validation in `web/src/adapters/filesystem/case-workspace.ts`
-- [ ] T038 [US1] Implement the workspace gate, case form, existing-case presentation, and explicit collision-decision UI in `web/src/components/case-intake/CaseCreation.tsx`
-- [ ] T039 [US1] Wire the case-creation command flow and asserted reviewer identity input into `web/src/app/App.tsx` and verify T030–T033 pass
+- [x] T034 [P] [US1] Implement immutable Case, CasePurpose, CaseStatus, and creation-provenance models in `web/src/domain/case/case.ts`
+- [x] T035 [P] [US1] Implement identifier syntax validation as a configurable non-case-specific rule in `web/src/domain/case/case-identifier.ts`
+- [x] T036 [US1] Implement local authoritative-identifier uniqueness, duplicate decisions, and collision review events in `web/src/domain/case/case-registry.ts`
+- [x] T037 [US1] Implement atomic local case-index and case-record persistence with read-back validation in `web/src/adapters/filesystem/case-workspace.ts`
+- [x] T038 [US1] Implement the workspace gate, case form, existing-case presentation, and explicit collision-decision UI in `web/src/components/case-intake/CaseCreation.tsx`
+- [x] T039 [US1] Wire the case-creation command flow and asserted reviewer identity input into `web/src/app/App.tsx` and verify T030–T033 pass
 
 **Checkpoint**: US1 works independently and no duplicate production case can be created silently within the selected workspace catalog.
 
