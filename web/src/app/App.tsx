@@ -33,6 +33,7 @@ import {
 import {
   parseUtcTimestamp,
   parseUuid,
+  type Sha256,
   type Uuid,
 } from "../domain/shared/types";
 import { canonicalize } from "../domain/manifests/canonical-json";
@@ -57,6 +58,35 @@ import { quarantineDecisionContentHash } from "../domain/quarantine/release-serv
 import type { QuarantineDecision } from "../domain/quarantine/models";
 import { parseSha256 } from "../domain/shared/types";
 import { inspectPassive } from "../adapters/parsers/passive-inspection";
+import {
+  ClassificationReview,
+  type ClassificationReviewItem,
+  type DateCandidateReviewItem,
+} from "../components/review/ClassificationReview";
+import {
+  RelationshipReview,
+  type RelationshipReviewItem,
+} from "../components/review/RelationshipReview";
+import { proposeClassifications } from "../domain/classification/classifier";
+import {
+  classificationDecisionContentHash,
+  replayClassificationApprovals,
+} from "../domain/classification/classification-review";
+import {
+  createRelationshipProposal,
+  relationshipDecisionContentHash,
+  replayRelationshipDecisions,
+} from "../domain/classification/relationship-service";
+import { proposeNearDuplicate } from "../domain/classification/near-duplicates";
+import type {
+  ClassificationApproval,
+  DateSelectionDecision,
+  RelationshipDecision,
+} from "../domain/classification/models";
+import {
+  extractDateCandidates,
+  validateDateSelection,
+} from "../domain/classification/date-candidates";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -111,6 +141,19 @@ export function App() {
   const quarantineHistory = useRef(new Map<string, QuarantineDecision[]>());
   const [quarantineItems, setQuarantineItems] = useState<
     readonly QuarantineQueueItem[]
+  >([]);
+  const classificationHistory = useRef(
+    new Map<string, ClassificationApproval[]>(),
+  );
+  const relationshipHistory = useRef(new Map<string, RelationshipDecision[]>());
+  const [classificationItems, setClassificationItems] = useState<
+    readonly ClassificationReviewItem[]
+  >([]);
+  const [dateCandidateItems, setDateCandidateItems] = useState<
+    readonly DateCandidateReviewItem[]
+  >([]);
+  const [relationshipItems, setRelationshipItems] = useState<
+    readonly RelationshipReviewItem[]
   >([]);
 
   const activateCase = (caseRecord: CaseRecord) => {
@@ -358,6 +401,16 @@ export function App() {
           items={quarantineItems}
           onDecision={recordQuarantineDecision}
         />
+        <ClassificationReview
+          items={classificationItems}
+          dateCandidates={dateCandidateItems}
+          onDecision={recordClassificationDecision}
+          onDateSelect={recordDateSelection}
+        />
+        <RelationshipReview
+          items={relationshipItems}
+          onDecision={recordRelationshipDecision}
+        />
       </main>
     </div>
   );
@@ -387,6 +440,11 @@ export function App() {
     update(items);
     const entries: SnapshotEntry[] = [];
     const seenHashes = new Set<string>();
+    const comparableArtifacts: {
+      readonly sha256: Sha256;
+      readonly text: string;
+      readonly label: string;
+    }[] = [];
     let failures = 0;
     for (const item of items) {
       if (signal.aborted) {
@@ -495,6 +553,86 @@ export function App() {
             ]
           : []),
       ];
+      if (blockingFindings.length === 0 && passive?.status === "success") {
+        const proposals = await proposeClassifications({
+          artifactSha256: hashed.value.sha256,
+          filename: item.path,
+          mediaType: file.type || null,
+          text: passive.text,
+        });
+        setClassificationItems((current) => [
+          ...current.filter(
+            (candidate) =>
+              candidate.proposal.artifactSha256 !== hashed.value.sha256,
+          ),
+          ...proposals.map((proposal) => ({
+            displayName: item.path,
+            proposal,
+            effectiveStatus: "provisional" as const,
+            reviewer: null,
+            rationale: null,
+            provenanceCount: 0,
+          })),
+        ]);
+        const dateCandidates = await extractDateCandidates(
+          hashed.value.sha256,
+          passive.text,
+        );
+        setDateCandidateItems((current) => [
+          ...current.filter(
+            (candidate) =>
+              candidate.candidate.artifactSha256 !== hashed.value.sha256,
+          ),
+          ...dateCandidates.map((candidate) => ({
+            displayName: item.path,
+            candidate,
+            selected: false,
+            reviewer: null,
+          })),
+        ]);
+        for (const prior of comparableArtifacts) {
+          const relationship =
+            prior.sha256 === hashed.value.sha256
+              ? await createRelationshipProposal({
+                  fromSha256: prior.sha256,
+                  toSha256: hashed.value.sha256,
+                  relationshipType: "exact-duplicate",
+                  status: "proposed",
+                  confidence: 1,
+                  supportingEvidence: [],
+                  ruleSetVersion: "feature-009-classification-v1",
+                })
+              : await proposeNearDuplicate(
+                  prior.sha256,
+                  hashed.value.sha256,
+                  prior.text,
+                  passive.text,
+                  0.35,
+                );
+          if (relationship) {
+            setRelationshipItems((current) => [
+              ...current.filter(
+                (candidate) =>
+                  candidate.relationship.relationshipKey !==
+                  relationship.relationshipKey,
+              ),
+              {
+                relationship,
+                fromLabel: prior.label,
+                toLabel: item.path,
+                effectiveStatus: "provisional",
+                rationale: null,
+                provenanceCount: 0,
+              },
+            ]);
+          }
+        }
+        comparableArtifacts.push({
+          sha256: hashed.value.sha256,
+          text: passive.text,
+          label: item.path,
+        });
+      }
       if (blockingFindings.length > 0) {
         setQuarantineItems((current) => {
           const next: QuarantineQueueItem = {
@@ -739,6 +877,190 @@ export function App() {
           : candidate,
       ),
     );
+  }
+
+  async function recordClassificationDecision(
+    item: ClassificationReviewItem,
+    action: "approve" | "reject" | "revoke" | "supersede",
+    reviewer: string,
+    rationale: string,
+  ): Promise<void> {
+    const history =
+      classificationHistory.current.get(item.proposal.proposalKey) ?? [];
+    const prior = history.at(-1) ?? null;
+    const status =
+      action === "approve"
+        ? ("approved" as const)
+        : action === "reject"
+          ? ("rejected" as const)
+          : action === "revoke"
+            ? ("revoked" as const)
+            : ("superseded" as const);
+    const base = {
+      appendOrdinal: history.length + 1,
+      priorApprovalId: prior?.approvalId ?? null,
+      priorApprovalContentSha256: prior?.decisionContentSha256 ?? null,
+      proposalKey: item.proposal.proposalKey,
+      artifactSha256: item.proposal.artifactSha256,
+      decisionType: action,
+      status,
+      ruleSetVersion: "feature-009-classification-v1",
+      schemaVersion: "1.0.0" as const,
+    };
+    const decision: ClassificationApproval = {
+      ...base,
+      approvalId: dependencies.uuid.generate(),
+      decisionContentSha256: await classificationDecisionContentHash(base),
+      actor: {
+        actorType: "human",
+        actorKey: reviewer,
+        displayName: reviewer,
+        authorityContext: "Locally asserted classification reviewer",
+      },
+      decidedAt: dependencies.clock.now(),
+      rationale,
+    };
+    const replay = await replayClassificationApprovals(item.proposal, [
+      ...history,
+      decision,
+    ]);
+    if (!replay.ok) throw new Error(replay.error.safeMessage);
+    await appendReviewEvent(decision);
+    classificationHistory.current.set(item.proposal.proposalKey, [
+      ...history,
+      decision,
+    ]);
+    setClassificationItems((current) =>
+      current.map((candidate) =>
+        candidate.proposal.proposalKey === item.proposal.proposalKey
+          ? {
+              ...candidate,
+              effectiveStatus: replay.value.status,
+              reviewer,
+              rationale,
+              provenanceCount: replay.value.provenance.length,
+            }
+          : candidate,
+      ),
+    );
+  }
+
+  async function recordRelationshipDecision(
+    item: RelationshipReviewItem,
+    action: "approve" | "reject" | "revoke" | "supersede",
+    reviewer: string,
+    rationale: string,
+  ): Promise<void> {
+    const key = item.relationship.relationshipKey;
+    const history = relationshipHistory.current.get(key) ?? [];
+    const prior = history.at(-1) ?? null;
+    const resultingGovernedStatus =
+      action === "approve"
+        ? ("approved" as const)
+        : action === "reject"
+          ? ("rejected" as const)
+          : action === "revoke"
+            ? ("revoked" as const)
+            : ("superseded" as const);
+    const base = {
+      appendOrdinal: history.length + 1,
+      priorDecisionId: prior?.decisionId ?? null,
+      priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
+      relationshipKey: key,
+      fromSha256: item.relationship.fromSha256,
+      toSha256: item.relationship.toSha256,
+      decisionType: action,
+      resultingGovernedStatus,
+      ruleSetVersion: "feature-009-classification-v1",
+      schemaVersion: "1.0.0" as const,
+    };
+    const decision: RelationshipDecision = {
+      ...base,
+      decisionId: dependencies.uuid.generate(),
+      decisionContentSha256: await relationshipDecisionContentHash(base),
+      actor: {
+        actorType: "human",
+        actorKey: reviewer,
+        displayName: reviewer,
+        authorityContext: "Locally asserted relationship reviewer",
+      },
+      decidedAt: dependencies.clock.now(),
+      rationale,
+      evidenceConsidered: item.relationship.supportingEvidence,
+    };
+    const replay = await replayRelationshipDecisions(item.relationship, [
+      ...history,
+      decision,
+    ]);
+    if (!replay.ok) throw new Error(replay.error.safeMessage);
+    await appendReviewEvent(decision);
+    relationshipHistory.current.set(key, [...history, decision]);
+    setRelationshipItems((current) =>
+      current.map((candidate) =>
+        candidate.relationship.relationshipKey === key
+          ? {
+              ...candidate,
+              effectiveStatus: replay.value.status,
+              rationale,
+              provenanceCount: replay.value.provenance.length,
+            }
+          : candidate,
+      ),
+    );
+  }
+
+  async function recordDateSelection(
+    item: DateCandidateReviewItem,
+    reviewer: string,
+    rationale: string,
+  ): Promise<void> {
+    const decision: DateSelectionDecision = {
+      decisionId: dependencies.uuid.generate(),
+      artifactSha256: item.candidate.artifactSha256,
+      selectedCandidateKey: item.candidate.candidateKey,
+      actor: {
+        actorType: "human",
+        actorKey: reviewer,
+        displayName: reviewer,
+        authorityContext: "Locally asserted date-candidate reviewer",
+      },
+      decidedAt: dependencies.clock.now(),
+      rationale,
+      ruleSetVersion: "feature-009-classification-v1",
+    };
+    const validation = validateDateSelection(
+      dateCandidateItems.map((candidate) => candidate.candidate),
+      decision,
+    );
+    if (!validation.ok) throw new Error(validation.error.safeMessage);
+    await appendReviewEvent(decision);
+    setDateCandidateItems((current) =>
+      current.map((candidate) =>
+        candidate.candidate.artifactSha256 === item.candidate.artifactSha256 &&
+        candidate.candidate.dateKind === item.candidate.dateKind
+          ? {
+              ...candidate,
+              selected:
+                candidate.candidate.candidateKey ===
+                item.candidate.candidateKey,
+              reviewer:
+                candidate.candidate.candidateKey === item.candidate.candidateKey
+                  ? reviewer
+                  : candidate.reviewer,
+            }
+          : candidate,
+      ),
+    );
+  }
+
+  async function appendReviewEvent(event: object): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (!activeWorkspace) throw new Error("Workspace unavailable.");
+    const saved = await activeWorkspace.append(
+      `cases/${activeCase?.caseId ?? "unavailable"}/reviews/events.jsonl`,
+      new TextEncoder().encode(`${canonicalize(event)}\n`),
+    );
+    if (!saved.ok) throw new Error("Review event could not be preserved.");
   }
 }
 
