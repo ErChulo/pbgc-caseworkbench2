@@ -47,6 +47,16 @@ import type { BrowserWorkspaceError } from "../adapters/filesystem/case-workspac
 import type { ChunkReaderPort } from "../domain/ports";
 import type { ArtifactRecord, ReceiptRecord } from "../domain/artifacts/models";
 import { reconcileInventory } from "../domain/manifests/reconciliation";
+import { screenBinaryRisk } from "../adapters/screening/binary-risk";
+import { screenSensitiveText } from "../adapters/screening/sensitive-data";
+import {
+  QuarantineQueue,
+  type QuarantineQueueItem,
+} from "../components/quarantine/QuarantineQueue";
+import { quarantineDecisionContentHash } from "../domain/quarantine/release-service";
+import type { QuarantineDecision } from "../domain/quarantine/models";
+import { parseSha256 } from "../domain/shared/types";
+import { inspectPassive } from "../adapters/parsers/passive-inspection";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -98,6 +108,10 @@ export function App() {
     new Map<string, InventoryCheckpointReference>(),
   );
   const lastCheckpoint = useRef<InventoryCheckpointReference | null>(null);
+  const quarantineHistory = useRef(new Map<string, QuarantineDecision[]>());
+  const [quarantineItems, setQuarantineItems] = useState<
+    readonly QuarantineQueueItem[]
+  >([]);
 
   const activateCase = (caseRecord: CaseRecord) => {
     if (activeCase?.caseId !== caseRecord.caseId) {
@@ -340,6 +354,10 @@ export function App() {
           enabled={workspaceReady && activeCase !== null}
           onProcess={processPackage}
         />
+        <QuarantineQueue
+          items={quarantineItems}
+          onDecision={recordQuarantineDecision}
+        />
       </main>
     </div>
   );
@@ -434,6 +452,78 @@ export function App() {
       }
       const duplicate = seenHashes.has(hashed.value.sha256);
       seenHashes.add(hashed.value.sha256);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const binaryRisk = await screenBinaryRisk(
+        bytes,
+        hashed.value.sha256,
+        file.type || null,
+        file.name,
+      );
+      const isPassiveText =
+        file.type.startsWith("text/") ||
+        /\.(?:csv|json|tsv|txt)$/iu.test(file.name);
+      const sensitiveRisk = isPassiveText
+        ? await screenSensitiveText(
+            new TextDecoder("utf-8", { fatal: false }).decode(bytes),
+            hashed.value.sha256,
+            {
+              authorizedRealPii: false,
+              expectedFields: [],
+              maximumSensitiveMatches: 8,
+            },
+          )
+        : null;
+      const initialBlockingFindings = [
+        ...binaryRisk.findings,
+        ...(sensitiveRisk?.findings ?? []),
+      ].filter((finding) => finding.blocksDownstream);
+      const passive =
+        initialBlockingFindings.length === 0
+          ? inspectPassive(file.name, bytes)
+          : null;
+      const passiveBlocked =
+        passive !== null &&
+        (passive.status !== "success" || passive.riskIndicators.length > 0);
+      const blockingFindings = [
+        ...initialBlockingFindings,
+        ...(passiveBlocked
+          ? [
+              {
+                category: passive.riskIndicators.join(", ") || passive.status,
+                blocksDownstream: true,
+              },
+            ]
+          : []),
+      ];
+      if (blockingFindings.length > 0) {
+        setQuarantineItems((current) => {
+          const next: QuarantineQueueItem = {
+            artifactSha256: hashed.value.sha256,
+            displayName: item.path,
+            accountingStatus: "pending-human-disposition",
+            provisionalState: "provisional-safety-block",
+            findingSummary: blockingFindings
+              .map((finding) => finding.category)
+              .join(", "),
+            evidenceRequired:
+              "An authorized reviewer must evaluate the exact bytes and named findings.",
+            nextAction:
+              "Release, retain in final quarantine, or reject with rationale.",
+            effectiveHumanStatus: "none",
+            reviewer: null,
+            rationale: null,
+            inheritanceAvailable:
+              quarantineHistory.current.get(hashed.value.sha256)?.at(-1)
+                ?.resultingStatus === "released",
+          };
+          return [
+            ...current.filter(
+              (candidate) => candidate.artifactSha256 !== next.artifactSha256,
+            ),
+            next,
+          ];
+        });
+      }
       entries.push({
         observedRelativePath: item.path,
         normalizedDisplayPath: item.path.normalize("NFC"),
@@ -443,11 +533,19 @@ export function App() {
         lastModifiedObserved: null,
       });
       items = replaceItem(items, item.id, {
-        status: duplicate ? "duplicate" : "preserved",
+        status:
+          blockingFindings.length > 0
+            ? "provisional-blocked"
+            : duplicate
+              ? "duplicate"
+              : "preserved",
         sha256: hashed.value.sha256,
-        message: duplicate
-          ? "Exact bytes linked to a separate receipt; no approval conferred."
-          : "Immutable copy verified; downstream use remains blocked.",
+        message:
+          blockingFindings.length > 0
+            ? "Automated safety finding blocked downstream use pending a typed human decision."
+            : duplicate
+              ? "Exact bytes linked to a separate receipt; no approval conferred."
+              : "Immutable copy verified; downstream use remains blocked.",
       });
       update(items);
     }
@@ -571,6 +669,76 @@ export function App() {
       resumeKind,
       packageStatus: failures === 0 ? "completed" : "partial",
     };
+  }
+
+  async function recordQuarantineDecision(
+    item: QuarantineQueueItem,
+    action:
+      "release" | "inherit-release" | "final-quarantine" | "reject" | "revoke",
+    reviewer: string,
+    rationale: string,
+  ): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null) throw new Error("Workspace unavailable.");
+    const artifactSha256 = parseSha256(item.artifactSha256);
+    if (!artifactSha256.ok) throw new Error("Artifact hash is invalid.");
+    const history = quarantineHistory.current.get(item.artifactSha256) ?? [];
+    const prior = history.at(-1) ?? null;
+    const resultingStatus =
+      action === "release" || action === "inherit-release"
+        ? ("released" as const)
+        : action === "final-quarantine"
+          ? ("final-quarantine" as const)
+          : action === "reject"
+            ? ("rejected" as const)
+            : ("revoked" as const);
+    const base = {
+      appendOrdinal: history.length + 1,
+      priorDecisionId: prior?.decisionId ?? null,
+      priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
+      artifactSha256: artifactSha256.value,
+      findingIds: Object.freeze([`ui-finding:${item.artifactSha256}`]),
+      action,
+      resultingStatus,
+      ruleSetVersion: "feature-009-screening-v1",
+      schemaVersion: "1.0.0" as const,
+    };
+    const decision: QuarantineDecision = {
+      ...base,
+      decisionId: dependencies.uuid.generate(),
+      decisionContentSha256: await quarantineDecisionContentHash(base),
+      reviewer: {
+        actorType: "human",
+        actorKey: reviewer,
+        displayName: reviewer,
+        authorityContext: "Locally asserted authorized reviewer",
+      },
+      decidedAt: dependencies.clock.now(),
+      rationale,
+    };
+    const path = `cases/${activeCase?.caseId ?? "unavailable"}/reviews/events.jsonl`;
+    const saved = await activeWorkspace.append(
+      path,
+      new TextEncoder().encode(`${canonicalize(decision)}\n`),
+    );
+    if (!saved.ok) throw new Error("Decision could not be preserved.");
+    quarantineHistory.current.set(item.artifactSha256, [...history, decision]);
+    setQuarantineItems((current) =>
+      current.map((candidate) =>
+        candidate.artifactSha256 === item.artifactSha256
+          ? {
+              ...candidate,
+              effectiveHumanStatus: resultingStatus,
+              reviewer,
+              rationale,
+              nextAction:
+                resultingStatus === "released"
+                  ? "Evidence is released for governed processing; revocation remains available."
+                  : "Disposition recorded. A later permitted typed decision requires predecessor linkage.",
+            }
+          : candidate,
+      ),
+    );
   }
 }
 

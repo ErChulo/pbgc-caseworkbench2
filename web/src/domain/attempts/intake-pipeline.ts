@@ -1,10 +1,45 @@
 import type { ArtifactRecord } from "../artifacts/models";
+import type { ScreeningResult } from "../quarantine/models";
 
 export interface IntakeStageEvent {
   readonly artifactId: ArtifactRecord["artifactId"];
   readonly stage:
-    "discovered" | "hashed" | "preserved" | "extracted" | "failed";
+    "discovered" | "hashed" | "preserved" | "screened" | "extracted" | "failed";
   readonly message: string;
+}
+
+export interface ScreenedArtifactOutcome {
+  readonly artifact: ArtifactRecord;
+  readonly screening: ScreeningResult;
+  readonly passiveExtractionAttempted: boolean;
+  readonly downstreamBlocked: true;
+}
+
+export async function runScreenedArtifactPipeline(
+  artifacts: readonly ArtifactRecord[],
+  screen: (artifact: ArtifactRecord) => Promise<ScreeningResult>,
+  inspectPassively: (artifact: ArtifactRecord) => Promise<void>,
+  signal?: AbortSignal,
+): Promise<readonly ScreenedArtifactOutcome[]> {
+  const outcomes: ScreenedArtifactOutcome[] = [];
+  for (const artifact of artifacts) {
+    if (signal?.aborted === true) break;
+    const screening = await screen(artifact);
+    const blocked =
+      screening.provisionalState === "provisional-quarantine" ||
+      screening.provisionalState === "provisional-safety-block" ||
+      screening.provisionalState === "rescreen-required";
+    if (!blocked) await inspectPassively(artifact);
+    outcomes.push(
+      Object.freeze({
+        artifact,
+        screening,
+        passiveExtractionAttempted: !blocked,
+        downstreamBlocked: true,
+      }),
+    );
+  }
+  return Object.freeze(outcomes);
 }
 
 export interface IntakePipelineOutcome {

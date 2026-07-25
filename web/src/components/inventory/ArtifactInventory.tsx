@@ -4,7 +4,13 @@ export interface ArtifactInventoryItem {
   readonly sizeBytes: number;
   readonly sha256: string | null;
   readonly status:
-    "queued" | "hashing" | "preserved" | "duplicate" | "failed" | "interrupted";
+    | "queued"
+    | "hashing"
+    | "preserved"
+    | "duplicate"
+    | "provisional-blocked"
+    | "failed"
+    | "interrupted";
   readonly message: string;
 }
 

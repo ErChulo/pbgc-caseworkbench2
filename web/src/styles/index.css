@@ -197,6 +197,72 @@ h2 {
   box-shadow: var(--shadow-panel);
 }
 
+.status-chip-warning {
+  color: #713f12;
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.quarantine-panel label {
+  display: grid;
+  gap: 0.4rem;
+  margin-block: var(--space-2);
+  font-weight: 700;
+}
+
+.quarantine-panel input,
+.quarantine-panel textarea {
+  width: 100%;
+  padding: 0.7rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.quarantine-list {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.quarantine-list > li {
+  padding: var(--space-3);
+  background: #fffaf0;
+  border: 1px solid #e8c272;
+  border-radius: var(--radius-sm);
+}
+
+.quarantine-list dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.quarantine-list dt {
+  color: var(--color-muted-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.quarantine-list dd {
+  margin: 0.2rem 0 0;
+}
+
+.decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .quarantine-list dl {
+    grid-template-columns: 1fr;
+  }
+}
+
 .workspace-gate {
   display: flex;
   align-items: center;

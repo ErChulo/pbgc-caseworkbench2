@@ -70,7 +70,7 @@ export function PackageIntake({
       <p>
         Files remain local. Originals are hashed and preserved without executing
         document content. All records stay blocked from downstream use until
-        screening in the next governed phase.
+        screening and an authorized human decision are complete.
       </p>
       <label className="file-picker">
         <span>Select individual files</span>
