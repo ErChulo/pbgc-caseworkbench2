@@ -10,7 +10,7 @@ Read `.specify/memory/constitution.md` before planning or editing.
 2. Preserve source citations, effective dates, supersession, and review status for every material plan rule.
 3. Do not invent participant data or replace missing required values with zero.
 4. Keep `CALC_INDICATOR`, `CALCULATION`, and I/O/B metadata distinct.
-5. Use redacted or synthetic participant data only.
+5. Never commit real participant PII or include it in fixtures, test data, examples, logs, screenshots, or documentation. Authorized real participant PII may be processed at runtime only on the user's local device under the constitution. External LLMs may receive only approved de-identified or synthetic/mock data.
 6. Do not recreate `mySort`.
 7. Canonical support sheets are `Summary`, `Tables`, and `UD Table`.
 8. Do not claim Excel, ValTool, Runtime, ATPBGC, or BCV execution unless actually performed.
@@ -39,7 +39,7 @@ Invoke installed skills automatically when their trigger applies:
 - Deployment: use `vercel:deployments-cicd`, `vercel:vercel-cli`, `vercel:vercel-api`, `vercel:env-vars`, or `vercel:vercel-functions` only when the task actually involves the corresponding Vercel capability.
 - Skill discovery: use `find-skills` when needed functionality may exist as an installable skill; use `skill-installer` or `skill-creator` only when explicitly asked to install or create a skill.
 
-No Spec Kit skill is installed. Govern Spec Kit work directly through `.specify/` and `.specify/memory/constitution.md`.
+Repository-local Spec Kit skills are installed under `.agents/skills/`. Use the applicable `speckit-*` skill for each Spec Kit workflow, with `.specify/` and `.specify/memory/constitution.md` remaining the governing project artifacts.
 
 ## Repository indexing and token-efficiency
 
@@ -62,6 +62,6 @@ For all development work in this repository:
 This policy applies to all future tasks unless explicitly overridden by the user.
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+For Feature 009 technical context, architecture, project structure, and planned
+commands, read `specs/009-case-intake-normalization/plan.md`.
 <!-- SPECKIT END -->
