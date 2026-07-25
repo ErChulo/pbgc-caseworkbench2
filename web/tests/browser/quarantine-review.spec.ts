@@ -36,10 +36,13 @@ test("separates accounting, provisional security, and typed human disposition", 
   await expect(
     page.getByRole("heading", { name: "Quarantine queue" }),
   ).toBeVisible();
-  await expect(page.getByText("pending-human-disposition")).toBeVisible();
-  await expect(page.getByText("provisional-safety-block")).toBeVisible();
-  await expect(page.getByText("none", { exact: true })).toBeVisible();
-  await expect(page.getByText("executable")).toBeVisible();
+  const quarantine = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Quarantine queue" }),
+  });
+  await expect(quarantine.getByText("pending-human-disposition")).toBeVisible();
+  await expect(quarantine.getByText("provisional-safety-block")).toBeVisible();
+  await expect(quarantine.getByText("none", { exact: true })).toBeVisible();
+  await expect(quarantine.getByText("executable")).toBeVisible();
   await expect(
     page.getByText(/authorized reviewer must evaluate/iu),
   ).toBeVisible();

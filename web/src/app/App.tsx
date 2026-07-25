@@ -102,6 +102,10 @@ import {
   replayPopulationCandidateDecisions,
   type PopulationCandidateDecision,
 } from "../domain/population/population-profile";
+import {
+  ManifestExport,
+  type ManifestExportSummary,
+} from "../components/inventory/ManifestExport";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -176,6 +180,8 @@ export function App() {
   const [populationItems, setPopulationItems] = useState<
     readonly PopulationReviewItem[]
   >([]);
+  const [manifestSummary, setManifestSummary] =
+    useState<ManifestExportSummary | null>(null);
 
   const activateCase = (caseRecord: CaseRecord) => {
     if (activeCase?.caseId !== caseRecord.caseId) {
@@ -435,6 +441,10 @@ export function App() {
         <PopulationReview
           items={populationItems}
           onDecision={recordPopulationDecision}
+        />
+        <ManifestExport
+          summary={manifestSummary}
+          onExport={exportCurrentManifest}
         />
       </main>
     </div>
@@ -864,6 +874,32 @@ export function App() {
     } else {
       lastCheckpoint.current = existingCheckpoint;
     }
+    setManifestSummary({
+      artifactCount: entries.length,
+      validationCount: entries.length,
+      unresolvedCount: items.filter(
+        (item) =>
+          item.status === "provisional-blocked" || item.status === "failed",
+      ).length,
+      accountingStatus:
+        failures === 0 ? "pending-human-disposition" : "partial-with-failures",
+      provisionalBlockReason:
+        entries.length === 0
+          ? "No evidence artifacts were available for governed processing."
+          : "Evidence remains provisional until all required typed human reviews are effective.",
+      requiredReview:
+        "Review quarantine, classification, relationship, population, and unresolved queues.",
+      nextAction:
+        "Complete applicable reviews, then regenerate the deterministic manifest.",
+      deterministicManifestHash: snapshot.snapshotId,
+      lineage: entries.map((entry, index) => ({
+        nodeId: `artifact-${String(index + 1)}`,
+        label: entry.observedRelativePath,
+        sourceHash: entry.sha256,
+        sourceLocator: entry.observedRelativePath,
+        status: "provisional",
+      })),
+    });
     return {
       items,
       snapshotId: snapshot.snapshotId,
@@ -1180,6 +1216,28 @@ export function App() {
       new TextEncoder().encode(`${canonicalize(event)}\n`),
     );
     if (!saved.ok) throw new Error("Review event could not be preserved.");
+  }
+
+  async function exportCurrentManifest(): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (!activeWorkspace || !activeCase || !manifestSummary)
+      throw new Error("No local manifest is available for export.");
+    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/exports`);
+    const bytes = new TextEncoder().encode(
+      `${canonicalize({
+        deterministicManifestHash: manifestSummary.deterministicManifestHash,
+        artifactCount: manifestSummary.artifactCount,
+        validationCount: manifestSummary.validationCount,
+        unresolvedCount: manifestSummary.unresolvedCount,
+        accountingStatus: manifestSummary.accountingStatus,
+        lineage: manifestSummary.lineage,
+      })}\n`,
+    );
+    const saved = await activeWorkspace.writeAtomic(
+      `cases/${activeCase.caseId}/exports/evidence-manifest.json`,
+      bytes,
+    );
+    if (!saved.ok) throw new Error("Local manifest export failed.");
   }
 }
 
