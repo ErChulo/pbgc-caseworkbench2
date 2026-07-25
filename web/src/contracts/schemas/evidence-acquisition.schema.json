@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/evidence-acquisition.schema.json",
+  "title": "Evidence Acquisition and Structured Extraction Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "deterministicRequestPayload", "requestPayloadSha256", "deterministicPackagePayload", "packagePayloadSha256", "deterministicProposalPayload", "proposalPayloadSha256", "operationalMetadata"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "deterministicRequestPayload": { "$ref": "#/$defs/deterministicRequestPayload" },
+    "requestPayloadSha256": { "$ref": "#/$defs/sha256" },
+    "deterministicPackagePayload": { "$ref": "#/$defs/deterministicPackagePayload" },
+    "packagePayloadSha256": { "$ref": "#/$defs/sha256" },
+    "deterministicProposalPayload": { "oneOf": [{ "$ref": "#/$defs/deterministicProposalPayload" }, { "type": "null" }] },
+    "proposalPayloadSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "operationalMetadata": { "$ref": "#/$defs/acquisitionOperationalMetadata" }
+  },
+  "$defs": {
+    "uuid": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+    "sha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+    "timestamp": { "$ref": "governed-records.schema.json#/$defs/timestamp" },
+    "humanActor": { "$ref": "governed-records.schema.json#/$defs/humanActor" },
+    "missingFactDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factKey", "description", "whyNeeded", "blocksRequestingModule"],
+      "properties": {
+        "factKey": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "whyNeeded": { "type": "string", "minLength": 1 },
+        "blocksRequestingModule": { "type": "boolean" }
+      }
+    },
+    "sourcePriorityRecommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["documentOrReportType", "priority", "rationale", "recommendationOnly"],
+      "properties": {
+        "documentOrReportType": { "type": "string", "minLength": 1 },
+        "priority": { "type": "integer", "minimum": 1 },
+        "rationale": { "type": "string", "minLength": 1 },
+        "recommendationOnly": { "const": true }
+      }
+    },
+    "extractionSchemaRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaId", "schemaVersion", "draft", "schemaSha256"],
+      "properties": {
+        "schemaId": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "draft": { "const": "https://json-schema.org/draft/2020-12/schema" },
+        "schemaSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "extractionInstructionRegistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instructionId", "instructionVersion", "instructionSha256", "instructionText", "purpose", "prohibitedActivities"],
+      "properties": {
+        "instructionId": { "type": "string", "minLength": 1 },
+        "instructionVersion": { "type": "string", "minLength": 1 },
+        "instructionSha256": { "$ref": "#/$defs/sha256" },
+        "instructionText": { "type": "string", "minLength": 1 },
+        "purpose": { "type": "string", "minLength": 1 },
+        "prohibitedActivities": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true }
+      }
+    },
+    "rerunTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["triggerKey", "requestingModuleIdentifier", "triggerCode", "triggerDescription", "requiredInputHashes"],
+      "properties": {
+        "triggerKey": { "type": "string", "minLength": 1 },
+        "requestingModuleIdentifier": { "type": "string", "minLength": 1 },
+        "triggerCode": { "type": "string", "minLength": 1 },
+        "triggerDescription": { "type": "string", "minLength": 1 },
+        "requiredInputHashes": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "uniqueItems": true }
+      }
+    },
+    "deterministicRequestPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestingModuleIdentifier", "missingFacts", "candidateDocumentOrReportTypes", "sourcePriorityRecommendations", "extractionSchemaRegistration", "extractionInstructionRegistration", "rerunTrigger"],
+      "properties": {
+        "requestingModuleIdentifier": { "type": "string", "minLength": 1 },
+        "missingFacts": { "type": "array", "items": { "$ref": "#/$defs/missingFactDeclaration" }, "minItems": 1 },
+        "candidateDocumentOrReportTypes": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "sourcePriorityRecommendations": { "type": "array", "items": { "$ref": "#/$defs/sourcePriorityRecommendation" } },
+        "extractionSchemaRegistration": { "$ref": "#/$defs/extractionSchemaRegistration" },
+        "extractionInstructionRegistration": { "$ref": "#/$defs/extractionInstructionRegistration" },
+        "rerunTrigger": { "$ref": "#/$defs/rerunTrigger" }
+      }
+    },
+    "deterministicPackagePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestPayloadSha256", "artifactSha256Values", "schemaId", "schemaVersion", "schemaSha256", "instructionId", "instructionVersion", "instructionSha256", "transmissionPolicy"],
+      "properties": {
+        "requestPayloadSha256": { "$ref": "#/$defs/sha256" },
+        "artifactSha256Values": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "uniqueItems": true },
+        "schemaId": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "schemaSha256": { "$ref": "#/$defs/sha256" },
+        "instructionId": { "type": "string", "minLength": 1 },
+        "instructionVersion": { "type": "string", "minLength": 1 },
+        "instructionSha256": { "$ref": "#/$defs/sha256" },
+        "transmissionPolicy": { "const": "local-only-no-transmission" }
+      }
+    },
+    "sourceCitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["citationId", "artifactSha256", "sourceLocator", "observedTextOrValue"],
+      "properties": {
+        "citationId": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "sourceLocator": { "type": "string", "minLength": 1 },
+        "observedTextOrValue": {}
+      }
+    },
+    "deterministicProposalPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestPayloadSha256", "packagePayloadSha256", "artifactSha256Values", "schemaId", "schemaVersion", "schemaSha256", "instructionId", "instructionVersion", "instructionSha256", "proposedExtractedFacts", "sourceCitations", "uncertainties", "conflicts", "rerunTrigger"],
+      "properties": {
+        "requestPayloadSha256": { "$ref": "#/$defs/sha256" },
+        "packagePayloadSha256": { "$ref": "#/$defs/sha256" },
+        "artifactSha256Values": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "minItems": 1, "uniqueItems": true },
+        "schemaId": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "schemaSha256": { "$ref": "#/$defs/sha256" },
+        "instructionId": { "type": "string", "minLength": 1 },
+        "instructionVersion": { "type": "string", "minLength": 1 },
+        "instructionSha256": { "$ref": "#/$defs/sha256" },
+        "proposedExtractedFacts": { "type": "object" },
+        "sourceCitations": { "type": "array", "items": { "$ref": "#/$defs/sourceCitation" }, "minItems": 1 },
+        "uncertainties": { "type": "array", "items": { "type": "object" } },
+        "conflicts": { "type": "array", "items": { "type": "object" } },
+        "rerunTrigger": { "$ref": "#/$defs/rerunTrigger" }
+      }
+    },
+    "proposalDecisionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "appendOrdinal", "proposalSha256", "decisionType", "humanActor", "rationale", "decisionTimestamp", "priorDecisionId", "priorDecisionContentSha256", "resultingGovernedStatus", "ruleSetVersion", "schemaVersion"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "proposalSha256": { "$ref": "#/$defs/sha256" },
+        "decisionType": { "enum": ["approve", "reject", "revoke", "supersede"] },
+        "humanActor": { "$ref": "#/$defs/humanActor" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "decisionTimestamp": { "$ref": "#/$defs/timestamp" },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "resultingGovernedStatus": { "enum": ["approved", "rejected", "revoked", "superseded"] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "decisionType": { "enum": ["revoke", "supersede"] } }, "required": ["decisionType"] },
+          "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } }
+        },
+        {
+          "if": { "properties": { "decisionType": { "enum": ["approve", "reject"] } }, "required": ["decisionType"] },
+          "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "decisionType": { "const": "approve" } }, "required": ["decisionType"] },
+          "then": { "properties": { "resultingGovernedStatus": { "const": "approved" } } }
+        },
+        {
+          "if": { "properties": { "decisionType": { "const": "reject" } }, "required": ["decisionType"] },
+          "then": { "properties": { "resultingGovernedStatus": { "const": "rejected" } } }
+        },
+        {
+          "if": { "properties": { "decisionType": { "const": "revoke" } }, "required": ["decisionType"] },
+          "then": { "properties": { "resultingGovernedStatus": { "const": "revoked" } } }
+        },
+        {
+          "if": { "properties": { "decisionType": { "const": "supersede" } }, "required": ["decisionType"] },
+          "then": { "properties": { "resultingGovernedStatus": { "const": "superseded" } } }
+        }
+      ]
+    },
+    "acquisitionOperationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestRecordId", "packageRecordId", "proposalRecordId", "createdAt", "importedAt", "storagePaths", "runtimeStatus", "uiState", "transportMetadata", "proposalDecisionHistory"],
+      "properties": {
+        "requestRecordId": { "$ref": "#/$defs/uuid" },
+        "packageRecordId": { "$ref": "#/$defs/uuid" },
+        "proposalRecordId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "importedAt": { "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+        "storagePaths": { "type": "array", "items": { "type": "string" } },
+        "runtimeStatus": { "type": "string", "minLength": 1 },
+        "uiState": { "type": ["object", "null"] },
+        "transportMetadata": { "type": ["object", "null"] },
+        "proposalDecisionHistory": { "type": "array", "items": { "$ref": "#/$defs/proposalDecisionRecord" } }
+      }
+    },
+    "acquisitionLineageNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId", "nodeType", "contentSha256", "artifactSha256Values", "requestingModuleIdentifier", "rerunTriggerKey"],
+      "properties": {
+        "nodeId": { "type": "string", "minLength": 1 },
+        "nodeType": { "enum": ["request", "package", "schema-registration", "instruction-registration", "proposal", "decision", "rerun-trigger", "promoted-fact"] },
+        "contentSha256": { "$ref": "#/$defs/sha256" },
+        "artifactSha256Values": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "uniqueItems": true },
+        "requestingModuleIdentifier": { "type": "string", "minLength": 1 },
+        "rerunTriggerKey": { "type": "string", "minLength": 1 }
+      }
+    },
+    "acquisitionLineageEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeId", "fromNodeId", "toNodeId", "edgeType"],
+      "properties": {
+        "edgeId": { "type": "string", "minLength": 1 },
+        "fromNodeId": { "type": "string", "minLength": 1 },
+        "toNodeId": { "type": "string", "minLength": 1 },
+        "edgeType": { "enum": ["request-to-package", "package-to-proposal", "proposal-to-decision", "decision-to-promoted-fact", "request-to-schema", "request-to-instruction", "request-to-rerun-trigger"] }
+      }
+    },
+    "governedPromotedFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["factId", "factKey", "factJsonPointer", "factContentSha256", "proposalSha256", "effectiveDecisionId", "artifactSha256Values", "citationIds", "targetGovernedRecordType", "targetGovernedRecordId", "promotionRuleSetVersion", "promotionSchemaVersion", "requestingModuleIdentifier", "rerunTriggerKey"],
+      "properties": {
+        "factId": { "type": "string", "minLength": 1 },
+        "factKey": { "type": "string", "minLength": 1 },
+        "factJsonPointer": { "type": "string", "pattern": "^(?:/(?:[^~/]|~0|~1)*)+$" },
+        "factContentSha256": { "$ref": "#/$defs/sha256" },
+        "proposalSha256": { "$ref": "#/$defs/sha256" },
+        "effectiveDecisionId": { "$ref": "#/$defs/uuid" },
+        "artifactSha256Values": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "minItems": 1, "uniqueItems": true },
+        "citationIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "targetGovernedRecordType": { "type": "string", "minLength": 1 },
+        "targetGovernedRecordId": { "type": "string", "minLength": 1 },
+        "promotionRuleSetVersion": { "type": "string", "minLength": 1 },
+        "promotionSchemaVersion": { "type": "string", "minLength": 1 },
+        "requestingModuleIdentifier": { "type": "string", "minLength": 1 },
+        "rerunTriggerKey": { "type": "string", "minLength": 1 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "deterministicProposalPayload": { "type": "null" } }, "required": ["deterministicProposalPayload"] },
+      "then": { "properties": { "proposalPayloadSha256": { "type": "null" }, "operationalMetadata": { "properties": { "proposalRecordId": { "type": "null" }, "proposalDecisionHistory": { "maxItems": 0 } } } } }
+    },
+    {
+      "if": { "properties": { "deterministicProposalPayload": { "type": "object" } }, "required": ["deterministicProposalPayload"] },
+      "then": { "properties": { "proposalPayloadSha256": { "$ref": "#/$defs/sha256" }, "operationalMetadata": { "properties": { "proposalRecordId": { "$ref": "#/$defs/uuid" } } } } }
+    }
+  ],
+  "x-canonicalization": "Each deterministic payload is serialized as canonical UTF-8 JSON with recursively lexicographically ordered object keys, the path-specific array rules below, explicit nulls for schema-declared nullable values, absence for optional values, and no UUIDs, timestamps, paths, runtime state, UI state, actor data, approval history, or transport metadata. String sort keys use Unicode NFC before ordinal UTF-8 comparison; identifiers and hashes are case-sensitive except SHA-256 is lowercase; duplicate set keys are rejected. At every nesting depth, any array not matched by an exact registered path is order-significant by default and preserves element order; an exact path rule overrides only that array and never its unregistered descendants.",
+  "x-recursive-deterministic-json": "Applies to observedTextOrValue, proposedExtractedFacts, uncertainties, conflicts, and every other nested JSON value: object keys canonicalize recursively; exact registered array paths use their declared rule; all otherwise-unregistered nested arrays preserve order and are hash-significant at every depth.",
+  "x-deterministic-array-semantics": {
+    "deterministicRequestPayload.missingFacts": "set-like; sort by NFC factKey, then NFC description, then canonical item bytes; reject duplicate factKey",
+    "deterministicRequestPayload.candidateDocumentOrReportTypes": "set-like; trim and NFC-normalize, preserve business-facing case, sort by Unicode case-folded value then original NFC value; reject case-fold-equivalent duplicates",
+    "deterministicRequestPayload.sourcePriorityRecommendations": "order-significant and valid only when already in ascending unique-priority order; nonascending input and duplicate priorities are invalid, and implementations must not reorder",
+    "deterministicPackagePayload.artifactSha256Values": "set-like; lowercase required, sort ascending hexadecimal, reject duplicates",
+    "deterministicProposalPayload.artifactSha256Values": "set-like; lowercase required, sort ascending hexadecimal, reject duplicates",
+    "deterministicProposalPayload.sourceCitations": "set-like; sort by NFC citationId, then artifactSha256, then NFC sourceLocator; reject duplicate citationId",
+    "deterministicProposalPayload.uncertainties": "order-significant; requesting extractor establishes explanatory order and implementations preserve it; nested arrays recursively preserve submitted order",
+    "deterministicProposalPayload.conflicts": "order-significant; requesting extractor establishes explanatory order and implementations preserve it; nested arrays recursively preserve submitted order",
+    "rerunTrigger.requiredInputHashes": "set-like; lowercase required, sort ascending hexadecimal, reject duplicates",
+    "extractionInstructionRegistration.prohibitedActivities": "set-like; trim and NFC-normalize, sort by Unicode case-folded value then original NFC value, reject case-fold-equivalent duplicates",
+    "deterministicProposalPayload.proposedExtractedFacts": "object, not array; object keys are recursively lexicographic; an exact registered nested-array path uses its registered rule, and every otherwise-unregistered nested array is valid, order-significant by default, preserves element order, and remains hash-significant at every depth"
+  },
+  "x-canonicalization-profile": "PBGC Case Workbench Canonicalization Profile v1",
+  "x-hash-invariants": [
+    "requestPayloadSha256 is the lowercase SHA-256 of canonical deterministicRequestPayload only",
+    "packagePayloadSha256 is the lowercase SHA-256 of canonical deterministicPackagePayload only",
+    "proposalPayloadSha256 is null when no proposal exists; otherwise it is the lowercase SHA-256 of canonical deterministicProposalPayload only",
+    "Changes confined to operationalMetadata never change requestPayloadSha256, packagePayloadSha256, or proposalPayloadSha256",
+    "Repeated generation from identical deterministic inputs produces byte-identical canonical payloads and identical hashes"
+  ],
+  "x-decision-history-invariants": [
+    "proposalDecisionHistory is append-only and replayed by appendOrdinal, never by decisionTimestamp; timestamps are informational only",
+    "The first decision has appendOrdinal 1 and null priorDecisionId/priorDecisionContentSha256; each later decision increments by exactly one and references the immediately preceding decision ID and deterministic decision-content hash",
+    "appendOrdinal and decisionId values are unique; predecessor links contain no gaps, branches, or cycles",
+    "Every decision proposalSha256 equals the enclosing proposalPayloadSha256",
+    "Valid transitions are no-decision to approve or reject; approve to revoke or supersede; reject to supersede only; revoked to supersede only; rejection is never revoked",
+    "supersede references the immediately preceding effective decision; superseding a non-effective decision is invalid",
+    "Current effective governed status is derived by replaying the valid decision chain and is never overwritten in place",
+    "Only a human actor may create a proposal decision",
+    "Every promoted fact factJsonPointer resolves to exactly one fact in proposedExtractedFacts; factContentSha256 hashes canonical {factKey, factJsonPointer, value}; cited IDs resolve to proposal citations whose artifact hashes are included in the promoted fact",
+    "A promoted fact's effectiveDecisionId resolves to the current effective approval for the same proposalSha256; revoked approval blocks promotion; duplicate promotion of one fact into conflicting governed records is invalid"
+  ],
+  "x-complete-transition-matrix": "Initial approve→approved or reject→rejected. approved→revoke→revoked or supersede→superseded; rejected→supersede→superseded; revoked→supersede→superseded. Rejection cannot be revoked and superseded is terminal for the proposal. Every noninitial record increments appendOrdinal exactly once and references the immediately preceding same-proposal decision ID and deterministic content hash; gaps, duplicate ordinals, branches, cycles, broken/stale predecessors, cross-proposal links, invalid transitions, and ineffective supersession are rejected; timestamps are informational only.",
+  "x-numeric-canonicalization": "Every finite JSON number in deterministic acquisition content uses RFC 8785 serialization; equivalent notation hashes identically, negative zero serializes as 0, and NaN/infinities are invalid. Exact lexical decimals use governed-records canonicalDecimalString values. This applies recursively inside proposedExtractedFacts and all other nested values.",
+  "x-lineage-content-hash-semantics": {
+    "request": "requestPayloadSha256 over deterministicRequestPayload",
+    "package": "packagePayloadSha256 over deterministicPackagePayload",
+    "proposal": "proposalPayloadSha256 over deterministicProposalPayload",
+    "decision": "SHA-256 over canonical deterministic projection {appendOrdinal, priorDecisionContentSha256, proposalSha256, decisionType, resultingGovernedStatus, ruleSetVersion, schemaVersion}; decisionId/priorDecisionId UUIDs, actor, rationale, and timestamp remain operational and excluded",
+    "promoted-fact": "factContentSha256 over canonical {factKey, factJsonPointer, value}",
+    "rerun-trigger": "SHA-256 over canonical rerunTrigger deterministic content"
+  },
+  "x-framework-boundary": "This contract supports local intake-layer acquisition and structured extraction packages only. It does not authorize external transmission, plan interpretation, actuarial calculation, or report production."
+}

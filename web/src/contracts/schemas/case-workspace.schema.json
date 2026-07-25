@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/case-workspace.schema.json",
+  "title": "Case Workspace",
+  "x-canonicalization-profile": "PBGC Case Workbench Canonicalization Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "workspaceId", "case", "intakeAttempts", "statusHistory", "ruleSetVersion"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "workspaceId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+    "ruleSetVersion": { "type": "string", "minLength": 1 },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseUuid", "caseKind", "createdBy", "createdAt", "status", "statusHistory"],
+      "properties": {
+        "caseUuid": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "authoritativePbgcCaseId": { "type": ["string", "null"], "minLength": 1 },
+        "caseKind": { "enum": ["production", "test", "training", "duplicate-investigation"] },
+        "designationRationale": { "type": ["string", "null"] },
+        "createdBy": { "$ref": "governed-records.schema.json#/$defs/actor" },
+        "createdAt": { "$ref": "governed-records.schema.json#/$defs/timestamp" },
+        "collisionDecisionId": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+        "status": { "enum": ["active", "closed", "archived", "blocked"] },
+        "statusHistory": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/statusEvent" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "caseKind": { "const": "production" } }, "required": ["caseKind"] },
+          "then": {
+            "required": ["authoritativePbgcCaseId"],
+            "properties": { "authoritativePbgcCaseId": { "type": "string", "minLength": 1 } }
+          }
+        },
+        {
+          "if": { "properties": { "caseKind": { "enum": ["test", "training", "duplicate-investigation"] } }, "required": ["caseKind"] },
+          "then": { "required": ["designationRationale"] }
+        }
+      ]
+    },
+    "intakeAttempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["attemptId", "caseUuid", "snapshotId", "snapshotRecordId", "initiatedBy", "sourceContext", "startedAt", "status", "statusHistory", "ruleSetVersion"],
+        "properties": {
+          "attemptId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+          "caseUuid": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+          "snapshotId": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+          "snapshotRecordId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+          "priorAttemptId": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+          "divergenceReason": { "type": ["string", "null"] },
+          "initiatedBy": { "$ref": "governed-records.schema.json#/$defs/actor" },
+          "sourceContext": { "type": "object" },
+          "startedAt": { "$ref": "governed-records.schema.json#/$defs/timestamp" },
+          "endedAt": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/timestamp" }, { "type": "null" }] },
+          "status": { "enum": ["discovering", "hashing", "preserving", "processing", "partial", "blocked", "completed", "failed", "interrupted", "cancelled"] },
+          "statusHistory": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/statusEvent" } },
+          "ruleSetVersion": { "type": "string", "minLength": 1 }
+        },
+        "allOf": [
+          {
+            "if": { "required": ["priorAttemptId"], "properties": { "priorAttemptId": { "type": "string" } } },
+            "then": { "required": ["divergenceReason"] }
+          }
+        ]
+      }
+    },
+    "statusHistory": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/statusEvent" } }
+  }
+  ,"x-numeric-canonicalization": "Every finite JSON number participating in snapshot or deterministic workspace identity uses RFC 8785 serialization; negative zero serializes as 0 and NaN/infinities are invalid. Exact lexical decimals use governed-records canonicalDecimalString."
+}

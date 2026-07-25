@@ -12,6 +12,7 @@
     "lint": "eslint . --max-warnings 0",
     "format:check": "prettier --check package.json tsconfig.json eslint.config.js vite.config.ts vitest.config.ts playwright.config.ts web docs/feature-009-browser-feasibility.md docs/feature-009-dependency-review.md docs/adr/009-local-first-evidence-intake.md",
     "validate:schemas": "node web/tools/validate-design-schemas.mjs",
+    "validate:contracts": "node web/tools/validate-contracts.mjs",
     "test": "vitest run",
     "test:unit": "vitest run --project unit --project contract --project worker",
     "test:integration": "vitest run --project integration",
@@ -19,7 +20,7 @@
     "test:browser:chromium": "playwright test --project=chromium",
     "build": "vite build",
     "verify:single-file": "node web/tools/verify-single-file.mjs",
-    "quality": "npm run typecheck && npm run lint && npm run format:check && npm run validate:schemas && npm test && npm run build && npm run verify:single-file"
+    "quality": "npm run typecheck && npm run lint && npm run format:check && npm run validate:schemas && npm run validate:contracts && npm test && npm run build && npm run verify:single-file"
   },
   "dependencies": {
     "ajv": "8.20.0",
