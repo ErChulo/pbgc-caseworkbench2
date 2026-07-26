@@ -10,9 +10,7 @@ test("shows a deterministic manifest, unresolved status, and one-view lineage lo
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-MANIFEST");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-MANIFEST");
   await page.getByRole("button", { name: "Create production case" }).click();
   await page.getByLabel("Select individual files").setInputFiles({
     name: "synthetic.csv",
@@ -25,9 +23,9 @@ test("shows a deterministic manifest, unresolved status, and one-view lineage lo
   const manifest = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Evidence manifest" }),
   });
-  await expect(manifest.getByText("One-view lineage")).toBeVisible();
-  await expect(manifest.getByText(/Accounting classification:/u)).toBeVisible();
-  await expect(manifest.getByText(/Provisional block:/u)).toBeVisible();
+  await expect(manifest.getByText("File-to-decision trace")).toBeVisible();
+  await expect(manifest.getByText(/Processing status:/u)).toBeVisible();
+  await expect(manifest.getByText(/Safety review needed:/u)).toBeVisible();
   await expect(manifest.getByText(/^[0-9a-f]{64}$/u).first()).toBeVisible();
   await manifest.getByRole("button", { name: "Export local manifest" }).click();
   expect(outboundRequests).toEqual([]);

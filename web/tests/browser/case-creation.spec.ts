@@ -99,9 +99,7 @@ test("creates one production case and requires an explicit duplicate decision", 
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-001");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-001");
   await page.getByRole("button", { name: "Create production case" }).click();
 
   const caseId = await page.getByTestId("current-case-id").textContent();
@@ -111,9 +109,7 @@ test("creates one production case and requires an explicit duplicate decision", 
   await expect(page.getByText("Production case created")).toBeVisible();
 
   await page.getByRole("button", { name: "Create another case" }).click();
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-001");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-001");
   await page.getByRole("button", { name: "Create production case" }).click();
 
   await expect(
@@ -142,16 +138,12 @@ test("creates a separately designated non-production case only after human appro
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-002");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-002");
   await page.getByRole("button", { name: "Create production case" }).click();
   const productionId = await page.getByTestId("current-case-id").textContent();
 
   await page.getByRole("button", { name: "Create another case" }).click();
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-002");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-002");
   await page.getByRole("button", { name: "Create production case" }).click();
   await page
     .getByLabel("Decision rationale")

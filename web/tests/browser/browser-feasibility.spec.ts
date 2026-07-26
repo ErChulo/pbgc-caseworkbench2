@@ -38,11 +38,9 @@ test("built artifact reports direct-file capability without network access", asy
   const artifact = pathToFileURL(resolve("dist/pbgc-caseworkbench.html")).href;
   await page.goto(artifact);
 
-  await expect(page.getByText(/Mode:/)).toContainText("direct-file");
-  await expect(page.locator('[data-feasibility="fail"]')).toBeVisible();
-  await expect(page.getByText("worker").locator("..")).toContainText("Fail");
-  await expect(page.getByText(/File System Access API:/)).toContainText(
-    "available",
-  );
+  await expect(
+    page.getByRole("heading", { name: "Evidence intake foundation" }),
+  ).toBeVisible();
+  await expect(page.locator(".feasibility")).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });

@@ -7,9 +7,7 @@ async function createSyntheticCase(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-QUARANTINE");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-QUARANTINE");
   await page.getByRole("button", { name: "Create production case" }).click();
 }
 
@@ -32,7 +30,7 @@ test("separates accounting, provisional security, and typed human disposition", 
       buffer: Buffer.from("synthetic safe sibling"),
     },
   ]);
-  await expect(page.getByText("Inventory checkpoint complete")).toBeVisible();
+  await expect(page.getByText("File inventory complete")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Quarantine queue" }),
   ).toBeVisible();
@@ -40,22 +38,26 @@ test("separates accounting, provisional security, and typed human disposition", 
     has: page.getByRole("heading", { name: "Quarantine queue" }),
   });
   await expect(quarantine.getByText("pending-human-disposition")).toBeVisible();
-  await expect(quarantine.getByText("provisional-safety-block")).toBeVisible();
-  await expect(quarantine.getByText("none", { exact: true })).toBeVisible();
+  await expect(quarantine.getByText("Safety review needed")).toBeVisible();
+  await expect(quarantine.getByText("No decision yet", { exact: true })).toBeVisible();
   await expect(quarantine.getByText("executable")).toBeVisible();
   await expect(
-    page.getByText(/authorized reviewer must evaluate/iu),
+    page.getByText(/authorized reviewer must check/iu),
   ).toBeVisible();
 
-  await page.getByLabel("Reviewer identity").fill("authorized-reviewer");
-  await page
-    .getByLabel("Decision rationale")
+  await quarantine.getByLabel("Reviewer name").fill("authorized-reviewer");
+  await quarantine
+    .getByLabel("Rationale")
     .fill("Synthetic exact-byte review completed.");
   const riskItem = page.locator(".quarantine-list > li", {
     hasText: "synthetic-risk.exe",
   });
-  await riskItem.getByRole("button", { name: "release", exact: true }).click();
-  await expect(page.getByText("released", { exact: true })).toBeVisible();
+  await riskItem
+    .getByRole("button", { name: "Release for use" })
+    .click();
+  await expect(
+    quarantine.getByText("Released", { exact: true }),
+  ).toBeVisible();
   await picker.setInputFiles({
     name: "synthetic-risk-copy.exe",
     mimeType: "application/octet-stream",
@@ -65,10 +67,10 @@ test("separates accounting, provisional security, and typed human disposition", 
     hasText: "synthetic-risk-copy.exe",
   });
   await inheritedItem
-    .getByRole("button", { name: "inherit release", exact: true })
+    .getByRole("button", { name: "Inherit approved status", exact: true })
     .click();
   await expect(
-    inheritedItem.getByText("released", { exact: true }),
+    inheritedItem.getByText("Released", { exact: true }),
   ).toBeVisible();
 
   await picker.setInputFiles({
@@ -81,15 +83,15 @@ test("separates accounting, provisional security, and typed human disposition", 
   });
   await expect(
     changedItem.getByRole("button", {
-      name: "inherit release",
+      name: "Inherit approved status",
       exact: true,
     }),
   ).toBeDisabled();
   await inheritedItem
-    .getByRole("button", { name: "revoke", exact: true })
+    .getByRole("button", { name: "Withdraw approval", exact: true })
     .click();
   await expect(
-    inheritedItem.getByText("revoked", { exact: true }),
+    inheritedItem.getByText("Revoked", { exact: true }),
   ).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });

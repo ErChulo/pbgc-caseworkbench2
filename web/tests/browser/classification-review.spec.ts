@@ -10,9 +10,7 @@ test("reviews classification and relationship proposals with immutable human his
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-CLASSIFICATION");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-CLASSIFICATION");
   await page.getByRole("button", { name: "Create production case" }).click();
   await page.getByLabel("Select individual files").setInputFiles([
     {
@@ -30,41 +28,33 @@ test("reviews classification and relationship proposals with immutable human his
       ),
     },
   ]);
-  await expect(page.getByText("Inventory checkpoint complete")).toBeVisible();
+  await expect(page.getByText("File inventory complete")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Classification review" }),
   ).toBeVisible();
-  const classification = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "Classification review" }),
-  });
   await expect(
-    classification.getByText("Human approval required"),
+    page.getByText("Awaiting review").first(),
   ).toBeVisible();
-  await expect(
-    page.getByText("proposed", { exact: true }).first(),
-  ).toBeVisible();
-  await expect(
-    page.getByText("provisional", { exact: true }).first(),
-  ).toBeVisible();
-  await page.getByLabel("Classification reviewer").fill("authorized-reviewer");
-  await page
-    .getByLabel("Classification rationale")
+
+  const classification = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Classification review" }) });
+  await classification
+    .getByLabel("Reviewer name")
+    .fill("authorized-reviewer");
+  await classification
+    .getByLabel("Rationale")
     .fill("Synthetic document category reviewed.");
-  const firstClassification = page
-    .locator(".review-panel")
-    .first()
-    .locator("li")
-    .first();
-  await firstClassification.getByRole("button", { name: "approve" }).click();
+  const firstClassification = classification.locator("li").first();
+  await firstClassification.getByRole("button", { name: "Approve" }).click();
   await expect(
-    firstClassification.getByText("approved", { exact: true }),
+    firstClassification.getByText("Approved", { exact: true }),
   ).toBeVisible();
+  await firstClassification
+    .getByRole("button", { name: "Withdraw approval" })
+    .click();
   await expect(
-    firstClassification.getByText("proposed", { exact: true }),
-  ).toBeVisible();
-  await firstClassification.getByRole("button", { name: "revoke" }).click();
-  await expect(
-    firstClassification.getByText("revoked", { exact: true }),
+    firstClassification.getByText("Revoked", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Effective-date candidates" }),
@@ -74,24 +64,23 @@ test("reviews classification and relationship proposals with immutable human his
     .first()
     .click();
   await expect(
-    page.getByText("selected", { exact: true }).first(),
+    page.getByText("Selected", { exact: true }).first(),
   ).toBeVisible();
 
   await expect(
     page.getByRole("heading", { name: "Relationship review" }),
   ).toBeVisible();
-  await page.getByLabel("Relationship reviewer").fill("relationship-reviewer");
-  await page
-    .getByLabel("Relationship rationale")
-    .fill("Synthetic similarity evidence reviewed.");
   const relationship = page
-    .locator(".review-panel")
-    .nth(1)
-    .locator("li")
-    .first();
-  await relationship.getByRole("button", { name: "reject" }).click();
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Relationship review" }) });
+  await relationship.getByLabel("Reviewer name").fill("relationship-reviewer");
+  await relationship
+    .getByLabel("Rationale")
+    .fill("Synthetic similarity evidence reviewed.");
+  const firstRelationship = relationship.locator("li").first();
+  await firstRelationship.getByRole("button", { name: "Reject" }).click();
   await expect(
-    relationship.getByText("rejected", { exact: true }),
+    firstRelationship.getByText("Rejected", { exact: true }),
   ).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });

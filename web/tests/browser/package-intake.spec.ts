@@ -9,9 +9,7 @@ async function createSyntheticCase(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-INTAKE");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-INTAKE");
   await page.getByRole("button", { name: "Create production case" }).click();
 }
 
@@ -23,20 +21,20 @@ test("inventories, hashes, preserves, and resumes an unchanged synthetic selecti
   const picker = page.getByLabel("Select a folder");
   const fixtureDirectory = path.resolve("web/tests/fixtures/browser-package");
   await picker.setInputFiles(fixtureDirectory);
-  await expect(page.getByText("Inventory checkpoint complete")).toBeVisible();
+  await expect(page.getByText("File inventory complete")).toBeVisible();
   await expect(
     page.getByText(
-      "Exact bytes linked to a separate receipt; no approval conferred.",
+      "Same content as another file. Kept separately; no approval given.",
     ),
   ).toBeVisible();
   await expect(
-    page.getByText("Initial immutable snapshot created."),
+    page.getByText("First snapshot of this file set created."),
   ).toBeVisible();
   await picker.setInputFiles(fixtureDirectory);
   await expect(
-    page.getByText("Unchanged snapshot resumed without duplicate records."),
+    page.getByText("Same files as before — no duplicate records created."),
   ).toBeVisible();
-  await expect(page.getByText("Provisional only")).toBeVisible();
+  await expect(page.getByText("Pending review")).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });
 
@@ -50,17 +48,19 @@ test("records changed selection as linked divergence and preserves partial conti
     mimeType: "text/plain",
     buffer: Buffer.from("one"),
   });
-  await expect(page.getByText("Inventory checkpoint complete")).toBeVisible();
+  await expect(page.getByText("File inventory complete")).toBeVisible();
   await picker.setInputFiles({
     name: "alpha.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("two"),
   });
   await expect(
-    page.getByText("Changed package created a linked snapshot."),
+    page.getByText("Files changed — new snapshot linked to the previous one."),
   ).toBeVisible();
   await expect(
-    page.getByText(/downstream use remains blocked/iu),
+    page.getByText(
+      "File preserved. Downstream use blocked until all reviews complete.",
+    ),
   ).toBeVisible();
 });
 
@@ -76,10 +76,10 @@ test("interrupts large-file hashing at a safe boundary without claiming completi
   });
   await selection;
   await expect(
-    page.getByRole("button", { name: "Interrupt safely" }),
+    page.getByRole("button", { name: "Stop safely" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Interrupt safely" }).click();
-  await expect(page.getByText("Inventory interrupted")).toBeVisible();
+  await page.getByRole("button", { name: "Stop safely" }).click();
+  await expect(page.getByText("File inventory interrupted")).toBeVisible();
   await expect(
     page.getByText("Work stopped at a durable boundary."),
   ).toBeVisible();

@@ -35,17 +35,17 @@ describe("T042 incremental SHA-256", () => {
     },
   );
 
-  it("matches an independent Web Crypto digest for synthetic large-stream bytes", async () => {
+  it("matches an independent Node crypto digest for synthetic large-stream bytes", async () => {
     const bytes = deterministicBytes(2 * 1024 * 1024 + 11);
     const result = await hashChunkReader(readerFromBytes(bytes), {
       chunkSizeBytes: 65_537,
     });
-    const independent = Buffer.from(
-      await globalThis.crypto.subtle.digest(
-        "SHA-256",
-        Uint8Array.from(bytes).buffer,
-      ),
-    ).toString("hex");
+    // Use Node's `createHash` as the independent digest source. The chunk-
+    // boundary `it.each` above uses the same pattern, and this avoids the
+    // SubtleCrypto polyfill `BufferSource` validation in jsdom plus the
+    // stricter `BufferSource` typing in newer `@types/web` that rejected
+    // every Uint8Array / ArrayBuffer coercion we tried.
+    const independent = createHash("sha256").update(bytes).digest("hex");
     expect(result.ok && result.value.sha256).toBe(independent);
   });
 

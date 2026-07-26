@@ -10,9 +10,7 @@ test("profiles a synthetic population locally and records a separate human decis
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
-  await page
-    .getByLabel("Authoritative PBGC case identifier")
-    .fill("PBGC-SYNTHETIC-POPULATION");
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-POPULATION");
   await page.getByRole("button", { name: "Create production case" }).click();
   await page.getByLabel("Select individual files").setInputFiles({
     name: "synthetic-population.csv",
@@ -25,7 +23,7 @@ test("profiles a synthetic population locally and records a separate human decis
       ].join("\n"),
     ),
   });
-  await expect(page.getByText("Inventory checkpoint complete")).toBeVisible();
+  await expect(page.getByText("File inventory complete")).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Population candidate review" }),
   ).toBeVisible();
@@ -33,22 +31,22 @@ test("profiles a synthetic population locally and records a separate human decis
     has: page.getByRole("heading", { name: "Population candidate review" }),
   });
   await expect(
-    population.getByText("unresolved", { exact: true }).first(),
+    population.getByText("Needs investigation", { exact: true }).first(),
   ).toBeVisible();
-  await expect(
-    population.getByText(/generalKey, status, service/u),
-  ).toBeVisible();
-  await expect(
-    population.getByText("provisional", { exact: true }),
-  ).toBeVisible();
-  await page.getByLabel("Population reviewer").fill("population-reviewer");
-  await page
-    .getByLabel("Population rationale")
+  await expect(population.getByText(/generalKey, status, service/u)).toBeVisible();
+  await expect(population.getByText("Awaiting review").first()).toBeVisible();
+
+  await population.getByLabel("Reviewer name").fill("population-reviewer");
+  await population
+    .getByLabel("Rationale")
     .fill("Synthetic structural candidate reviewed locally.");
-  await population.getByRole("button", { name: "approve" }).click();
-  await expect(population.getByText("approved", { exact: true })).toBeVisible();
+  const populationCandidate = population.locator("li").first();
+  await populationCandidate.getByRole("button", { name: "Approve" }).click();
   await expect(
-    population.getByText("unresolved", { exact: true }),
+    populationCandidate.getByText("Approved", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    populationCandidate.getByText("Needs investigation", { exact: true }),
   ).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });
