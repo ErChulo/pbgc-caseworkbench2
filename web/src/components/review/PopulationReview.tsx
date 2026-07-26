@@ -1,9 +1,15 @@
-import { useState } from "react";
-
 import type {
   PopulationCandidateProfile,
   PopulationDecisionProjection,
 } from "../../domain/population/population-profile";
+import { Tooltip } from "../Tooltip";
+import {
+  ACTION_LABELS,
+  ACTION_TOOLTIPS,
+  RATIONALE_PLACEHOLDER,
+  REVIEW_ACTIONS,
+  plainStatus,
+} from "./shared";
 
 export interface PopulationReviewItem {
   readonly displayName: string;
@@ -14,9 +20,17 @@ export interface PopulationReviewItem {
 
 export function PopulationReview({
   items,
+  reviewer: sharedReviewer,
+  rationale: sharedRationale,
+  onReviewerChange,
+  onRationaleChange,
   onDecision,
 }: {
   readonly items: readonly PopulationReviewItem[];
+  readonly reviewer: string;
+  readonly rationale: string;
+  readonly onReviewerChange: (value: string) => void;
+  readonly onRationaleChange: (value: string) => void;
   readonly onDecision: (
     item: PopulationReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
@@ -24,8 +38,6 @@ export function PopulationReview({
     rationale: string,
   ) => Promise<void>;
 }) {
-  const [reviewer, setReviewer] = useState("");
-  const [rationale, setRationale] = useState("");
   if (items.length === 0) return null;
   return (
     <section
@@ -42,28 +54,33 @@ export function PopulationReview({
         </span>
       </div>
       <p>
-        Detection is proposal-only. Values remain exactly as observed; missing,
+        Detection is suggestion-only. Values remain exactly as observed; missing,
         blank, malformed, formula text, leading-zero text, and literal zero are
         not corrected or imputed.
       </p>
-      <div className="form-grid">
-        <label>
-          Population reviewer
+      <div className="shared-reviewer">
+        <label htmlFor="population-reviewer">
+          Reviewer name
           <input
-            value={reviewer}
+            id="population-reviewer"
+            value={sharedReviewer}
             onChange={(event) => {
-              setReviewer(event.currentTarget.value);
+              onReviewerChange(event.currentTarget.value);
             }}
             autoComplete="off"
           />
         </label>
-        <label>
-          Population rationale
+        <label htmlFor="population-rationale">
+          Rationale
           <textarea
-            value={rationale}
+            id="population-rationale"
+            value={sharedRationale}
+            rows={3}
+            placeholder={RATIONALE_PLACEHOLDER}
             onChange={(event) => {
-              setRationale(event.currentTarget.value);
+              onRationaleChange(event.currentTarget.value);
             }}
+            autoComplete="off"
           />
         </label>
       </div>
@@ -73,16 +90,16 @@ export function PopulationReview({
             <h3>{item.displayName}</h3>
             <dl>
               <div>
-                <dt>Source state</dt>
-                <dd>{item.candidate.candidateStatus}</dd>
+                <dt>Source status</dt>
+                <dd>{plainStatus(item.candidate.candidateStatus)}</dd>
               </div>
               <div>
-                <dt>Computed human status</dt>
-                <dd>{item.projection.status}</dd>
+                <dt>Current status</dt>
+                <dd>{plainStatus(item.projection.status)}</dd>
               </div>
               <div>
                 <dt>Observed fields</dt>
-                <dd>{item.candidate.observedFields.join(", ") || "none"}</dd>
+                <dd>{item.candidate.observedFields.join(", ") || "None"}</dd>
               </div>
               <div>
                 <dt>Observed records</dt>
@@ -102,20 +119,19 @@ export function PopulationReview({
             </p>
             {item.candidate.candidateStatus === "unresolved" && (
               <p className="notice">
-                Unresolved: review the original local artifact and its
+                Needs investigation: review the original local artifact and its
                 structural findings before governed downstream use.
               </p>
             )}
             <div className="decision-actions">
-              {(["approve", "reject", "revoke", "supersede"] as const).map(
-                (action) => (
+              {REVIEW_ACTIONS.map((action) => (
+                <Tooltip key={action} content={ACTION_TOOLTIPS[action]}>
                   <button
-                    key={action}
                     type="button"
                     className="button button-secondary"
                     disabled={
-                      reviewer.trim().length === 0 ||
-                      rationale.trim().length === 0 ||
+                      sharedReviewer.trim().length === 0 ||
+                      sharedRationale.trim().length === 0 ||
                       (action === "revoke" &&
                         item.projection.status !== "approved") ||
                       (action === "supersede" &&
@@ -125,15 +141,15 @@ export function PopulationReview({
                       void onDecision(
                         item,
                         action,
-                        reviewer.trim(),
-                        rationale.trim(),
+                        sharedReviewer.trim(),
+                        sharedRationale.trim(),
                       )
                     }
                   >
-                    {action}
+                    {ACTION_LABELS[action]}
                   </button>
-                ),
-              )}
+                </Tooltip>
+              ))}
             </div>
           </li>
         ))}

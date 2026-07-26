@@ -49,18 +49,18 @@ export function ManifestExport({
         </div>
       </dl>
       <p>
-        <strong>Accounting classification:</strong> {summary.accountingStatus}.
-        This accounting label does not confer approval or release.
+        <strong>Processing status:</strong> {summary.accountingStatus}.
+        This label does not confer approval or release.
       </p>
       {summary.provisionalBlockReason !== null && (
         <p className="notice">
-          <strong>Provisional block:</strong> {summary.provisionalBlockReason}{" "}
-          <strong>Required review:</strong> {summary.requiredReview}.{" "}
-          <strong>Next action:</strong> {summary.nextAction}
+          <strong>Safety review needed:</strong> {summary.provisionalBlockReason}{" "}
+          <strong>Review required:</strong> {summary.requiredReview}.{" "}
+          <strong>Next step:</strong> {summary.nextAction}
         </p>
       )}
       <p>
-        <strong>Deterministic manifest SHA-256:</strong>{" "}
+        <strong>Manifest fingerprint:</strong>{" "}
         <code>{summary.deterministicManifestHash}</code>
       </p>
       <button

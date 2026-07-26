@@ -1,9 +1,15 @@
-import { useState } from "react";
-
 import type {
   EvidenceRelationship,
   GovernedStatus,
 } from "../../domain/classification/models";
+import { Tooltip } from "../Tooltip";
+import {
+  ACTION_LABELS,
+  ACTION_TOOLTIPS,
+  RATIONALE_PLACEHOLDER,
+  REVIEW_ACTIONS,
+  plainStatus,
+} from "./shared";
 
 export interface RelationshipReviewItem {
   readonly relationship: EvidenceRelationship;
@@ -16,9 +22,17 @@ export interface RelationshipReviewItem {
 
 export function RelationshipReview({
   items,
+  reviewer: sharedReviewer,
+  rationale: sharedRationale,
+  onReviewerChange,
+  onRationaleChange,
   onDecision,
 }: {
   readonly items: readonly RelationshipReviewItem[];
+  readonly reviewer: string;
+  readonly rationale: string;
+  readonly onReviewerChange: (value: string) => void;
+  readonly onRationaleChange: (value: string) => void;
   readonly onDecision: (
     item: RelationshipReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
@@ -26,8 +40,6 @@ export function RelationshipReview({
     rationale: string,
   ) => Promise<void>;
 }) {
-  const [reviewer, setReviewer] = useState("");
-  const [rationale, setRationale] = useState("");
   if (items.length === 0) return null;
   return (
     <section
@@ -39,29 +51,35 @@ export function RelationshipReview({
           <p className="section-label">Relationship evidence</p>
           <h2 id="relationship-title">Relationship review</h2>
         </div>
-        <span className="status-chip status-chip-warning">Proposal only</span>
+        <span className="status-chip status-chip-warning">Suggestion only</span>
       </div>
       <p>
-        Similarity and documentary signals are directional proposals. Only a
-        typed human decision chain computes governed status.
+        Similarity and documentary signals are suggestions. Only a typed human
+        decision chain produces a governed status.
       </p>
-      <div className="form-grid">
-        <label>
-          Relationship reviewer
+      <div className="shared-reviewer">
+        <label htmlFor="relationship-reviewer">
+          Reviewer name
           <input
-            value={reviewer}
+            id="relationship-reviewer"
+            value={sharedReviewer}
             onChange={(event) => {
-              setReviewer(event.currentTarget.value);
+              onReviewerChange(event.currentTarget.value);
             }}
+            autoComplete="off"
           />
         </label>
-        <label>
-          Relationship rationale
+        <label htmlFor="relationship-rationale">
+          Rationale
           <textarea
-            value={rationale}
+            id="relationship-rationale"
+            value={sharedRationale}
+            rows={3}
+            placeholder={RATIONALE_PLACEHOLDER}
             onChange={(event) => {
-              setRationale(event.currentTarget.value);
+              onRationaleChange(event.currentTarget.value);
             }}
+            autoComplete="off"
           />
         </label>
       </div>
@@ -74,17 +92,17 @@ export function RelationshipReview({
             </p>
             <dl>
               <div>
-                <dt>Proposal state</dt>
-                <dd>{item.relationship.status}</dd>
+                <dt>Proposal status</dt>
+                <dd>{plainStatus(item.relationship.status)}</dd>
               </div>
               <div>
-                <dt>Computed human status</dt>
-                <dd>{item.effectiveStatus}</dd>
+                <dt>Current status</dt>
+                <dd>{plainStatus(item.effectiveStatus)}</dd>
               </div>
               <div>
                 <dt>Confidence</dt>
                 <dd>
-                  {item.relationship.confidence?.toFixed(2) ?? "not scored"}
+                  {item.relationship.confidence?.toFixed(2) ?? "Not scored"}
                 </dd>
               </div>
               <div>
@@ -98,15 +116,14 @@ export function RelationshipReview({
               </p>
             )}
             <div className="decision-actions">
-              {(["approve", "reject", "revoke", "supersede"] as const).map(
-                (action) => (
+              {REVIEW_ACTIONS.map((action) => (
+                <Tooltip key={action} content={ACTION_TOOLTIPS[action]}>
                   <button
-                    key={action}
                     type="button"
                     className="button button-secondary"
                     disabled={
-                      !reviewer.trim() ||
-                      !rationale.trim() ||
+                      !sharedReviewer.trim() ||
+                      !sharedRationale.trim() ||
                       (action === "revoke" &&
                         item.effectiveStatus !== "approved") ||
                       (action === "supersede" &&
@@ -116,15 +133,15 @@ export function RelationshipReview({
                       void onDecision(
                         item,
                         action,
-                        reviewer.trim(),
-                        rationale.trim(),
+                        sharedReviewer.trim(),
+                        sharedRationale.trim(),
                       )
                     }
                   >
-                    {action}
+                    {ACTION_LABELS[action]}
                   </button>
-                ),
-              )}
+                </Tooltip>
+              ))}
             </div>
           </li>
         ))}

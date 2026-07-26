@@ -1,4 +1,5 @@
 import { FeasibilityStatus } from "../components/FeasibilityStatus";
+import { HelpPanel } from "../components/HelpPanel";
 
 const setupChecks = [
   ["Distribution", "Single HTML target"],
@@ -33,6 +34,7 @@ export function BootstrapApp() {
             unavailable until their governed implementation phases.
           </p>
         </section>
+        <HelpPanel title="Startup help" label="Operator guidance" />
         <section className="status-panel" aria-labelledby="status-title">
           <div className="panel-heading">
             <div>

@@ -13,10 +13,10 @@ export function LineageExplorer({
 }) {
   return (
     <section aria-labelledby="lineage-title">
-      <h3 id="lineage-title">One-view lineage</h3>
+      <h3 id="lineage-title">File-to-decision trace</h3>
       <p>
-        Each entry links a normalized or governed record to exact local source
-        bytes, locator, and review state.
+        Each entry links a record to its exact source file, location, and
+        current status.
       </p>
       <ul className="review-list">
         {nodes.map((node) => (
@@ -24,15 +24,15 @@ export function LineageExplorer({
             <strong>{node.label}</strong>
             <dl>
               <div>
-                <dt>Source SHA-256</dt>
+                <dt>Content fingerprint</dt>
                 <dd>{node.sourceHash}</dd>
               </div>
               <div>
-                <dt>Source locator</dt>
+                <dt>Source location</dt>
                 <dd>{node.sourceLocator}</dd>
               </div>
               <div>
-                <dt>Governed status</dt>
+                <dt>Current status</dt>
                 <dd>{node.status}</dd>
               </div>
             </dl>

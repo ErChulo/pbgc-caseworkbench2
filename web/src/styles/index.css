@@ -10,16 +10,44 @@
     sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
   --color-background: #f3f6fa;
   --color-surface: #ffffff;
+  --color-surface-alt: #f7f9fc;
   --color-text: #172033;
   --color-muted-text: #4c5d73;
   --color-primary: #1e407a;
+  --color-primary-hover: #153566;
   --color-primary-soft: #e8f0fb;
+  --color-primary-border: #b9cae1;
   --color-border: #cbd6e4;
+  --color-border-input: #9babc0;
+  --color-focus: #005fcc;
+
   --color-provisional: #8a4b08;
   --color-provisional-soft: #fff2d6;
-  --color-focus: #005fcc;
+  --color-provisional-border: #e8c272;
+
+  --color-notice-bg: #edf5fd;
+  --color-notice-text: #284666;
+  --color-notice-border: #3f75aa;
+
+  --color-warning-text: #713f12;
+  --color-warning-bg: #fef3c7;
+  --color-warning-border: #f59e0b;
+
+  --color-error-text: #7c1e1e;
+  --color-error-bg: #fff0f0;
+  --color-error-border: #b42318;
+
+  --color-quarantine-bg: #fffaf0;
+  --color-quarantine-border: #e8c272;
+
+  --color-failed-text: #8d2020;
+  --color-failed-border: #a72c2c;
+
+  --color-info-bg: #eef5ff;
+
   --shadow-panel: 0 18px 45px rgb(28 46 72 / 10%);
   --radius-sm: 0.5rem;
   --radius-lg: 1rem;
@@ -118,7 +146,7 @@ h2 {
   padding-inline: 0.85rem;
   color: var(--color-primary);
   background: var(--color-primary-soft);
-  border: 1px solid #b9cae1;
+  border: 1px solid var(--color-primary-border);
 }
 
 .app-main {
@@ -153,7 +181,7 @@ h2 {
   padding-inline: 0.75rem;
   color: var(--color-provisional);
   background: var(--color-provisional-soft);
-  border: 1px solid #e8c272;
+  border: 1px solid var(--color-provisional-border);
 }
 
 .status-grid {
@@ -165,7 +193,7 @@ h2 {
 
 .status-item {
   padding: var(--space-2);
-  background: #f7f9fc;
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
@@ -184,9 +212,9 @@ h2 {
 .notice {
   margin-block-end: 0;
   padding: 0.8rem 1rem;
-  color: #284666;
-  background: #edf5fd;
-  border-inline-start: 4px solid #3f75aa;
+  color: var(--color-notice-text);
+  background: var(--color-notice-bg);
+  border-left: 2px solid var(--color-notice-border);
 }
 
 .case-panel {
@@ -198,9 +226,9 @@ h2 {
 }
 
 .status-chip-warning {
-  color: #713f12;
-  background: #fef3c7;
-  border-color: #f59e0b;
+  color: var(--color-warning-text);
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
 }
 
 .quarantine-panel label {
@@ -230,8 +258,8 @@ h2 {
 
 .quarantine-list > li {
   padding: var(--space-3);
-  background: #fffaf0;
-  border: 1px solid #e8c272;
+  background: var(--color-quarantine-bg);
+  border: 1px solid var(--color-quarantine-border);
   border-radius: var(--radius-sm);
 }
 
@@ -266,7 +294,7 @@ h2 {
 
 .review-list > li {
   padding: var(--space-3);
-  background: #f7f9fc;
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
@@ -312,7 +340,7 @@ h2 {
   gap: var(--space-2);
   margin-block: var(--space-3);
   padding: var(--space-2);
-  background: #f7f9fc;
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
@@ -357,7 +385,7 @@ textarea {
   padding: 0.65rem 0.75rem;
   color: var(--color-text);
   background: var(--color-surface);
-  border: 1px solid #9babc0;
+  border: 1px solid var(--color-border-input);
   border-radius: var(--radius-sm);
 }
 
@@ -392,7 +420,7 @@ textarea {
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #153566;
+  background: var(--color-primary-hover);
 }
 
 .button-secondary {
@@ -408,13 +436,13 @@ textarea {
 .form-message {
   margin: 0;
   padding: 0.75rem 1rem;
-  border-inline-start: 4px solid;
+  border-left: 2px solid;
 }
 
 .form-message-error {
-  color: #7c1e1e;
-  background: #fff0f0;
-  border-color: #b42318;
+  color: var(--color-error-text);
+  background: var(--color-error-bg);
+  border-color: var(--color-error-border);
 }
 
 .form-message-warning {
@@ -472,18 +500,38 @@ textarea {
 
 .feasibility {
   margin-block-start: var(--space-2);
+}
+
+.feasibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  color: var(--color-muted-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.feasibility-toggle:hover {
+  color: var(--color-primary);
+}
+
+.feasibility-details {
   padding: var(--space-2);
-  background: #f7f9fc;
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
 
-.feasibility h3 {
+.feasibility-details h3 {
   margin-block: 0 0.25rem;
   font-size: 1rem;
 }
 
-.feasibility p {
+.feasibility-details p {
   margin-block-end: var(--space-1);
 }
 
@@ -555,9 +603,12 @@ textarea {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .button {
+    transition: none;
   }
 }
 
@@ -594,7 +645,7 @@ textarea {
   margin: 1rem 0;
   padding: 0.875rem 1rem;
   border-radius: 0.75rem;
-  background: #eef5ff;
+  background: var(--color-info-bg);
   color: var(--color-text);
 }
 
@@ -654,8 +705,8 @@ textarea {
 
 .inventory-status-failed,
 .inventory-status-interrupted {
-  border-color: #a72c2c;
-  color: #8d2020;
+  border-color: var(--color-failed-border);
+  color: var(--color-failed-text);
 }
 
 @media (max-width: 640px) {
@@ -667,4 +718,146 @@ textarea {
   .file-picker input {
     max-width: 100%;
   }
+
+  .inventory-table-wrap {
+    overflow-x: visible;
+  }
+
+  .inventory-table {
+    min-width: 0;
+  }
+
+  .inventory-table thead {
+    display: none;
+  }
+
+  .inventory-table tbody {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .inventory-table tr {
+    display: grid;
+    gap: 0.35rem;
+    padding: var(--space-2);
+    background: var(--color-surface-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .inventory-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.25rem 0;
+    border-bottom: none;
+  }
+
+  .inventory-table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: var(--color-muted-text);
+    font-size: 0.82rem;
+  }
+}
+
+/* Tooltip styles */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+  border-bottom: 1px dotted var(--color-muted-text);
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  max-width: 20rem;
+  padding: 0.6rem 0.8rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-panel);
+  font-size: 0.82rem;
+  font-weight: 400;
+  line-height: 1.4;
+  white-space: normal;
+  pointer-events: none;
+}
+
+.tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--color-border);
+}
+
+/* Reviewer identity shared section.
+ * Each panel renders reviewer name + rationale stacked full width on purpose:
+ * the rationale textarea is the wider field and benefits from horizontal room. */
+.shared-reviewer {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  margin-block-end: var(--space-3);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.shared-reviewer label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+/* Keyboard shortcut hint */
+.shortcut-hint {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  margin-inline-start: 0.35rem;
+  color: var(--color-muted-text);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* Confirmation dialog */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 40%);
+}
+
+.confirm-dialog {
+  max-width: 28rem;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.confirm-dialog h3 {
+  margin-block: 0 var(--space-2);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
 }

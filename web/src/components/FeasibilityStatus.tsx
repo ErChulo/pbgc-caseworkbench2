@@ -7,6 +7,7 @@ import {
 
 export function FeasibilityStatus() {
   const [result, setResult] = useState<FeasibilityResult | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -21,7 +22,7 @@ export function FeasibilityStatus() {
   if (!result) {
     return (
       <p className="feasibility" role="status">
-        Checking local browser capabilities…
+        Checking browser compatibility…
       </p>
     );
   }
@@ -41,28 +42,40 @@ export function FeasibilityStatus() {
       aria-labelledby="feasibility-title"
       data-feasibility={passed ? "pass" : "fail"}
     >
-      <h3 id="feasibility-title">Browser feasibility probe</h3>
       <p>
-        Mode: <strong>{result.mode}</strong>. Required inline-runtime checks:{" "}
-        <strong>{passed ? "passed" : "blocked"}</strong>.
+        Browser: <strong>{passed ? "Compatible" : "Not fully compatible"}</strong>
+        {!result.fileSystemAccess && " (limited mode)"}
       </p>
-      <dl className="probe-grid">
-        {Object.entries(result)
-          .filter(
-            ([key]) =>
-              !["mode", "secureContext", "fileSystemAccess"].includes(key),
-          )
-          .map(([key, value]) => (
-            <div key={key}>
-              <dt>{key}</dt>
-              <dd>{value ? "Pass" : "Fail"}</dd>
-            </div>
-          ))}
-      </dl>
-      <p className="capability-note">
-        Secure context: {result.secureContext ? "yes" : "no"}; File System
-        Access API: {result.fileSystemAccess ? "available" : "unavailable"}.
-      </p>
+      <button
+        type="button"
+        className="feasibility-toggle"
+        aria-expanded={expanded}
+        onClick={() => { setExpanded(!expanded); }}
+      >
+        {expanded ? "Hide" : "Show"} technical details
+      </button>
+      {expanded && (
+        <div className="feasibility-details">
+          <h3 id="feasibility-title">Browser compatibility details</h3>
+          <dl className="probe-grid">
+            {Object.entries(result)
+              .filter(
+                ([key]) =>
+                  !["mode", "secureContext", "fileSystemAccess"].includes(key),
+              )
+              .map(([key, value]) => (
+                <div key={key}>
+                  <dt>{key}</dt>
+                  <dd>{value ? "Pass" : "Fail"}</dd>
+                </div>
+              ))}
+          </dl>
+          <p className="capability-note">
+            Secure context: {result.secureContext ? "yes" : "no"}; File System
+            Access API: {result.fileSystemAccess ? "available" : "unavailable"}.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

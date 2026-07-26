@@ -11,6 +11,7 @@ import {
   type ProductionCaseRequest,
 } from "../components/case-intake/CaseCreation";
 import { FeasibilityStatus } from "../components/FeasibilityStatus";
+import { HelpPanel } from "../components/HelpPanel";
 import {
   PackageIntake,
   type PackageIntakeResult,
@@ -182,6 +183,8 @@ export function App() {
   >([]);
   const [manifestSummary, setManifestSummary] =
     useState<ManifestExportSummary | null>(null);
+  const [sharedReviewer, setSharedReviewer] = useState("");
+  const [sharedRationale, setSharedRationale] = useState("");
 
   const activateCase = (caseRecord: CaseRecord) => {
     if (activeCase?.caseId !== caseRecord.caseId) {
@@ -405,6 +408,7 @@ export function App() {
           </p>
           <FeasibilityStatus />
         </section>
+        <HelpPanel />
         <CaseCreation
           workspaceReady={workspaceReady}
           workspaceLabel={workspaceLabel}
@@ -426,20 +430,36 @@ export function App() {
         />
         <QuarantineQueue
           items={quarantineItems}
+          reviewer={sharedReviewer}
+          rationale={sharedRationale}
+          onReviewerChange={setSharedReviewer}
+          onRationaleChange={setSharedRationale}
           onDecision={recordQuarantineDecision}
         />
         <ClassificationReview
           items={classificationItems}
           dateCandidates={dateCandidateItems}
+          reviewer={sharedReviewer}
+          rationale={sharedRationale}
+          onReviewerChange={setSharedReviewer}
+          onRationaleChange={setSharedRationale}
           onDecision={recordClassificationDecision}
           onDateSelect={recordDateSelection}
         />
         <RelationshipReview
           items={relationshipItems}
+          reviewer={sharedReviewer}
+          rationale={sharedRationale}
+          onReviewerChange={setSharedReviewer}
+          onRationaleChange={setSharedRationale}
           onDecision={recordRelationshipDecision}
         />
         <PopulationReview
           items={populationItems}
+          reviewer={sharedReviewer}
+          rationale={sharedRationale}
+          onReviewerChange={setSharedReviewer}
+          onRationaleChange={setSharedRationale}
           onDecision={recordPopulationDecision}
         />
         <ManifestExport
@@ -717,9 +737,9 @@ export function App() {
               .map((finding) => finding.category)
               .join(", "),
             evidenceRequired:
-              "An authorized reviewer must evaluate the exact bytes and named findings.",
+              "An authorized reviewer must check the exact files and findings.",
             nextAction:
-              "Release, retain in final quarantine, or reject with rationale.",
+              "Release for use, permanently quarantine, or reject with a reason.",
             effectiveHumanStatus: "none",
             reviewer: null,
             rationale: null,
@@ -753,10 +773,10 @@ export function App() {
         sha256: hashed.value.sha256,
         message:
           blockingFindings.length > 0
-            ? "Automated safety finding blocked downstream use pending a typed human decision."
+            ? "Safety review needed. An authorized reviewer must decide before use."
             : duplicate
-              ? "Exact bytes linked to a separate receipt; no approval conferred."
-              : "Immutable copy verified; downstream use remains blocked.",
+              ? "Same content as another file. Kept separately; no approval given."
+              : "File preserved. Downstream use blocked until all reviews complete.",
       });
       update(items);
     }
@@ -882,15 +902,15 @@ export function App() {
           item.status === "provisional-blocked" || item.status === "failed",
       ).length,
       accountingStatus:
-        failures === 0 ? "pending-human-disposition" : "partial-with-failures",
+        failures === 0 ? "Awaiting human review" : "Partial — some files failed",
       provisionalBlockReason:
         entries.length === 0
-          ? "No evidence artifacts were available for governed processing."
-          : "Evidence remains provisional until all required typed human reviews are effective.",
+          ? "No evidence files were available for processing."
+          : "Evidence is pending until all required reviews are complete.",
       requiredReview:
-        "Review quarantine, classification, relationship, population, and unresolved queues.",
+        "Review quarantine, classification, relationship, and population queues.",
       nextAction:
-        "Complete applicable reviews, then regenerate the deterministic manifest.",
+        "Complete all reviews, then export the final manifest.",
       deterministicManifestHash: snapshot.snapshotId,
       lineage: entries.map((entry, index) => ({
         nodeId: `artifact-${String(index + 1)}`,

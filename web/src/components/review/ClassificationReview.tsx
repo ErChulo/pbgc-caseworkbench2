@@ -1,10 +1,16 @@
-import { useState } from "react";
-
 import type {
   ClassificationProposal,
   DateCandidate,
   GovernedStatus,
 } from "../../domain/classification/models";
+import { Tooltip } from "../Tooltip";
+import {
+  ACTION_LABELS,
+  ACTION_TOOLTIPS,
+  RATIONALE_PLACEHOLDER,
+  REVIEW_ACTIONS,
+  plainStatus,
+} from "./shared";
 
 export interface ClassificationReviewItem {
   readonly displayName: string;
@@ -25,11 +31,19 @@ export interface DateCandidateReviewItem {
 export function ClassificationReview({
   items,
   dateCandidates,
+  reviewer: sharedReviewer,
+  rationale: sharedRationale,
+  onReviewerChange,
+  onRationaleChange,
   onDecision,
   onDateSelect,
 }: {
   readonly items: readonly ClassificationReviewItem[];
   readonly dateCandidates: readonly DateCandidateReviewItem[];
+  readonly reviewer: string;
+  readonly rationale: string;
+  readonly onReviewerChange: (value: string) => void;
+  readonly onRationaleChange: (value: string) => void;
   readonly onDecision: (
     item: ClassificationReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
@@ -42,8 +56,6 @@ export function ClassificationReview({
     rationale: string,
   ) => Promise<void>;
 }) {
-  const [reviewer, setReviewer] = useState("");
-  const [rationale, setRationale] = useState("");
   if (items.length === 0 && dateCandidates.length === 0) return null;
   return (
     <section
@@ -60,27 +72,32 @@ export function ClassificationReview({
         </span>
       </div>
       <p>
-        Automated categories and source roles remain proposals. Approval does
-        not itself confer document authority.
+        Automated categories and source roles are suggestions only. Approval
+        does not itself confer document authority.
       </p>
-      <div className="form-grid">
-        <label>
-          Classification reviewer
+      <div className="shared-reviewer">
+        <label htmlFor="classification-reviewer">
+          Reviewer name
           <input
-            value={reviewer}
+            id="classification-reviewer"
+            value={sharedReviewer}
             onChange={(event) => {
-              setReviewer(event.currentTarget.value);
+              onReviewerChange(event.currentTarget.value);
             }}
             autoComplete="off"
           />
         </label>
-        <label>
-          Classification rationale
+        <label htmlFor="classification-rationale">
+          Rationale
           <textarea
-            value={rationale}
+            id="classification-rationale"
+            value={sharedRationale}
+            rows={3}
+            placeholder={RATIONALE_PLACEHOLDER}
             onChange={(event) => {
-              setRationale(event.currentTarget.value);
+              onRationaleChange(event.currentTarget.value);
             }}
+            autoComplete="off"
           />
         </label>
       </div>
@@ -90,20 +107,20 @@ export function ClassificationReview({
             <h3>{item.displayName}</h3>
             <dl>
               <div>
-                <dt>Dimension</dt>
+                <dt>Category</dt>
                 <dd>{item.proposal.dimension}</dd>
               </div>
               <div>
-                <dt>Proposed value</dt>
+                <dt>Suggested value</dt>
                 <dd>{item.proposal.proposedValue}</dd>
               </div>
               <div>
-                <dt>Proposal state</dt>
-                <dd>{item.proposal.status}</dd>
+                <dt>Proposal status</dt>
+                <dd>{plainStatus(item.proposal.status)}</dd>
               </div>
               <div>
-                <dt>Computed human status</dt>
-                <dd>{item.effectiveStatus}</dd>
+                <dt>Current status</dt>
+                <dd>{plainStatus(item.effectiveStatus)}</dd>
               </div>
               <div>
                 <dt>Confidence</dt>
@@ -120,15 +137,14 @@ export function ClassificationReview({
               </p>
             )}
             <div className="decision-actions">
-              {(["approve", "reject", "revoke", "supersede"] as const).map(
-                (action) => (
+              {REVIEW_ACTIONS.map((action) => (
+                <Tooltip key={action} content={ACTION_TOOLTIPS[action]}>
                   <button
-                    key={action}
                     type="button"
                     className="button button-secondary"
                     disabled={
-                      !reviewer.trim() ||
-                      !rationale.trim() ||
+                      !sharedReviewer.trim() ||
+                      !sharedRationale.trim() ||
                       (action === "revoke" &&
                         item.effectiveStatus !== "approved") ||
                       (action === "supersede" &&
@@ -138,15 +154,15 @@ export function ClassificationReview({
                       void onDecision(
                         item,
                         action,
-                        reviewer.trim(),
-                        rationale.trim(),
+                        sharedReviewer.trim(),
+                        sharedRationale.trim(),
                       )
                     }
                   >
-                    {action}
+                    {ACTION_LABELS[action]}
                   </button>
-                ),
-              )}
+                </Tooltip>
+              ))}
             </div>
           </li>
         ))}
@@ -155,8 +171,9 @@ export function ClassificationReview({
         <>
           <h3>Effective-date candidates</h3>
           <p>
-            Raw date values and competing candidates remain preserved. A human
-            selection is recorded separately and does not rewrite source text.
+            Raw date values and competing candidates are preserved as-is. A
+            human selection is recorded separately and does not rewrite source
+            text.
           </p>
           <ul className="review-list">
             {dateCandidates.map((item) => (
@@ -180,27 +197,31 @@ export function ClassificationReview({
                     <dd>{item.candidate.sourceLocator}</dd>
                   </div>
                   <div>
-                    <dt>Source state</dt>
-                    <dd>{item.candidate.status}</dd>
+                    <dt>Source status</dt>
+                    <dd>{plainStatus(item.candidate.status)}</dd>
                   </div>
                   <div>
                     <dt>Human selection</dt>
-                    <dd>{item.selected ? "selected" : "not selected"}</dd>
+                    <dd>{item.selected ? "Selected" : "Not selected"}</dd>
                   </div>
                 </dl>
                 <button
                   type="button"
                   className="button button-secondary"
                   disabled={
-                    !reviewer.trim() ||
-                    !rationale.trim() ||
+                    !sharedReviewer.trim() ||
+                    !sharedRationale.trim() ||
                     !item.candidate.valid
                   }
                   onClick={() =>
-                    void onDateSelect(item, reviewer.trim(), rationale.trim())
+                    void onDateSelect(
+                      item,
+                      sharedReviewer.trim(),
+                      sharedRationale.trim(),
+                    )
                   }
                 >
-                  select date candidate
+                  Select date candidate
                 </button>
               </li>
             ))}

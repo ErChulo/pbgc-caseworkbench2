@@ -159,7 +159,7 @@ export function CaseCreation({
             </label>
           </div>
           <label>
-            <span>Authoritative PBGC case identifier</span>
+            <span>Case number</span>
             <input
               name="authoritativeCaseId"
               value={authoritativeCaseId}
@@ -174,8 +174,8 @@ export function CaseCreation({
               aria-describedby="case-identifier-help"
             />
             <small id="case-identifier-help">
-              Required for production. No plan, employer, or participant facts
-              are inferred from this identifier.
+              The official PBGC case number. No plan, employer, or participant
+              facts are inferred from this number.
             </small>
           </label>
           {error ? (
@@ -201,7 +201,7 @@ export function CaseCreation({
           </div>
           <dl className="case-summary">
             <div>
-              <dt>Existing internal UUID</dt>
+              <dt>Internal ID</dt>
               <dd data-testid="existing-case-id">
                 {view.collision.existingCase.caseId}
               </dd>
@@ -277,7 +277,7 @@ export function CaseCreation({
           <h3>{view.message}</h3>
           <dl className="case-summary">
             <div>
-              <dt>Internal immutable UUID</dt>
+              <dt>Internal ID</dt>
               <dd data-testid="current-case-id">{view.caseRecord.caseId}</dd>
             </div>
             <div>

@@ -47,7 +47,7 @@ export function PackageIntake({
       setSummary(result);
     } catch {
       setError(
-        "Package intake failed safely. Previously preserved artifacts remain unchanged.",
+        "File intake failed safely. Previously preserved files remain unchanged.",
       );
     } finally {
       controller.current = null;
@@ -62,15 +62,15 @@ export function PackageIntake({
     >
       <div className="panel-heading">
         <div>
-          <p className="section-label">Immutable evidence</p>
-          <h2 id="package-intake-title">Inventory a case package</h2>
+          <p className="section-label">Preserve evidence</p>
+          <h2 id="package-intake-title">Add files to the case</h2>
         </div>
-        <span className="status-chip">Provisional only</span>
+        <span className="status-chip">Pending review</span>
       </div>
       <p>
-        Files remain local. Originals are hashed and preserved without executing
-        document content. All records stay blocked from downstream use until
-        screening and an authorized human decision are complete.
+        Files stay on your device. Each file is fingerprinted and preserved
+        without opening or executing its content. All records are blocked from
+        downstream use until screening and human review are complete.
       </p>
       <label className="file-picker">
         <span>Select individual files</span>
@@ -95,18 +95,18 @@ export function PackageIntake({
       </label>
       {!enabled && (
         <p className="form-message form-message-warning">
-          Create or resume a controlled case before selecting evidence.
+          Create or resume a case before adding files.
         </p>
       )}
       {busy && (
         <div className="progress-row" role="status">
-          <span>Hashing and preserving local evidence…</span>
+          <span>Fingerprinting and preserving files…</span>
           <button
             className="button button-secondary"
             type="button"
             onClick={() => controller.current?.abort()}
           >
-            Interrupt safely
+            Stop safely
           </button>
         </div>
       )}
@@ -119,15 +119,15 @@ export function PackageIntake({
         <div className="package-summary" role="status">
           <strong>
             {summary.packageStatus === "completed"
-              ? "Inventory checkpoint complete"
-              : `Inventory ${summary.packageStatus}`}
+              ? "File inventory complete"
+              : `File inventory ${summary.packageStatus}`}
           </strong>
           <span>
             {summary.resumeKind === "unchanged-resume"
-              ? "Unchanged snapshot resumed without duplicate records."
+              ? "Same files as before — no duplicate records created."
               : summary.resumeKind === "linked-divergence"
-                ? "Changed package created a linked snapshot."
-                : "Initial immutable snapshot created."}
+                ? "Files changed — new snapshot linked to the previous one."
+                : "First snapshot of this file set created."}
           </span>
           {summary.snapshotId && <code>Snapshot {summary.snapshotId}</code>}
         </div>
