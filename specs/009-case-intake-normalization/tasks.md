@@ -256,21 +256,21 @@
 
 **Purpose**: Verify the complete bounded feature, single-HTML deployment, performance target, security boundary, and constitutional compliance.
 
-- [ ] T116 [P] Add the full synthetic acceptance corpus generator for at least 100 mixed artifacts and a scalable 1,000-artifact/10-GB sparse or generated corpus with independent hashes in `web/tests/fixtures/generators/acceptance-corpus.ts`
-- [ ] T117 [P] Add Chromium and Edge workspace-selection, permission-denial/revocation, local reopen, and unsupported-browser non-production-mode tests in `web/tests/browser/workspace-capabilities.spec.ts`
-- [ ] T118 [P] Add nested-archive, large-file worker responsiveness, interrupted/resumed intake, quarantine/release, classification review, and manifest-export E2E coverage in `web/tests/browser/end-to-end-intake.spec.ts`
-- [ ] T119 [P] Add direct `file://` acceptance checks where supported and an approved localhost/static-origin fallback test with no server-side data path in `web/tests/browser/delivery-modes.spec.ts`
-- [ ] T120 Implement the build verifier that fails unless `dist/` contains only `pbgc-caseworkbench.html`, all runtime assets/workers/WASM are inlined, CSP is restrictive, no service worker exists, and no external URL is referenced in `web/tools/verify-single-html.mjs`
-- [ ] T121 Run the complete offline single-HTML flow with outbound requests blocked and assert zero production network requests or uncaught console errors in `web/tests/browser/single-html-offline.spec.ts`
-- [ ] T122 Run and document the 1,000-artifact/10-GB acceptance benchmark, including browser/OS/hardware, elapsed time, UI responsiveness, and limitations, in `docs/feature-009-performance-results.md`
-- [ ] T123 [P] Document production workspace selection, backups, local PII handling, quarantine limitations, recovery, static-origin fallback, keyboard operation, and built-in help in `docs/feature-009-operator-guide.md` and `web/tests/browser/accessibility.spec.ts`
+- [x] T116 [P] Add the full synthetic acceptance corpus generator for at least 100 mixed artifacts and a scalable 1,000-artifact/10-GB sparse or generated corpus with independent hashes in `web/tests/fixtures/generators/acceptance-corpus.ts`
+- [x] T117 [P] Add Chromium and Edge workspace-selection, permission-denial/revocation, local reopen, and unsupported-browser non-production-mode tests in `web/tests/browser/workspace-capabilities.spec.ts`
+- [x] T118 [P] Add nested-archive, large-file worker responsiveness, interrupted/resumed intake, quarantine/release, classification review, and manifest-export E2E coverage in `web/tests/browser/end-to-end-intake.spec.ts`
+- [x] T119 [P] Add direct `file://` acceptance checks where supported and an approved localhost/static-origin fallback test with no server-side data path in `web/tests/browser/delivery-modes.spec.ts`
+- [x] T120 Implement the build verifier that fails unless `dist/` contains only `pbgc-caseworkbench.html`, all runtime assets/workers/WASM are inlined, CSP is restrictive, no service worker exists, and no external URL is referenced in `web/tools/verify-single-html.mjs`
+- [x] T121 Run the complete offline single-HTML flow with outbound requests blocked and assert zero production network requests or uncaught console errors in `web/tests/browser/single-html-offline.spec.ts`
+- [x] T122 Run and document the 1,000-artifact/10-GB acceptance benchmark, including browser/OS/hardware, elapsed time, UI responsiveness, and limitations, in `docs/feature-009-performance-results.md`
+- [x] T123 [P] Document production workspace selection, backups, local PII handling, quarantine limitations, recovery, static-origin fallback, keyboard operation, and built-in help in `docs/feature-009-operator-guide.md` and `web/tests/browser/accessibility.spec.ts`
 - [ ] T124 Conduct the SC-010 usability protocol after T123 with at least 20 authorized caseworkers, no task-specific coaching after start, all four required first-attempt tasks, a 19-of-20 success threshold, and anonymized retained evidence in `docs/feature-009-usability-results.md`
-- [ ] T125 [P] Document supported/unsupported formats, passive-inspection limitations, and the explicit absence of antivirus/Office execution claims in `docs/feature-009-format-support.md`
-- [ ] T126 Run `npm run typecheck`, `npm run lint`, `npm test`, schema validation, integration tests, and `npm run test:browser:e2e`; record only actually executed results in `docs/feature-009-validation-report.md`
-- [ ] T127 Run dependency vulnerability and license review against the pinned lockfile, resolve release-blocking findings, and update `docs/feature-009-dependency-review.md`
-- [ ] T128 Run the production build and build-size review, document total/inlined dependency sizes and approved exceptions in `docs/feature-009-build-review.md`
-- [ ] T129 Run `git diff --check`, scan staged/untracked content for secrets, credentials, real PII, raw case evidence, caches, and temporary artifacts, and record the release result in `docs/feature-009-validation-report.md`
-- [ ] T130 Complete the constitution compliance review against every Feature 009 prohibition and evidence-maturity claim, recording pass/fail evidence and unresolved blockers in `docs/feature-009-constitution-review.md`
+- [x] T125 [P] Document supported/unsupported formats, passive-inspection limitations, and the explicit absence of antivirus/Office execution claims in `docs/feature-009-format-support.md`
+- [x] T126 Run `npm run typecheck`, `npm run lint`, `npm test`, schema validation, integration tests, and `npm run test:browser:e2e`; record only actually executed results in `docs/feature-009-validation-report.md`
+- [x] T127 Run dependency vulnerability and license review against the pinned lockfile, resolve release-blocking findings, and update `docs/feature-009-dependency-review.md`
+- [x] T128 Run the production build and build-size review, document total/inlined dependency sizes and approved exceptions in `docs/feature-009-build-review.md`
+- [x] T129 Run `git diff --check`, scan staged/untracked content for secrets, credentials, real PII, raw case evidence, caches, and temporary artifacts, and record the release result in `docs/feature-009-validation-report.md`
+- [x] T130 Complete the constitution compliance review against every Feature 009 prohibition and evidence-maturity claim, recording pass/fail evidence and unresolved blockers in `docs/feature-009-constitution-review.md`
 
 **Final checkpoint**: All quality gates pass with recorded evidence; no deferred enterprise capability, actuarial logic, plan interpretation, V1 generation, benefit determination, backend, cloud dependency, or real-PII LLM path has entered scope.
 
