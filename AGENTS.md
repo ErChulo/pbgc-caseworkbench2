@@ -62,6 +62,8 @@ For all development work in this repository:
 This policy applies to all future tasks unless explicitly overridden by the user.
 
 <!-- SPECKIT START -->
+For Feature 001 technical context, architecture, project structure, and planned
+commands, read `specs/001-evidence-ingestion/plan.md`.
 For Feature 009 technical context, architecture, project structure, and planned
 commands, read `specs/009-case-intake-normalization/plan.md`.
 <!-- SPECKIT END -->

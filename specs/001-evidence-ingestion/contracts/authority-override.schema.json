@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/authority-override.schema.json",
+  "title": "Authority Override",
+  "description": "Typed record authorizing a non-default source as the primary citation for a PlanRuleRecord. Issued by a human; one artifact for one scope per override; supersedes prior overrides via a separate replayable chain.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["overrideId", "caseId", "affectedRuleScope", "authorizedSourceRole", "authorizedArtifactSha256", "scopeRationale", "defaultAuthorityOrder", "issuer", "issuedAt", "overrideContentSha256", "schemaVersion"],
+  "properties": {
+    "overrideId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+    "caseId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+    "affectedRuleScope": { "type": "string", "minLength": 1 },
+    "authorizedSourceRole": { "$ref": "evidence-catalog.schema.json#/$defs/sourceRole" },
+    "authorizedArtifactSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+    "scopeRationale": { "type": "string", "minLength": 1 },
+    "defaultAuthorityOrder": {
+      "type": "array",
+      "items": { "$ref": "evidence-catalog.schema.json#/$defs/sourceRole" }
+    },
+    "issuer": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/humanActor" },
+    "issuedAt": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/timestamp" },
+    "overrideContentSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+    "supersessionChain": { "type": "array", "items": { "$ref": "#/$defs/overrideSupersessionLink" } },
+    "schemaVersion": { "const": "1.0.0" }
+  },
+  "$defs": {
+    "overrideSupersessionLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "priorOverrideId", "priorOverrideContentSha256", "linkType"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "priorOverrideId": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+        "priorOverrideContentSha256": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] },
+        "linkType": { "enum": ["initial", "supersession", "repeal"] }
+      }
+    }
+  }
+}
