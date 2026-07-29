@@ -107,6 +107,27 @@ import {
   ManifestExport,
   type ManifestExportSummary,
 } from "../components/inventory/ManifestExport";
+import { EvidenceCatalogReview } from "../components/evidence/EvidenceCatalogReview";
+import { ProvisionCandidateReview } from "../components/evidence/ProvisionCandidateReview";
+import {
+  PlanRuleAuthor,
+  type RuleAuthoringDraft,
+} from "../components/evidence/PlanRuleAuthor";
+import {
+  UnresolvedItemQueue,
+  type UnresolvedAction,
+} from "../components/evidence/UnresolvedItemQueue";
+import { evidenceReviewDemo } from "../components/evidence/demo-evidence";
+import type {
+  AuthorityOverride,
+  PlanRuleRecord,
+  UnresolvedItem,
+} from "../domain/plan-rules/models";
+import {
+  authorRule,
+  type GovernanceDependencies,
+} from "../domain/plan-rules/rule-authoring";
+import { resolveItem } from "../domain/plan-rules/unresolved-items";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -140,7 +161,42 @@ interface InventoryCheckpointReference {
   readonly snapshot: PackageSnapshot;
 }
 
-export function App() {
+type EvidenceReviewView = "catalog" | "candidates" | "rules" | "unresolved";
+
+const EVIDENCE_REVIEW_ROUTES: readonly [EvidenceReviewView, string][] = [
+  ["catalog", "Catalog"],
+  ["candidates", "Candidates"],
+  ["rules", "Rule authoring"],
+  ["unresolved", "Unresolved items"],
+];
+const DEMO_PROVISION_CANDIDATES = evidenceReviewDemo.candidates.map(
+  (item) => item.candidate,
+);
+const EMPTY_DEMO_RULES = [] as const;
+const EMPTY_AUTHORITY_OVERRIDES: readonly AuthorityOverride[] = [];
+const SYNTHETIC_RULE_SCOPE = "benefit/accrual-freeze/participant-group";
+
+function createSessionGovernanceDependencies(): GovernanceDependencies {
+  let sequence = 500;
+  return {
+    now: () => "2026-07-29T13:00:00.000Z",
+    uuid: () => {
+      sequence += 1;
+      return `00000000-0000-4000-8000-${String(sequence).padStart(12, "0")}`;
+    },
+  };
+}
+
+interface SessionPreviewOutcome {
+  readonly kind: "success" | "error";
+  readonly message: string;
+}
+
+export function App({
+  evidenceGovernanceDependencies,
+}: {
+  readonly evidenceGovernanceDependencies?: GovernanceDependencies;
+} = {}) {
   const workspace = useRef<BrowserDirectoryWorkspace | null>(null);
   const catalog = useRef<WorkspaceCatalog | null>(null);
   const registry = useRef<CaseRegistry | null>(null);
@@ -185,6 +241,23 @@ export function App() {
     useState<ManifestExportSummary | null>(null);
   const [sharedReviewer, setSharedReviewer] = useState("");
   const [sharedRationale, setSharedRationale] = useState("");
+  const [evidenceReviewView, setEvidenceReviewView] =
+    useState<EvidenceReviewView>("catalog");
+  const [evidenceUnresolvedItems, setEvidenceUnresolvedItems] = useState<
+    readonly UnresolvedItem[]
+  >(() => evidenceReviewDemo.unresolvedItems);
+  const [evidenceUnresolvedRecords, setEvidenceUnresolvedRecords] = useState<
+    readonly UnresolvedItem[]
+  >(() => evidenceReviewDemo.unresolvedItems);
+  const [previewRules, setPreviewRules] =
+    useState<readonly PlanRuleRecord[]>(EMPTY_DEMO_RULES);
+  const [ruleAuthoringOutcome, setRuleAuthoringOutcome] =
+    useState<SessionPreviewOutcome | null>(null);
+  const [ruleAuthoringBusy, setRuleAuthoringBusy] = useState(false);
+  const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
+    useState<GovernanceDependencies>(createSessionGovernanceDependencies);
+  const activeGovernanceDependencies =
+    evidenceGovernanceDependencies ?? sessionGovernanceDependencies;
 
   const activateCase = (caseRecord: CaseRecord) => {
     if (activeCase?.caseId !== caseRecord.caseId) {
@@ -384,6 +457,170 @@ export function App() {
     return true;
   };
 
+  const recordUnresolvedAction = async (
+    item: UnresolvedItem,
+    action: UnresolvedAction,
+    interpretationId: string | null,
+    reviewer: string,
+    rationale: string,
+  ) => {
+    const result = await resolveItem(
+      item,
+      action,
+      interpretationId,
+      rationale,
+      {
+        actorType: "human",
+        actorKey: reviewer,
+        displayName: reviewer,
+        authorityContext: "synthetic-session-preview",
+      },
+      activeGovernanceDependencies,
+    );
+    if (!result.ok) {
+      return {
+        ok: false,
+        message: `Resolution validation failed: ${result.error}`,
+      };
+    }
+    setEvidenceUnresolvedItems((current) => [
+      ...current.map((candidate) =>
+        candidate.itemId === item.itemId ? result.value.item : candidate,
+      ),
+      ...(result.value.branchedItem === null
+        ? []
+        : [result.value.branchedItem]),
+    ]);
+    setEvidenceUnresolvedRecords((current) => [
+      ...current,
+      result.value.item,
+      ...(result.value.branchedItem === null
+        ? []
+        : [result.value.branchedItem]),
+    ]);
+    setRuleAuthoringOutcome(null);
+    return {
+      ok: true,
+      message: `${action} passed governed validation in this synthetic session preview. The decision was not persisted.`,
+    };
+  };
+
+  const recordRuleAuthoring = async (draft: RuleAuthoringDraft) => {
+    setRuleAuthoringBusy(true);
+    setRuleAuthoringOutcome(null);
+    const selectedIds = new Set(draft.candidateIds);
+    const selectedCandidates = evidenceReviewDemo.candidates
+      .filter((entry) => selectedIds.has(entry.candidate.candidateId))
+      .map((entry) => entry.candidate);
+    const primaryCandidate = selectedCandidates.find(
+      (candidate) =>
+        candidate.artifactSha256 === draft.primaryCitation.artifactSha256 &&
+        candidate.artifactLocator === draft.primaryCitation.artifactLocator,
+    );
+    const predecessor =
+      draft.predecessorRuleId === null
+        ? null
+        : (previewRules.find(
+            (rule) => rule.ruleId === draft.predecessorRuleId,
+          ) ?? null);
+    const result = await authorRule(
+      {
+        proposedCandidates: selectedCandidates,
+        primaryCitation: draft.primaryCitation,
+        catalog: evidenceReviewDemo.catalog,
+        unresolvedRecords: evidenceUnresolvedRecords,
+        authorityOverrides: EMPTY_AUTHORITY_OVERRIDES,
+        governingRestatement: draft.governingRestatement,
+        effectiveDate: draft.effectiveDate,
+        endDate: null,
+        adoptionOrExecutionDate:
+          primaryCandidate?.extractedAdoptionDate ?? null,
+        applicabilityConditions: [
+          {
+            dimension: draft.applicabilityDimension,
+            value: draft.applicabilityValue,
+            evidence: [draft.primaryCitation],
+          },
+        ],
+        requiredApplicabilityDimensions: [draft.applicabilityDimension],
+        affectedScope: SYNTHETIC_RULE_SCOPE,
+        reviewer: {
+          actorType: "human",
+          actorKey: draft.reviewer,
+          displayName: draft.reviewer,
+          authorityContext: `synthetic-session-preview: ${draft.rationale}`,
+        },
+        approvalRationale: draft.rationale,
+        confidence: Math.min(
+          ...selectedCandidates.map((candidate) => candidate.confidence),
+        ),
+        predecessor,
+        linkType: predecessor === null ? undefined : "supersession",
+        ruleSetVersion: "feature-001-plan-rule-v1",
+      },
+      activeGovernanceDependencies,
+    );
+    if (!result.ok) {
+      setRuleAuthoringOutcome({
+        kind: "error",
+        message: `${result.error.code}: ${result.error.message}`,
+      });
+      setRuleAuthoringBusy(false);
+      return;
+    }
+    setPreviewRules((current) => [...current, result.value]);
+    setRuleAuthoringOutcome({
+      kind: "success",
+      message: `Governed validation passed for a synthetic session preview effective ${result.value.effectiveDate}. This preview was not persisted and will be lost on reset or refresh.`,
+    });
+    setRuleAuthoringBusy(false);
+  };
+
+  const resetEvidenceSessionPreview = () => {
+    if (evidenceGovernanceDependencies === undefined) {
+      setSessionGovernanceDependencies(createSessionGovernanceDependencies());
+    }
+    setEvidenceUnresolvedItems(evidenceReviewDemo.unresolvedItems);
+    setEvidenceUnresolvedRecords(evidenceReviewDemo.unresolvedItems);
+    setPreviewRules(EMPTY_DEMO_RULES);
+    setRuleAuthoringOutcome(null);
+    setRuleAuthoringBusy(false);
+  };
+
+  const evidenceReviewContent =
+    evidenceReviewView === "catalog" ? (
+      <EvidenceCatalogReview catalog={evidenceReviewDemo.catalog} />
+    ) : evidenceReviewView === "candidates" ? (
+      <ProvisionCandidateReview
+        candidates={DEMO_PROVISION_CANDIDATES}
+        nearDuplicates={evidenceReviewDemo.nearDuplicates}
+        supersessions={evidenceReviewDemo.supersessions}
+      />
+    ) : evidenceReviewView === "rules" ? (
+      <>
+        {ruleAuthoringOutcome ? (
+          <p
+            className={`form-message ${ruleAuthoringOutcome.kind === "error" ? "form-message-error" : "notice"}`}
+            role={ruleAuthoringOutcome.kind === "error" ? "alert" : "status"}
+          >
+            {ruleAuthoringOutcome.message}
+          </p>
+        ) : null}
+        <PlanRuleAuthor
+          candidates={evidenceReviewDemo.candidates}
+          unresolvedItems={evidenceUnresolvedItems}
+          existingRules={previewRules}
+          busy={ruleAuthoringBusy}
+          onAuthor={recordRuleAuthoring}
+        />
+      </>
+    ) : (
+      <UnresolvedItemQueue
+        items={evidenceUnresolvedItems}
+        onAction={recordUnresolvedAction}
+      />
+    );
+
   return (
     <div className="app-frame">
       <header className="app-header">
@@ -446,6 +683,64 @@ export function App() {
           onDecision={recordClassificationDecision}
           onDateSelect={recordDateSelection}
         />
+        <div
+          className="evidence-review-stage"
+          aria-labelledby="evidence-review-stage-title"
+        >
+          <div className="evidence-stage-heading">
+            <div>
+              <p className="section-label">Feature 001 reviewer workspace</p>
+              <h2 id="evidence-review-stage-title">
+                Evidence and plan-rule review
+              </h2>
+            </div>
+            <p>Typed synthetic demo data only</p>
+          </div>
+          <div className="notice session-preview-controls">
+            <p>
+              <strong>Synthetic session preview only.</strong> Governed
+              operations validate in memory, but this reviewer workspace does
+              not persist decisions or rules. Reset or browser refresh restores
+              the initial synthetic state.
+            </p>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={resetEvidenceSessionPreview}
+            >
+              Reset session preview
+            </button>
+          </div>
+          <nav
+            className="evidence-review-nav"
+            aria-label="Evidence review stages"
+          >
+            {EVIDENCE_REVIEW_ROUTES.map(([route, label]) => (
+              <button
+                key={route}
+                type="button"
+                className="button button-secondary"
+                aria-current={evidenceReviewView === route ? "page" : undefined}
+                aria-controls="evidence-review-content"
+                onClick={() => {
+                  setEvidenceReviewView(route);
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          <p className="visually-hidden" role="status" aria-live="polite">
+            Showing{" "}
+            {
+              EVIDENCE_REVIEW_ROUTES.find(
+                ([route]) => route === evidenceReviewView,
+              )?.[1]
+            }
+            .
+          </p>
+          <div id="evidence-review-content">{evidenceReviewContent}</div>
+        </div>
         <RelationshipReview
           items={relationshipItems}
           reviewer={sharedReviewer}

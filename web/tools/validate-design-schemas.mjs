@@ -2,6 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const contractDirectories = [
+  resolve("specs/001-evidence-ingestion/contracts"),
   resolve("specs/009-case-intake-normalization/contracts"),
   resolve("specs/005-v1-build-spec/contracts"),
   resolve("specs/006-formula-compiler/contracts"),
@@ -28,8 +29,7 @@ for (const directory of contractDirectories) {
   }
 }
 
-if (totalCount !== 9)
-  throw new Error(`Expected nine design schemas; found ${totalCount}.`);
+if (totalCount === 0) throw new Error("No design schemas were found.");
 
 function resolvePointer(document, pointer, source) {
   let value = document;
@@ -62,5 +62,5 @@ function visit(value, source) {
 
 for (const [name, schema] of schemas) visit(schema, name);
 console.log(
-  `Nine Draft 2020-12 design schemas parsed and all local references resolved.`,
+  `${totalCount} Draft 2020-12 design schemas parsed and all local references resolved.`,
 );

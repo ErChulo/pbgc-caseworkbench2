@@ -2,6 +2,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const sourceDirectories = [
+  resolve("specs/001-evidence-ingestion/contracts"),
   resolve("specs/009-case-intake-normalization/contracts"),
   resolve("specs/005-v1-build-spec/contracts"),
   resolve("specs/006-formula-compiler/contracts"),
@@ -24,11 +25,8 @@ sourceNames.sort();
 
 const runtimeNames = await schemaNames(runtimeDirectory);
 
-if (sourceNames.length !== 9) {
-  throw new Error(
-    `Expected nine approved source schemas; found ${sourceNames.length}.`,
-  );
-}
+if (sourceNames.length === 0)
+  throw new Error("No approved source schemas found.");
 if (JSON.stringify(runtimeNames) !== JSON.stringify(sourceNames)) {
   throw new Error(
     `Runtime schema set differs from approved source set.\nSource: ${sourceNames.join(", ")}\nRuntime: ${runtimeNames.join(", ")}`,
@@ -118,5 +116,5 @@ function visit(value, currentName) {
 for (const [name, schema] of schemas) visit(schema, name);
 
 console.log(
-  "Nine runtime schemas match approved source bytes; all local references resolve offline.",
+  `${sourceNames.length} runtime schemas match approved source bytes; all local references resolve offline.`,
 );

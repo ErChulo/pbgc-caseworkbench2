@@ -12,6 +12,11 @@ import governedRecordsSchema from "./schemas/governed-records.schema.json";
 import normalizedEvidenceSchema from "./schemas/normalized-evidence.schema.json";
 import compiledFormulaArtifactSchema from "./schemas/compiled-formula-artifact.schema.json";
 import buildSpecSchema from "./schemas/build-spec.schema.json";
+import authorityOverrideSchema from "./schemas/authority-override.schema.json";
+import evidenceCatalogSchema from "./schemas/evidence-catalog.schema.json";
+import planRuleRecordSchema from "./schemas/plan-rule-record.schema.json";
+import provisionCandidateSchema from "./schemas/provision-candidate.schema.json";
+import evidenceUnresolvedItemSchema from "./schemas/unresolved-item.schema.json";
 
 export interface ContractValidationIssue {
   readonly code: string;
@@ -44,6 +49,11 @@ const schemas = [
   normalizedEvidenceSchema,
   compiledFormulaArtifactSchema,
   buildSpecSchema,
+  authorityOverrideSchema,
+  evidenceCatalogSchema,
+  planRuleRecordSchema,
+  provisionCandidateSchema,
+  evidenceUnresolvedItemSchema,
 ] as const;
 
 const ajv = new Ajv2020({
@@ -56,18 +66,56 @@ ajv.addFormat(
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu,
 );
 ajv.addFormat("date-time", (value: string) => !Number.isNaN(Date.parse(value)));
+ajv.addFormat("date", (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return (
+    !Number.isNaN(parsed.valueOf()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+});
 for (const schema of schemas) ajv.addSchema(schema);
 
 const governedId = governedRecordsSchema.$id;
 const validators: Readonly<Record<string, ValidateFunction | undefined>> = {
   caseWorkspace: ajv.getSchema(caseWorkspaceSchema.$id),
+  "case-workspace.schema.json": ajv.getSchema(caseWorkspaceSchema.$id),
   deidentifiedExport: ajv.getSchema(deidentifiedExportSchema.$id),
+  "deidentified-export.schema.json": ajv.getSchema(
+    deidentifiedExportSchema.$id,
+  ),
   evidenceAcquisition: ajv.getSchema(evidenceAcquisitionSchema.$id),
+  "evidence-acquisition.schema.json": ajv.getSchema(
+    evidenceAcquisitionSchema.$id,
+  ),
   evidenceManifest: ajv.getSchema(evidenceManifestSchema.$id),
+  "evidence-manifest.schema.json": ajv.getSchema(evidenceManifestSchema.$id),
   extractionResult: ajv.getSchema(extractionResultSchema.$id),
+  "extraction-result.schema.json": ajv.getSchema(extractionResultSchema.$id),
   normalizedEvidence: ajv.getSchema(normalizedEvidenceSchema.$id),
+  "normalized-evidence.schema.json": ajv.getSchema(
+    normalizedEvidenceSchema.$id,
+  ),
   compiledFormulaArtifact: ajv.getSchema(compiledFormulaArtifactSchema.$id),
+  "compiled-formula-artifact.schema.json": ajv.getSchema(
+    compiledFormulaArtifactSchema.$id,
+  ),
   buildSpec: ajv.getSchema(buildSpecSchema.$id),
+  "build-spec.schema.json": ajv.getSchema(buildSpecSchema.$id),
+  authorityOverride: ajv.getSchema(authorityOverrideSchema.$id),
+  "authority-override.schema.json": ajv.getSchema(authorityOverrideSchema.$id),
+  evidenceCatalog: ajv.getSchema(evidenceCatalogSchema.$id),
+  "evidence-catalog.schema.json": ajv.getSchema(evidenceCatalogSchema.$id),
+  planRuleRecord: ajv.getSchema(planRuleRecordSchema.$id),
+  "plan-rule-record.schema.json": ajv.getSchema(planRuleRecordSchema.$id),
+  provisionCandidate: ajv.getSchema(provisionCandidateSchema.$id),
+  "provision-candidate.schema.json": ajv.getSchema(
+    provisionCandidateSchema.$id,
+  ),
+  evidenceUnresolvedItem: ajv.getSchema(evidenceUnresolvedItemSchema.$id),
+  "unresolved-item.schema.json": ajv.getSchema(
+    evidenceUnresolvedItemSchema.$id,
+  ),
   unresolvedItem: ajv.getSchema(`${governedId}#/$defs/unresolvedItem`),
   quarantineDecision: ajv.getSchema(`${governedId}#/$defs/quarantineDecision`),
   artifactEligibilityDecision: ajv.getSchema(
@@ -77,6 +125,11 @@ const validators: Readonly<Record<string, ValidateFunction | undefined>> = {
     `${governedId}#/$defs/populationCandidateDecision`,
   ),
 };
+
+const semanticOnlyContracts = new Set([
+  "authorityDecisionProjection",
+  "unresolvedItemDecisionChain",
+]);
 
 function issue(
   code: string,
@@ -340,6 +393,48 @@ function semanticIssues(
     }
   }
 
+  if (contract === "evidenceCatalog") {
+    const caseEvidence: readonly unknown[] = Array.isArray(record?.caseEvidence)
+      ? (record.caseEvidence as readonly unknown[])
+      : [];
+    const referenceOnly: readonly unknown[] = Array.isArray(
+      record?.referenceOnly,
+    )
+      ? (record.referenceOnly as readonly unknown[])
+      : [];
+    const artifacts = [...caseEvidence, ...referenceOnly];
+    for (const [index, artifactValue] of artifacts.entries()) {
+      const artifact = asRecord(artifactValue);
+      const receiptIds: readonly unknown[] | undefined = Array.isArray(
+        artifact?.receiptIds,
+      )
+        ? (artifact.receiptIds as readonly unknown[])
+        : undefined;
+      const receiptStrings = receiptIds?.filter(
+        (value): value is string => typeof value === "string",
+      );
+      if (
+        receiptStrings === undefined ||
+        receiptStrings.length !== receiptIds?.length ||
+        receiptStrings[0] !== artifact?.receiptId ||
+        JSON.stringify(receiptStrings) !==
+          JSON.stringify(
+            [...receiptStrings].sort((left, right) =>
+              left.localeCompare(right),
+            ),
+          )
+      ) {
+        result.push(
+          issue(
+            "CANONICAL_RECEIPT_INVALID",
+            "receiptIds must be sorted and begin with the canonical receiptId.",
+            `/artifacts/${String(index)}/receiptIds`,
+          ),
+        );
+      }
+    }
+  }
+
   return result;
 }
 
@@ -350,7 +445,18 @@ export function validateContract(
 ): ContractValidationResult {
   const issues: ContractValidationIssue[] = [];
   const validator = validators[contract];
-  if (validator && !validator(value)) {
+  if (validator === undefined && !semanticOnlyContracts.has(contract)) {
+    return {
+      valid: false,
+      issues: [
+        issue(
+          "CONTRACT_UNKNOWN",
+          `Contract ${contract} is not registered for runtime validation.`,
+        ),
+      ],
+    };
+  }
+  if (validator !== undefined && !validator(value)) {
     issues.push(...(validator.errors ?? []).map(schemaIssue));
   }
   issues.push(...semanticIssues(contract, value, context));
