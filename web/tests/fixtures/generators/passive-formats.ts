@@ -76,7 +76,11 @@ export function pptxFixture(): Uint8Array {
 
 export const pdfFixture = () =>
   new TextEncoder().encode(
-    "%PDF-1.7\n1 0 obj << /Title (Synthetic PDF) >> endobj\nBT (Passive text) Tj ET\n%%EOF",
+    "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R /Title (Synthetic PDF) >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /Contents 4 0 R >> endobj\n4 0 obj << /Length 23 >> stream\nBT (Passive text) Tj ET\nendstream\nendobj\n%%EOF",
+  );
+export const multiPagePdfFixture = () =>
+  new TextEncoder().encode(
+    "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /Contents 4 0 R >> endobj\n4 0 obj << /Length 94 >> stream\nBT (Section 4.1  Benefit = 1.5% of pay.) Tj (Effective 2025-01-01.) Tj ET\nendstream\nendobj\n5 0 obj << /Type /Page /Parent 2 0 R /Contents 6 0 R >> endobj\n6 0 obj << /Length 46 >> stream\nBT (Adopted 2024-12-15.) Tj ET\nendstream\nendobj\n%%EOF",
   );
 export const activePdfFixture = () =>
   new TextEncoder().encode(

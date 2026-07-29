@@ -13,17 +13,17 @@ Every governed entity is **immutable once authored**, **content-hash bound**, an
 
 ## Primitive reuse (from Feature 009)
 
-| Primitive | Source | Used by |
-|---|---|---|
-| `Sha256` (lowercase hex) | `web/src/domain/shared/types.ts` | every entity's content/locator hash |
-| `Uuid` | `web/src/domain/shared/types.ts` | every record id and decision id |
-| `UtcTimestamp` | `web/src/domain/shared/types.ts` | every occurredAt/decidedAt/reviewedAt |
-| `HumanActor` | `web/src/domain/quarantine/models.ts` | every reviewer/approver/author identity |
-| `Result<T, E>` | `web/src/domain/shared/types.ts` | every operation return type |
-| `canonicalize`/`hashTyped` | `web/src/domain/manifests/canonical-json.ts` | every content hash |
-| `EvidenceRelationship` | `web/src/domain/classification/models.ts` | near-duplicate, supersession, amendment, authority, conflict, effective-period links |
-| `DecisionProjection` pattern | `web/src/domain/classification/models.ts` | every computed projection |
-| gapless replay + validTransition pattern | `web/src/domain/classification/relationship-service.ts` | `SupersessionChain`, `UnresolvedItem` resolution, `AuthorityOverride` issuance |
+| Primitive                                | Source                                                  | Used by                                                                              |
+| ---------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `Sha256` (lowercase hex)                 | `web/src/domain/shared/types.ts`                        | every entity's content/locator hash                                                  |
+| `Uuid`                                   | `web/src/domain/shared/types.ts`                        | every record id and decision id                                                      |
+| `UtcTimestamp`                           | `web/src/domain/shared/types.ts`                        | every occurredAt/decidedAt/reviewedAt                                                |
+| `HumanActor`                             | `web/src/domain/quarantine/models.ts`                   | every reviewer/approver/author identity                                              |
+| `Result<T, E>`                           | `web/src/domain/shared/types.ts`                        | every operation return type                                                          |
+| `canonicalize`/`hashTyped`               | `web/src/domain/manifests/canonical-json.ts`            | every content hash                                                                   |
+| `EvidenceRelationship`                   | `web/src/domain/classification/models.ts`               | near-duplicate, supersession, amendment, authority, conflict, effective-period links |
+| `DecisionProjection` pattern             | `web/src/domain/classification/models.ts`               | every computed projection                                                            |
+| gapless replay + validTransition pattern | `web/src/domain/classification/relationship-service.ts` | `SupersessionChain`, `UnresolvedItem` resolution, `AuthorityOverride` issuance       |
 
 ## Entity: EvidenceCatalog
 
@@ -37,16 +37,16 @@ The catalog is the typed, hash-anchored entry point for every eligible artifact 
 
 ### Fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `catalogId` | `Uuid` | yes | immutable catalog id, regenerated per rebuild |
-| `caseId` | `Uuid` | yes | inherited from Feature 009 case-workspace |
-| `builtAt` | `UtcTimestamp` | yes | build wall-clock — excluded from the catalog's deterministic hash |
-| `schemaVersion` | `"1.0.0"` | yes | |
-| `caseEvidence` | readonly array of `EvidenceArtifact` | yes | case-evidence section (plan docs, amendments, CBAs, notices, reports, workpapers) |
-| `referenceOnly` | readonly array of `EvidenceArtifact` | yes | reference-only section (regulations, training, PBGC policy) — never backs a rule without an `AuthorityOverride` |
-| `excludedQuarantined` | readonly array of `ExcludedQuarantinedEntry` | yes | every artifact excluded by Feature 009 quarantine — recorded so the catalog never silently drops evidence |
-| `catalogContentSha256` | `Sha256` | yes | deterministic hash over `catalogId`, `caseId`, sorted `caseEvidence`, sorted `referenceOnly`, sorted `excludedQuarantined` — excludes `builtAt` and `schemaVersion` |
+| Field                  | Type                                         | Required | Notes                                                                                                                                                               |
+| ---------------------- | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `catalogId`            | `Uuid`                                       | yes      | immutable catalog id, regenerated per rebuild                                                                                                                       |
+| `caseId`               | `Uuid`                                       | yes      | inherited from Feature 009 case-workspace                                                                                                                           |
+| `builtAt`              | `UtcTimestamp`                               | yes      | build wall-clock — excluded from the catalog's deterministic hash                                                                                                   |
+| `schemaVersion`        | `"1.0.0"`                                    | yes      |                                                                                                                                                                     |
+| `caseEvidence`         | readonly array of `EvidenceArtifact`         | yes      | case-evidence section (plan docs, amendments, CBAs, notices, reports, workpapers)                                                                                   |
+| `referenceOnly`        | readonly array of `EvidenceArtifact`         | yes      | reference-only section (regulations, training, PBGC policy) — never backs a rule without an `AuthorityOverride`                                                     |
+| `excludedQuarantined`  | readonly array of `ExcludedQuarantinedEntry` | yes      | every artifact excluded by Feature 009 quarantine — recorded so the catalog never silently drops evidence                                                           |
+| `catalogContentSha256` | `Sha256`                                     | yes      | deterministic hash over `catalogId`, `caseId`, sorted `caseEvidence`, sorted `referenceOnly`, sorted `excludedQuarantined` — excludes `builtAt` and `schemaVersion` |
 
 ### Invariants
 
@@ -65,19 +65,20 @@ The unit a `ProvisionCandidate` or `PlanRuleRecord` can cite. Inherits everythin
 
 ### Fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `artifactId` | `Uuid` | yes | from Feature 009 `ArtifactRecord.artifactId` |
-| `sha256` | `Sha256` | yes | immutable content hash from Feature 009 |
-| `sizeBytes` | integer ≥ 0 | yes | from Feature 009 `ArtifactRecord` |
-| `locator` | string (workspace-relative path) | yes | from Feature 009 `ArtifactRecord.locator` |
-| `mediaType` | string or null | yes | from Feature 009 |
-| `receiptId` | `Uuid` | yes | from Feature 009 `ReceiptRecord` — preserved across exact duplicates |
-| `exactDuplicateOfSha256` | `Sha256` or null | yes | the canonical hash when this artifact is an exact duplicate; null when none |
-| `containedBySha256` | `Sha256` or null | yes | parent container hash when this entry is an extracted member |
-| `sourceRole` | `SourceRole` enum | yes | typed role (see below) |
-| `reviewStatus` | `"provisional"` \| `"released"` \| `"stale"` | yes | reuses Feature 009 quarantine release states; `stale` is set by `authority-service` currency checks |
-| `importedAt` | `UtcTimestamp` | yes | from Feature 009 receipt — excluded from rule-authoring hashes unless the rule explicitly depends on import time (no rule does by default) |
+| Field                    | Type                                         | Required | Notes                                                                                                                                      |
+| ------------------------ | -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `artifactId`             | `Uuid`                                       | yes      | from Feature 009 `ArtifactRecord.artifactId`                                                                                               |
+| `sha256`                 | `Sha256`                                     | yes      | immutable content hash from Feature 009                                                                                                    |
+| `sizeBytes`              | integer ≥ 0                                  | yes      | from Feature 009 `ArtifactRecord`                                                                                                          |
+| `locator`                | string (workspace-relative path)             | yes      | from Feature 009 `ArtifactRecord.locator`                                                                                                  |
+| `mediaType`              | string or null                               | yes      | from Feature 009                                                                                                                           |
+| `receiptId`              | `Uuid`                                       | yes      | canonical Feature 009 receipt; first entry in sorted `receiptIds`                                                                          |
+| `receiptIds`             | readonly array of `Uuid`                     | yes      | every Feature 009 receipt for the same immutable bytes, sorted deterministically                                                           |
+| `exactDuplicateOfSha256` | `Sha256` or null                             | yes      | the canonical hash when this artifact is an exact duplicate; null when none                                                                |
+| `containedBySha256`      | `Sha256` or null                             | yes      | parent container hash when this entry is an extracted member                                                                               |
+| `sourceRole`             | `SourceRole` enum                            | yes      | typed role (see below)                                                                                                                     |
+| `reviewStatus`           | `"provisional"` \| `"released"` \| `"stale"` | yes      | reuses Feature 009 quarantine release states; `stale` is set by `authority-service` currency checks                                        |
+| `importedAt`             | `UtcTimestamp`                               | yes      | from Feature 009 receipt — excluded from rule-authoring hashes unless the rule explicitly depends on import time (no rule does by default) |
 
 ### SourceRole enum
 
@@ -87,19 +88,22 @@ The unit a `ProvisionCandidate` or `PlanRuleRecord` can cite. Inherits everythin
 "collective-bargaining-agreement"
 "notice"
 "actuarial-report"
+"formal-determination"
+"approved-plan-summary"
 "certified-case-report"
 "supporting-administrative-report"
 "approved-historical-calculation-artifact"
 "regulation"
 "training-reference"
+"inference"
 "other"
 ```
 
-The default source-authority order (constitution section 4) applies in this enum's declaration order, with `regulation` and `training-reference` ranking below `approved-historical-calculation-artifact` and `inference` ranking below all listed. The full ordering is encoded in `authority-service.ts` and surfaced by `queryAuthority`.
+Constitutional authority tiers are explicit rather than inferred from declaration order: executed plan/amendment/CBA; formal determination; approved summary; certified case report; supporting administrative material (including notices and ordinary actuarial reports); approved historical calculation artifact; inference. Regulations, training references, and `other` remain restricted reference roles unless an authenticated case-specific override authorizes one artifact for one scope.
 
 ### Invariants
 
-1. `sha256`, `sizeBytes`, `locator`, `receiptId`, `exactDuplicateOfSha256`, `containedBySha256`, and `importedAt` MUST be byte-identical to the values in the Feature 009 inventory record for that artifact. Feature 001 MUST NOT re-derive them.
+1. `sha256`, `sizeBytes`, `locator`, `receiptId`, `receiptIds`, `exactDuplicateOfSha256`, `containedBySha256`, and `importedAt` MUST be byte-identical to the values in the Feature 009 inventory records for that artifact. Feature 001 MUST NOT re-derive them. `receiptIds` is sorted and `receiptId` is its first entry.
 2. `sourceRole` MUST be set by deterministic typing rules over Feature 009's classification output. An ambiguous typing emits an `UnresolvedItem` of kind `ambiguous-source-role` rather than defaulting to `other`.
 3. `reviewStatus` MUST be `released` to back any `PlanRuleRecord`. A `provisional` or `stale` artifact citation rejects rule authoring and emits or links an `UnresolvedItem`.
 
@@ -125,23 +129,23 @@ A proposal-only, locator-anchored extraction. Traces to exactly one `EvidenceArt
 
 ### Fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `candidateId` | `Uuid` | yes | immutable candidate id |
-| `artifactSha256` | `Sha256` | yes | the cited `EvidenceArtifact.sha256` |
-| `artifactLocator` | string (JSON Pointer / page+offset / sheet+cell / line+offset) | yes | exact locator within the artifact |
-| `provisionIdentifier` | string | yes | human-readable stable identifier (e.g., "section 4.1(a)") — deterministic when extractable, free-text when not |
-| `verbatimText` | string | yes | byte-exact text from the source at the locator |
-| `normalizedRestatement` | string | yes | deterministic restatement produced by `candidate-extraction.ts` |
-| `extractedEffectiveDate` | string (`YYYY-MM-DD`) or null | yes | when the source explicitly states an effective date for this provision |
-| `extractedAdoptionDate` | string (`YYYY-MM-DD`) or null | yes | when the source explicitly states an adoption or execution date |
-| `dateExtractionConvention` | `"explicit"` \| `"inferred-from-context"` \| `"unknown"` | yes | never silently inferred; `inferred-from-context` is proposal-only and linkable to an `UnresolvedItem` |
-| `confidence` | number ∈ [0, 1] | yes | deterministic score from extractor parameters |
-| `classifierId` | string | yes | identifier of the deterministic extractor that emitted this candidate |
-| `classifierVersion` | string | yes | extractor schema version |
-| `ruleSetVersion` | string | yes | Feature 001 rule-set version (e.g., `feature-001-evidence-ingestion-v1`) |
-| `status` | `"proposed"` \| `"unresolved"` | yes | never `"approved"` at the candidate level — approval produces a `PlanRuleRecord`, not a status change |
-| `candidateContentSha256` | `Sha256` | yes | deterministic hash over all fields except `candidateId` (excluded for replayability across regenerated UUIDs) |
+| Field                      | Type                                                           | Required | Notes                                                                                                          |
+| -------------------------- | -------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `candidateId`              | `Uuid`                                                         | yes      | immutable candidate id                                                                                         |
+| `artifactSha256`           | `Sha256`                                                       | yes      | the cited `EvidenceArtifact.sha256`                                                                            |
+| `artifactLocator`          | string (JSON Pointer / page+offset / sheet+cell / line+offset) | yes      | exact locator within the artifact                                                                              |
+| `provisionIdentifier`      | string                                                         | yes      | human-readable stable identifier (e.g., "section 4.1(a)") — deterministic when extractable, free-text when not |
+| `verbatimText`             | string                                                         | yes      | byte-exact text from the source at the locator                                                                 |
+| `normalizedRestatement`    | string                                                         | yes      | deterministic restatement produced by `candidate-extraction.ts`                                                |
+| `extractedEffectiveDate`   | string (`YYYY-MM-DD`) or null                                  | yes      | when the source explicitly states an effective date for this provision                                         |
+| `extractedAdoptionDate`    | string (`YYYY-MM-DD`) or null                                  | yes      | when the source explicitly states an adoption or execution date                                                |
+| `dateExtractionConvention` | `"explicit"` \| `"inferred-from-context"` \| `"unknown"`       | yes      | never silently inferred; `inferred-from-context` is proposal-only and linkable to an `UnresolvedItem`          |
+| `confidence`               | number ∈ [0, 1]                                                | yes      | deterministic score from extractor parameters                                                                  |
+| `classifierId`             | string                                                         | yes      | identifier of the deterministic extractor that emitted this candidate                                          |
+| `classifierVersion`        | string                                                         | yes      | extractor schema version                                                                                       |
+| `ruleSetVersion`           | string                                                         | yes      | Feature 001 rule-set version (e.g., `feature-001-evidence-ingestion-v1`)                                       |
+| `status`                   | `"proposed"` \| `"unresolved"`                                 | yes      | never `"approved"` at the candidate level — approval produces a `PlanRuleRecord`, not a status change          |
+| `candidateContentSha256`   | `Sha256`                                                       | yes      | deterministic hash over all fields except `candidateId` (excluded for replayability across regenerated UUIDs)  |
 
 ### Invariants
 
@@ -168,44 +172,46 @@ The effective-dated, source-cited, immutable authoritative rule. Authored by an 
 
 ### Fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `ruleId` | `Uuid` | yes | immutable rule id |
-| `governingRestatement` | string | yes | normalized restatement of the rule (matches `ProvisionCandidate.normalizedRestatement` when promoted from one) |
-| `primaryCitation` | `RuleCitation` | yes | exactly one — the authoritative source. See below. |
-| `supportingCitations` | readonly array of `RuleCitation` | yes | zero-or-more supporting citations from the catalog. Does not include the primary citation. Ordered by deterministic priority. |
-| `effectiveDate` | string (`YYYY-MM-DD`) | yes | from-scope-only effective date (constitution section 5). MUST NOT be inferred silently. |
-| `endDate` | string (`YYYY-MM-DD`) or null | yes | the date the rule stops governing; null when no end date is recorded; transitions to a successor rule append a supersession event rather than mutating this field |
-| `adoptionOrExecutionDate` | string (`YYYY-MM-DD`) or null | yes | when the source records one |
-| `applicabilityConditions` | readonly array of `ApplicabilityCondition` | yes | participant group, benefit purpose, service definition, actuarial-equivalence purpose, freeze/restriction, amendment period |
-| `supersessionChain` | readonly array of `SupersessionLink` | yes | empty for a rule with no predecessor; gapless by replay |
-| `confidence` | number ∈ [0, 1] | yes | final review confidence (may exceed candidate confidence but ≥ the primary candidate's confidence unless an `AuthorityOverride` is recorded) |
-| `authorityOverrideId` | `Uuid` or null | yes | linked `AuthorityOverride` when one authorizes using a non-default source; null otherwise |
-| `authorHuman` | `HumanActor` | yes | the authorized human who authored the rule |
-| `authoredAt` | `UtcTimestamp` | yes | excluded from `ruleContentSha256` for replayability |
-| `reviewStatus` | `"human-approved"` \| `"provisional"` | yes | never `"automated-final"` |
-| `linkedUnresolvedItemIds` | readonly array of `Uuid` | yes | every outstanding unresolved item covering this rule's scope; authoring is rejected when this list is non-empty unless each item is explicitly linked as "consumed assumption" with rationale |
-| `ruleSetVersion` | string | yes | Feature 001 rule-set version |
-| `schemaVersion` | `"1.0.0"` | yes | |
-| `ruleContentSha256` | `Sha256` | yes | deterministic hash over `ruleId`, `governingRestatement`, `primaryCitation`, sorted `supportingCitations`, `effectiveDate`, `endDate`, `adoptionOrExecutionDate`, sorted `applicabilityConditions`, sorted `supersessionChain`, `confidence`, `authorityOverrideId`, `linkedUnresolvedItemIds`, `ruleSetVersion`, `schemaVersion` — excludes `authorHuman` and `authoredAt` for human/timestamp-immune replay |
+| Field                     | Type                                       | Required | Notes                                                                                                                                                                                         |
+| ------------------------- | ------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ruleId`                  | `Uuid`                                     | yes      | immutable rule id                                                                                                                                                                             |
+| `governingRestatement`    | string                                     | yes      | normalized restatement of the rule (matches `ProvisionCandidate.normalizedRestatement` when promoted from one)                                                                                |
+| `affectedScope`           | string                                     | yes      | normalized scope used for unresolved-item and authority-override matching                                                                                                                     |
+| `primaryCitation`         | `RuleCitation`                             | yes      | exactly one — the authoritative source. See below.                                                                                                                                            |
+| `supportingCitations`     | readonly array of `RuleCitation`           | yes      | zero-or-more supporting citations from the catalog. Does not include the primary citation. Ordered by deterministic priority.                                                                 |
+| `effectiveDate`           | string (`YYYY-MM-DD`)                      | yes      | from-scope-only effective date (constitution section 5). MUST NOT be inferred silently.                                                                                                       |
+| `endDate`                 | string (`YYYY-MM-DD`) or null              | yes      | the date the rule stops governing; null when no end date is recorded; transitions to a successor rule append a supersession event rather than mutating this field                             |
+| `adoptionOrExecutionDate` | string (`YYYY-MM-DD`) or null              | yes      | when the source records one                                                                                                                                                                   |
+| `applicabilityConditions` | readonly array of `ApplicabilityCondition` | yes      | participant group, benefit purpose, service definition, actuarial-equivalence purpose, freeze/restriction, amendment period                                                                   |
+| `supersessionChain`       | readonly array of `SupersessionLink`       | yes      | empty for a rule with no predecessor; gapless by replay                                                                                                                                       |
+| `confidence`              | number ∈ [0, 1]                            | yes      | final review confidence (may exceed candidate confidence but ≥ the primary candidate's confidence unless an `AuthorityOverride` is recorded)                                                  |
+| `authorityOverrideId`     | `Uuid` or null                             | yes      | linked `AuthorityOverride` when one authorizes using a non-default source; null otherwise                                                                                                     |
+| `authorHuman`             | `HumanActor`                               | yes      | the authorized human who authored the rule                                                                                                                                                    |
+| `authoredAt`              | `UtcTimestamp`                             | yes      | integrity-bound approval timestamp                                                                                                                                                            |
+| `reviewStatus`            | `"human-approved"` \| `"provisional"`      | yes      | never `"automated-final"`                                                                                                                                                                     |
+| `approvalRationale`       | string                                     | yes      | integrity-bound human approval rationale                                                                                                                                                      |
+| `linkedUnresolvedItemIds` | readonly array of `Uuid`                   | yes      | every outstanding unresolved item covering this rule's scope; authoring is rejected when this list is non-empty unless each item is explicitly linked as "consumed assumption" with rationale |
+| `ruleSetVersion`          | string                                     | yes      | Feature 001 rule-set version                                                                                                                                                                  |
+| `schemaVersion`           | `"1.0.0"`                                  | yes      |                                                                                                                                                                                               |
+| `ruleContentSha256`       | `Sha256`                                   | yes      | canonical SHA-256 over every governed field except the hash itself, including scope, human actor, approval status, timestamp, and rationale                                                   |
 
 ### RuleCitation
 
-| Field | Type | Notes |
-|---|---|---|
-| `artifactSha256` | `Sha256` | the `EvidenceArtifact.sha256` |
-| `artifactLocator` | string | exact locator within the artifact |
-| `sourceRole` | `SourceRole` | from the `EvidenceArtifact.sourceRole` cited |
-| `provisionIdentifier` | string or null | the cited provision's identifier |
-| `citationLocator` | string | a sub-locator of `artifactLocator` narrowing the citation |
+| Field                 | Type           | Notes                                                     |
+| --------------------- | -------------- | --------------------------------------------------------- |
+| `artifactSha256`      | `Sha256`       | the `EvidenceArtifact.sha256`                             |
+| `artifactLocator`     | string         | exact locator within the artifact                         |
+| `sourceRole`          | `SourceRole`   | from the `EvidenceArtifact.sourceRole` cited              |
+| `provisionIdentifier` | string or null | the cited provision's identifier                          |
+| `citationLocator`     | string         | a sub-locator of `artifactLocator` narrowing the citation |
 
 ### ApplicabilityCondition
 
-| Field | Type | Notes |
-|---|---|---|
-| `dimension` | `"participant-group" \| "benefit-purpose" \| "service-definition" \| "actuarial-equivalence-purpose" \| "freeze-or-restriction" \| "amendment-period"` | the dimension the condition distinguishes |
-| `value` | string | the condition's named value (e.g., `"early-retirement-supplement"`, `"pre-2020-07-31-service"`) |
-| `evidence` | readonly array of `RuleCitation` | the citations supporting this condition |
+| Field       | Type                                                                                                                                                   | Notes                                                                                           |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `dimension` | `"participant-group" \| "benefit-purpose" \| "service-definition" \| "actuarial-equivalence-purpose" \| "freeze-or-restriction" \| "amendment-period"` | the dimension the condition distinguishes                                                       |
+| `value`     | string                                                                                                                                                 | the condition's named value (e.g., `"early-retirement-supplement"`, `"pre-2020-07-31-service"`) |
+| `evidence`  | readonly array of `RuleCitation`                                                                                                                       | the citations supporting this condition                                                         |
 
 ### SupersessionLink
 
@@ -214,12 +220,14 @@ The effective-dated, source-cited, immutable authoritative rule. Authored by an 
   "ordinal": 1,                                  // appendOrdinal, gapless
   "predecessorRuleId": Uuid | null,              // null only for the first rule in a chain
   "predecessorRuleContentSha256": Sha256 | null,  // hash-bound prior linkage
-  "successorRuleId": Uuid,
-  "successorRuleContentSha256": Sha256,
   "effectiveDate": "YYYY-MM-DD",                 // when the successor takes effect
   "linkType": "supersession" | "amendment" | "re-authoring" | "repeal"
 }
 ```
+
+The enclosing `PlanRuleRecord` is the successor identity. A link stores only
+the predecessor identity and hash so the successor's canonical content hash
+does not recursively include itself.
 
 ### Invariants
 
@@ -262,20 +270,23 @@ First-class record of an ambiguous interpretation, conflicting source, missing s
 
 ### Fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `itemId` | `Uuid` | yes | |
-| `kind` | enum (see below) | yes | |
-| `affectedScope` | string | yes | free-text but required — describes what the item covers |
-| `competingInterpretations` | readonly array of `Interpretation` | yes | MUST have ≥ 2 entries; never collapsed to a single value (the moment it collapses, the item is no longer `open`) |
-| `consequence` | string | yes | calculation/liability consequence if left unresolved |
-| `linkedUnresolvedItemIds` | readonly array of `Uuid` | yes | items this item depends on or supersedes; empty when independent |
-| `reviewerHuman` | `HumanActor` or null | yes | the responsible reviewer; null only at creation, set at assignment |
-| `assignee` | `HumanActor` or null | yes | alternative to `reviewerHuman` when the assignee differs from the recorder |
-| `openAt` | `UtcTimestamp` | yes | |
-| `resolutionHistory` | readonly array of `ResolutionEvent` | yes | gapless content-hash-bound replay chain, exactly mirroring Feature 009's pattern |
-| `itemContentSha256` | `Sha256` | yes | deterministic over all fields except `itemId`, `openAt`, `reviewerHuman`, and `resolutionHistory` author/timestamp fields — replayable across human/timestamp variation |
-| `status` | `"open" \| "resolved" \| "superseded"` | yes | computed projection over `resolutionHistory`; never stored as authority |
+| Field                        | Type                                   | Required | Notes                                                                                                                                                                   |
+| ---------------------------- | -------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `itemId`                     | `Uuid`                                 | yes      |                                                                                                                                                                         |
+| `kind`                       | enum (see below)                       | yes      |                                                                                                                                                                         |
+| `affectedScope`              | string                                 | yes      | free-text but required — describes what the item covers                                                                                                                 |
+| `competingInterpretations`   | readonly array of `Interpretation`     | yes      | MUST have ≥ 2 entries; never collapsed to a single value (the moment it collapses, the item is no longer `open`)                                                        |
+| `consequence`                | string                                 | yes      | calculation/liability consequence if left unresolved                                                                                                                    |
+| `linkedUnresolvedItemIds`    | readonly array of `Uuid`               | yes      | items this item depends on or supersedes; empty when independent                                                                                                        |
+| `reviewerHuman`              | `HumanActor` or null                   | yes      | the responsible reviewer; null only at creation, set at assignment                                                                                                      |
+| `assignee`                   | `HumanActor` or null                   | yes      | alternative to `reviewerHuman` when the assignee differs from the recorder                                                                                              |
+| `openAt`                     | `UtcTimestamp`                         | yes      |                                                                                                                                                                         |
+| `resolutionHistory`          | readonly array of `ResolutionEvent`    | yes      | gapless content-hash-bound replay chain, exactly mirroring Feature 009's pattern                                                                                        |
+| `itemContentSha256`          | `Sha256`                               | yes      | deterministic over all fields except `itemId`, `openAt`, `reviewerHuman`, and `resolutionHistory` author/timestamp fields — replayable across human/timestamp variation |
+| `status`                     | `"open" \| "resolved" \| "superseded"` | yes      | computed projection over `resolutionHistory`; never stored as authority                                                                                                 |
+| `revisionOrdinal`            | integer ≥ 1                            | yes      | gapless append-only lifecycle revision ordinal                                                                                                                          |
+| `priorRevisionContentSha256` | `Sha256` or null                       | yes      | immediate predecessor revision hash; null only on creation                                                                                                              |
+| `revisionContentSha256`      | `Sha256`                               | yes      | canonical hash over the complete stored revision except this field                                                                                                      |
 
 ### Kind enum
 
@@ -294,28 +305,28 @@ First-class record of an ambiguous interpretation, conflicting source, missing s
 
 ### Interpretation
 
-| Field | Type | Notes |
-|---|---|---|
-| `interpretationId` | `Uuid` | stable per interpretation |
-| `statement` | string | the interpretation as the candidate reviewer phrased it |
-| `evidence` | readonly array of `RuleCitation` | the citations supporting this interpretation |
-| `sourceCandidateId` | `Uuid` or null | linked `ProvisionCandidate.candidateId` when applicable |
+| Field               | Type                             | Notes                                                   |
+| ------------------- | -------------------------------- | ------------------------------------------------------- |
+| `interpretationId`  | `Uuid`                           | stable per interpretation                               |
+| `statement`         | string                           | the interpretation as the candidate reviewer phrased it |
+| `evidence`          | readonly array of `RuleCitation` | the citations supporting this interpretation            |
+| `sourceCandidateId` | `Uuid` or null                   | linked `ProvisionCandidate.candidateId` when applicable |
 
 ### ResolutionEvent
 
-| Field | Type | Notes |
-|---|---|---|
-| `eventId` | `Uuid` | |
-| `appendOrdinal` | integer ≥ 1 | gapless |
-| `priorEventId` | `Uuid` or null | null only for the first event in the chain |
-| `priorEventContentSha256` | `Sha256` or null | |
-| `decisionType` | `"accept" \| "supersede" \| "reject" \| "branch"` | |
-| `resultingStatus` | `"open" \| "resolved" \| "superseded"` | |
-| `actor` | `HumanActor` | automated actors never resolve unresolved items |
-| `decidedAt` | `UtcTimestamp` | excluded from the event content hash |
-| `rationale` | string | |
-| `consumedAssumptions` | readonly array of `Uuid` | `PlanRuleRecord` ids that explicitly consumed this item as a documented assumption if the resolution is `accept` |
-| `eventContentSha256` | `Sha256` | hash over all fields except `eventId` and `decidedAt` |
+| Field                     | Type                                              | Notes                                                                                                            |
+| ------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `eventId`                 | `Uuid`                                            |                                                                                                                  |
+| `appendOrdinal`           | integer ≥ 1                                       | gapless                                                                                                          |
+| `priorEventId`            | `Uuid` or null                                    | null only for the first event in the chain                                                                       |
+| `priorEventContentSha256` | `Sha256` or null                                  |                                                                                                                  |
+| `decisionType`            | `"accept" \| "supersede" \| "reject" \| "branch"` |                                                                                                                  |
+| `resultingStatus`         | `"open" \| "resolved" \| "superseded"`            |                                                                                                                  |
+| `actor`                   | `HumanActor`                                      | automated actors never resolve unresolved items                                                                  |
+| `decidedAt`               | `UtcTimestamp`                                    | excluded from the event content hash                                                                             |
+| `rationale`               | string                                            |                                                                                                                  |
+| `consumedAssumptions`     | readonly array of `Uuid`                          | `PlanRuleRecord` ids that explicitly consumed this item as a documented assumption if the resolution is `accept` |
+| `eventContentSha256`      | `Sha256`                                          | hash over all fields except `eventId` and `decidedAt`                                                            |
 
 ### Invariants
 
@@ -324,6 +335,7 @@ First-class record of an ambiguous interpretation, conflicting source, missing s
 3. `appendOrdinal` is gapless from 1; `priorEventId` and `priorEventContentSha256` are required for ordinals ≥ 2 and must match the preceding event exactly.
 4. The resolution chain supports a `branch` decision that spawns a successor unresolved item (the constitution's "competing interpretations shall be preserved" rule — branches preserve the non-selected path rather than erasing it).
 5. `status` is always the computed projection over `resolutionHistory`; the persistence format stores it redundantly as a cache but the validator recomputes it.
+6. Persistence appends the creation revision and every extending resolution revision. Each successor increments `revisionOrdinal`, binds `priorRevisionContentSha256`, preserves immutable item content, and extends resolution history by exactly one event.
 
 ## Entity: AuthorityOverride
 
@@ -335,19 +347,20 @@ The typed record authorizing a non-default source as the primary citation for a 
 
 ### Fields
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `overrideId` | `Uuid` | yes | |
-| `caseId` | `Uuid` | yes | |
-| `affectedRuleScope` | string | yes | the rule scope this override authorizes |
-| `authorizedSourceRole` | `SourceRole` | yes | the role that would normally be rejected (`regulation`, `training-reference`, `other`) |
-| `authorizedArtifactSha256` | `Sha256` | yes | the specific reference-artifact hash authorized as canonical for this purpose — never blanket authorizes a directory or filename |
-| `scopeRationale` | string | yes | free-text "why this source for this purpose" |
-| `defaultAuthorityOrder` | readonly array of `SourceRole` | yes | the canonical order at issuance time, recorded so future currency reviews see what was in effect |
-| `issuer` | `HumanActor` | yes | |
-| `issuedAt` | `UtcTimestamp` | yes | excluded from content hash |
-| `overrideContentSha256` | `Sha256` | yes | deterministic over all fields except `overrideId` and `issuedAt` |
-| `schemaVersion` | `"1.0.0"` | yes | |
+| Field                      | Type                           | Required | Notes                                                                                                                            |
+| -------------------------- | ------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `overrideId`               | `Uuid`                         | yes      |                                                                                                                                  |
+| `caseId`                   | `Uuid`                         | yes      |                                                                                                                                  |
+| `affectedRuleScope`        | string                         | yes      | the rule scope this override authorizes                                                                                          |
+| `authorizedSourceRole`     | `SourceRole`                   | yes      | the role that would normally be rejected (`regulation`, `training-reference`, `other`)                                           |
+| `authorizedArtifactSha256` | `Sha256`                       | yes      | the specific reference-artifact hash authorized as canonical for this purpose — never blanket authorizes a directory or filename |
+| `scopeRationale`           | string                         | yes      | free-text "why this source for this purpose"                                                                                     |
+| `defaultAuthorityOrder`    | readonly array of `SourceRole` | yes      | the canonical order at issuance time, recorded so future currency reviews see what was in effect                                 |
+| `issuer`                   | `HumanActor`                   | yes      |                                                                                                                                  |
+| `issuedAt`                 | `UtcTimestamp`                 | yes      | integrity-bound issuance timestamp                                                                                               |
+| `overrideContentSha256`    | `Sha256`                       | yes      | canonical SHA-256 over every field except the hash itself                                                                        |
+| `supersessionChain`        | readonly array                 | yes      | gapless predecessor-hash-bound override history                                                                                  |
+| `schemaVersion`            | `"1.0.0"`                      | yes      |                                                                                                                                  |
 
 ### Invariants
 
@@ -357,7 +370,7 @@ The typed record authorizing a non-default source as the primary citation for a 
 
 ## Cross-references and determinism
 
-Cross-entity references are always `Sha256`-bound (cite the artifact hash, candidate content hash, or rule content hash) and never `Uuid`-only. This guarantees that replaying the same authoritative history (artifacts + candidates + rules + unresolved items) yields byte-identical deterministic output regardless of UUID or wall-clock variation, mirroring Feature 009's `CanonicalContext` and `hashTyped` (`web/src/domain/manifests/canonical-json.ts:196-222`).
+Cross-entity references are always `Sha256`-bound (cite the artifact hash, candidate content hash, rule content hash, or immediate revision hash) and never `Uuid`-only. Operational UUID and clock values are explicitly injected for deterministic tests; when they are governed approval facts, they are integrity-bound rather than excluded.
 
 JSON Pointer is used as the canonical locator when the source artifact is parsed JSON; page/offset (for PDFs), sheet/cell (for spreadsheets), and line/offset (for plain text) are stored alongside but always accompanied by an artifact-hash anchor so a mismatched hash invalidates the citation.
 
@@ -372,12 +385,12 @@ The latter set is covered by `web/tests/contract/evidence-contracts.test.ts` and
 
 ## State transition matrix (quick reference)
 
-| Entity | Initial event | Permitted transitions |
-|---|---|---|
-| `EvidenceArtifact.reviewStatus` | `provisional` (inherited from 009) | `provisional → released` (009 human review), `released → stale` (currency detection), `stale → released` (human resolution via unresolved item) |
-| `ProvisionCandidate.status` | `proposed` | `proposed → unresolved` (unresolved-item linkage), `unresolved → proposed` (item superseded/resolved) |
-| `PlanRuleRecord` (chain projection) | `active` via `author` | `active → superseded` (supersede), `active → repealed` (repeal), `superseded → active` (reinstate after revocation) |
-| `UnresolvedItem.status` | `open` | `open → resolved` (accept), `open → superseded` (supersede or branch), `resolved → open` only via `branch` event in a parallel chain |
-| `AuthorityOverride` | issued | issued → superseded-by-new-override (separate chain) |
+| Entity                              | Initial event                      | Permitted transitions                                                                                                                           |
+| ----------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `EvidenceArtifact.reviewStatus`     | `provisional` (inherited from 009) | `provisional → released` (009 human review), `released → stale` (currency detection), `stale → released` (human resolution via unresolved item) |
+| `ProvisionCandidate.status`         | `proposed`                         | `proposed → unresolved` (unresolved-item linkage), `unresolved → proposed` (item superseded/resolved)                                           |
+| `PlanRuleRecord` (chain projection) | `active` via `author`              | `active → superseded` (supersede), `active → repealed` (repeal), `superseded → active` (reinstate after revocation)                             |
+| `UnresolvedItem.status`             | `open`                             | `open → resolved` (accept), `open → superseded` (supersede or branch), `resolved → open` only via `branch` event in a parallel chain            |
+| `AuthorityOverride`                 | issued                             | issued → superseded-by-new-override (separate chain)                                                                                            |
 
 All transitions require a `HumanActor`. Automated code may propose and compute projections; only a human (or a typed replay chain) finalizes a transition. This matches the Feature 009 pattern exactly.

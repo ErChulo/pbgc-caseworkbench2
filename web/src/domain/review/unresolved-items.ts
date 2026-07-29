@@ -1,6 +1,17 @@
 import { hashTyped } from "../manifests/canonical-json";
 import { parseSha256, type Result, type Sha256 } from "../shared/types";
 
+export {
+  createUnresolvedItem,
+  hiddenContentUnresolvedInput,
+  replayResolutionHistory,
+  resolveItem,
+  staleSourceUnresolvedInput,
+  surfaceHiddenContentFlag,
+  unresolvedItemEmitters,
+  validateUnresolvedItem,
+} from "../plan-rules/unresolved-items";
+
 export interface UnresolvedItem {
   readonly itemKey: Sha256;
   readonly affectedScope: string;

@@ -118,6 +118,15 @@ describe("T064 passive inspection", () => {
     expect(parsePdfPassive(pdfFixture())).toMatchObject({
       status: "success",
       text: "Passive text",
+      rawValues: [
+        {
+          kind: "pdf-text-span",
+          pageNumber: 1,
+          startOffset: 0,
+          endOffset: 12,
+          verbatimText: "Passive text",
+        },
+      ],
     });
     const active = parsePdfPassive(activePdfFixture());
     expect(active.status).toBe("partial");
