@@ -76,6 +76,44 @@ export interface ArchitectureBuilderResult {
   readonly unresolvedItems: readonly [];
 }
 
+export type ArchitectureGovernanceRecords = Omit<
+  ArchitectureBuilderInput,
+  "dependencies"
+>;
+
+export async function reauthenticateArchitecture(
+  architecture: V1Architecture,
+  records: ArchitectureGovernanceRecords,
+): Promise<Result<void, string>> {
+  if (records.caseId !== architecture.caseId)
+    return {
+      ok: false,
+      error: "Architecture and governed records identify different cases.",
+    };
+  const rebuilt = await buildArchitecture({
+    ...records,
+    dependencies: {
+      uuid: () => architecture.architectureId,
+      now: () => architecture.builtAt,
+    },
+  });
+  if (!rebuilt.ok)
+    return {
+      ok: false,
+      error: `Feature004 governed-record replay failed: ${rebuilt.error.message}`,
+    };
+  if (
+    rebuilt.value.architecture.architectureContentSha256 !==
+    architecture.architectureContentSha256
+  )
+    return {
+      ok: false,
+      error:
+        "Architecture semantic content does not match the supplied original governed records.",
+    };
+  return { ok: true, value: undefined };
+}
+
 export async function buildArchitecture(
   input: ArchitectureBuilderInput,
 ): Promise<Result<ArchitectureBuilderResult, ArchitectureBuildError>> {

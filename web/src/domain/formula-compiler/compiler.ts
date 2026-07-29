@@ -82,7 +82,9 @@ function validateProvenance(
       ),
     );
   if (
-    provenance.sourcePlanRules.some((rule) => rule.unresolvedItemIds.length > 0)
+    provenance.sourcePlanRules.some(
+      (rule) => rule.linkedUnresolvedItemIds.length > 0,
+    )
   )
     issues.push(
       diagnostic(
@@ -92,7 +94,7 @@ function validateProvenance(
         "Formula provenance contains an unresolved material issue.",
       ),
     );
-  if (!provenance.approvalRecordId.trim())
+  if (provenance.formulaApproval.resultingStatus !== "approved")
     issues.push(
       diagnostic(
         formula,
@@ -101,7 +103,7 @@ function validateProvenance(
         "Formula approval record is required.",
       ),
     );
-  if (provenance.affectedTestIds.length === 0)
+  if (provenance.formulaApproval.affectedTestIds.length === 0)
     issues.push(
       diagnostic(
         formula,
@@ -110,7 +112,7 @@ function validateProvenance(
         "Affected-test analysis is required.",
       ),
     );
-  if (!provenance.regenerationImpact.trim())
+  if (!provenance.formulaApproval.regenerationImpact.trim())
     issues.push(
       diagnostic(
         formula,
@@ -119,7 +121,7 @@ function validateProvenance(
         "Regeneration impact is required.",
       ),
     );
-  if (provenance.validationOracleIds.length === 0)
+  if (provenance.formulaApproval.validationOracleIds.length === 0)
     issues.push(
       diagnostic(
         formula,

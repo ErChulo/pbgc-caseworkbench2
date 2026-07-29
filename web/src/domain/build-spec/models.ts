@@ -1,12 +1,66 @@
+import type { V1ArchitectureLineage } from "../architecture/models";
+import type { PlanRuleRecord } from "../plan-rules/models";
+import type { HumanActor } from "../quarantine/models";
 import type { Sha256, Uuid, UtcTimestamp } from "../shared/types";
 
 export type IoBValue = "I" | "O" | "B" | "N" | "P" | "";
-
 export type DataSourceType = "population" | "case-control" | "evidence";
-
 export type NamedRangeScope = "workbook" | "sheet";
 
-export interface FormulaDefinition {
+export interface FormulaCitation {
+  readonly artifactSha256: Sha256;
+  readonly sourceRole: string;
+  readonly locator: string;
+}
+
+export interface FormulaRuleProvenance extends PlanRuleRecord {
+  readonly relationship: "governing" | "supporting";
+  readonly citation: FormulaCitation;
+  readonly supersedesRuleId: Uuid | null;
+  readonly unresolvedItemIds: readonly Uuid[];
+}
+
+export interface FormulaApprovalRecord {
+  readonly decisionId: Uuid;
+  readonly decisionContentSha256: Sha256;
+  readonly appendOrdinal: number;
+  readonly priorDecisionId: Uuid | null;
+  readonly priorDecisionContentSha256: Sha256 | null;
+  readonly decisionType: "approve" | "revoke" | "supersede";
+  readonly resultingStatus: "approved" | "revoked" | "superseded";
+  readonly formulaText: string;
+  readonly target: {
+    readonly tabName: string;
+    readonly cellAddress: string;
+    readonly genericField: string;
+  };
+  readonly scenarioId: string;
+  readonly iobClassification: "O" | "B";
+  readonly sourcePlanRules: readonly {
+    readonly ruleId: Uuid;
+    readonly ruleContentSha256: Sha256;
+    readonly relationship: "governing" | "supporting";
+  }[];
+  readonly derivationDescription: string;
+  readonly affectedTestIds: readonly string[];
+  readonly regenerationImpact: string;
+  readonly validationOracleIds: readonly string[];
+  readonly humanActor: HumanActor;
+  readonly rationale: string;
+  readonly decidedAt: UtcTimestamp;
+  readonly schemaVersion: "1.0.0";
+}
+
+export interface FormulaProvenance {
+  readonly sourcePlanRules: readonly FormulaRuleProvenance[];
+  readonly derivationDescription: string;
+  readonly formulaApproval: FormulaApprovalRecord;
+  readonly affectedTestIds: readonly string[];
+  readonly regenerationImpact: string;
+  readonly validationOracleIds: readonly string[];
+}
+
+export interface FormulaDefinitionV2 {
   readonly formulaId: string;
   readonly scenarioId: string;
   readonly tabName: string;
@@ -16,45 +70,21 @@ export interface FormulaDefinition {
   readonly dependencies: readonly string[];
   readonly iobClassification: IoBValue;
   readonly justification: string;
-}
-
-export interface FormulaCitation {
-  readonly artifactSha256: Sha256;
-  readonly sourceRole: string;
-  readonly locator: string;
-}
-
-export interface FormulaRuleProvenance {
-  readonly ruleId: Uuid;
-  readonly ruleContentSha256: Sha256;
-  readonly relationship: "governing" | "supporting";
-  readonly citation: FormulaCitation;
-  readonly effectiveDate: string;
-  readonly endDate: string | null;
-  readonly adoptionOrExecutionDate: string | null;
-  readonly applicabilityConditions: readonly {
-    readonly dimension: string;
-    readonly value: string;
-  }[];
-  readonly supersedesRuleId: Uuid | null;
-  readonly confidence: number;
-  readonly reviewStatus: "human-approved" | "provisional";
-  readonly authorityOverrideId: Uuid | null;
-  readonly unresolvedItemIds: readonly Uuid[];
-}
-
-export interface FormulaProvenance {
-  readonly sourcePlanRules: readonly FormulaRuleProvenance[];
-  readonly derivationDescription: string;
-  readonly approvalRecordId: string;
-  readonly affectedTestIds: readonly string[];
-  readonly regenerationImpact: string;
-  readonly validationOracleIds: readonly string[];
-}
-
-export interface FormulaDefinitionV2 extends FormulaDefinition {
   readonly formulaKind: "scalar";
   readonly provenance: FormulaProvenance;
+}
+
+export type FormulaDefinition = FormulaDefinitionV2;
+
+export interface FormulaGovernanceEntry {
+  readonly cellKey: string;
+  readonly scenarioId: string;
+  readonly approvalDecisions: readonly FormulaApprovalRecord[];
+}
+
+export interface FormulaGovernanceInput {
+  readonly approvedPlanRules: readonly PlanRuleRecord[];
+  readonly formulas: readonly FormulaGovernanceEntry[];
 }
 
 export interface NamedRangeDefinition {
@@ -62,14 +92,12 @@ export interface NamedRangeDefinition {
   readonly cellAddress: string;
   readonly tabName: string;
   readonly scope: NamedRangeScope;
-  readonly genericField: string;
+  readonly genericField: string | null;
   readonly scenarioId: string | null;
-  readonly provenance: NamedRangeProvenance;
-}
-
-export interface NamedRangeProvenance {
-  readonly source: string;
-  readonly architectureNamedRange: string;
+  readonly provenance: {
+    readonly source: "architecture";
+    readonly architectureNamedRange: string;
+  };
 }
 
 export interface DataSourceReference {
@@ -99,29 +127,36 @@ export interface ExecutionOrder {
 }
 
 export type ValidationErrorCode =
-  | "MISSING_FORMULA"
-  | "DUPLICATE_RANGE"
-  | "UNSATISFIED_DEPENDENCY"
+  | "ARCHITECTURE_HASH_MISMATCH"
+  | "ARCHITECTURE_INVALID"
+  | "ARCHITECTURE_RULE_SET_MISMATCH"
   | "CIRCULAR_DEPENDENCY"
+  | "DUPLICATE_FORMULA"
+  | "DUPLICATE_MAPPING"
+  | "DUPLICATE_RANGE"
+  | "FORMULA_GOVERNANCE_INVALID"
+  | "FORMULA_PROVENANCE_INVALID"
   | "INVALID_CELL_ADDRESS"
-  | "MISSING_DATA_SOURCE";
-
-export type ValidationWarningCode =
-  "UNUSED_RANGE" | "DEEP_DEPENDENCY" | "LARGE_FORMULA";
+  | "MAPPING_MISMATCH"
+  | "MISSING_DATA_SOURCE"
+  | "MISSING_FORMULA"
+  | "SCHEMA_VALIDATION_FAILED"
+  | "UNSATISFIED_DEPENDENCY";
 
 export interface ValidationError {
   readonly code: ValidationErrorCode;
   readonly message: string;
   readonly field: string | null;
   readonly formulaId: string | null;
-  readonly context: Record<string, unknown>;
+  readonly context: Readonly<Record<string, unknown>>;
 }
 
+export type ValidationWarningCode = "DEEP_DEPENDENCY" | "LARGE_FORMULA";
 export interface ValidationWarning {
   readonly code: ValidationWarningCode;
   readonly message: string;
   readonly field: string | null;
-  readonly context: Record<string, unknown>;
+  readonly context: Readonly<Record<string, unknown>>;
 }
 
 export interface ValidationResult {
@@ -131,18 +166,19 @@ export interface ValidationResult {
   readonly validatedAt: UtcTimestamp;
 }
 
-export const buildSpecSchemaVersion = "1.0.0" as const;
+export const buildSpecSchemaVersion = "2.0.0" as const;
 export type BuildSpecSchemaVersion = typeof buildSpecSchemaVersion;
-export const buildSpecSchemaVersion2 = "2.0.0" as const;
 
-export interface BuildSpec {
+export interface BuildSpecV2 {
   readonly schemaVersion: BuildSpecSchemaVersion;
   readonly buildSpecId: Uuid;
   readonly architectureId: Uuid;
+  readonly architectureContentSha256: Sha256;
   readonly caseId: Uuid;
   readonly ruleSetVersion: string;
   readonly generatedAt: UtcTimestamp;
-  readonly formulas: readonly FormulaDefinition[];
+  readonly architectureLineage: V1ArchitectureLineage;
+  readonly formulas: readonly FormulaDefinitionV2[];
   readonly namedRanges: readonly NamedRangeDefinition[];
   readonly cellMappings: readonly CellMapping[];
   readonly executionOrder: ExecutionOrder;
@@ -150,23 +186,16 @@ export interface BuildSpec {
   readonly buildSpecContentSha256: Sha256;
 }
 
-export interface BuildSpecV2 extends Omit<
-  BuildSpec,
-  "schemaVersion" | "formulas"
-> {
-  readonly schemaVersion: typeof buildSpecSchemaVersion2;
-  readonly formulas: readonly FormulaDefinitionV2[];
-}
+export type BuildSpec = BuildSpecV2;
 
 export interface ExportMetadata {
   readonly exportedAt: UtcTimestamp;
   readonly exportedBy: string;
-  readonly schemaVersion: string;
   readonly toolVersion: string;
 }
 
 export interface BuildSpecExport {
-  readonly buildSpec: BuildSpec | BuildSpecV2;
+  readonly buildSpec: BuildSpecV2;
   readonly exportMetadata: ExportMetadata;
   readonly contentSha256: Sha256;
 }
@@ -179,7 +208,7 @@ export interface ImportMetadata {
 }
 
 export interface BuildSpecImport {
-  readonly buildSpec: BuildSpec | BuildSpecV2;
+  readonly buildSpec: BuildSpecV2;
   readonly importMetadata: ImportMetadata;
   readonly contentSha256: Sha256;
 }
@@ -195,21 +224,4 @@ export type BuildSpecImportError =
       readonly actual: Sha256;
     };
 
-export type BuildSpecError =
-  | { readonly code: "CIRCULAR_DEPENDENCY"; readonly cycle: readonly string[] }
-  | { readonly code: "MISSING_FORMULA"; readonly field: string }
-  | { readonly code: "DUPLICATE_RANGE"; readonly rangeName: string }
-  | {
-      readonly code: "UNSATISFIED_DEPENDENCY";
-      readonly formulaId: string;
-      readonly dependency: string;
-    }
-  | {
-      readonly code: "SCHEMA_VALIDATION_FAILED";
-      readonly errors: readonly string[];
-    }
-  | {
-      readonly code: "HASH_MISMATCH";
-      readonly expected: string;
-      readonly actual: string;
-    };
+export type BuildSpecError = ValidationError;

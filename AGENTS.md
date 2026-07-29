@@ -66,6 +66,8 @@ For Feature 001 technical context, architecture, project structure, and planned
 commands, read `specs/001-evidence-ingestion/plan.md`.
 For Feature 004 technical context, architecture, project structure, and planned
 commands, read `specs/004-v1-architecture-selector/plan.md`.
+For Feature 005 technical context, architecture authentication, BuildSpec 2.0.0
+contract, and planned commands, read `specs/005-v1-build-spec/plan.md`.
 For Feature 009 technical context, architecture, project structure, and planned
 commands, read `specs/009-case-intake-normalization/plan.md`.
 For Feature 006 technical context, architecture, project structure, and planned

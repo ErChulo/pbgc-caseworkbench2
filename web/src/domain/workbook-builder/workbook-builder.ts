@@ -1,0 +1,168 @@
+import { deterministicUuid } from "../build-spec/identity";
+import { hashTyped } from "../manifests/canonical-json";
+import { parseSha256, type Sha256 } from "../shared/types";
+import type {
+  WorkbookGenerationInput,
+  V1Workbook,
+  SummarySheetData,
+  TablesSheetData,
+  UDTableSheetData,
+  WorkbookGenerationError,
+} from "./models";
+import {
+  validateBuildSpec,
+  validatePopulationProfile,
+  validateDataSources,
+  aggregateValidationResults,
+} from "./validation";
+
+export async function buildWorkbook(
+  input: WorkbookGenerationInput,
+): Promise<
+  | { ok: true; workbook: V1Workbook }
+  | { ok: false; errors: readonly WorkbookGenerationError[] }
+> {
+  const validationBuildSpec = validateBuildSpec(input.buildSpec);
+  const validationPopulation = validatePopulationProfile(
+    input.populationProfile,
+  );
+  const validationDataSources = validateDataSources(input.buildSpec);
+
+  const validation = aggregateValidationResults(
+    validationBuildSpec,
+    validationPopulation,
+    validationDataSources,
+  );
+
+  if (validation.errors.length > 0) {
+    return { ok: false, errors: validation.errors };
+  }
+
+  const zeroHashParsed = parseSha256("0".repeat(64));
+  if (!zeroHashParsed.ok) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: "HASH_FAILED",
+          message: "Failed to parse zero hash",
+          affectedCells: [],
+          severity: "error",
+        },
+      ],
+    };
+  }
+  const zeroHash = zeroHashParsed.value;
+
+  const summarySheet = generateSummarySheet(input, zeroHash);
+  const tablesSheet = generateTablesSheet();
+  const udTableSheet = generateUDTableSheet(input);
+
+  const supportContent = {
+    summarySheet,
+    tablesSheet,
+    udTableSheet,
+  };
+
+  const populationProfileContentSha256 =
+    input.populationProfile.effectiveWorkbookProfileContentSha256 ?? zeroHash;
+
+  const workbookId = await deterministicUuid("V1Workbook", {
+    buildSpecId: input.buildSpec.buildSpecId,
+    buildSpecContentSha256: input.buildSpec.buildSpecContentSha256,
+    populationDecisionId: input.populationProfile.effectiveDecisionId,
+    populationProfileContentSha256: populationProfileContentSha256,
+  });
+
+  const workbook: V1Workbook = {
+    workbookId,
+    buildSpecId: input.buildSpec.buildSpecId,
+    buildSpecContentSha256: input.buildSpec.buildSpecContentSha256,
+    architectureId: input.buildSpec.architectureId,
+    architectureContentSha256: input.buildSpec.architectureContentSha256,
+    caseId: input.buildSpec.caseId,
+    populationProfileDecisionId:
+      input.populationProfile.effectiveDecisionId ?? null,
+    populationProfileContentSha256: populationProfileContentSha256,
+    generatedAt: input.buildSpec.generatedAt,
+    sheets: [],
+    namedRanges: input.buildSpec.namedRanges,
+    cellMappings: input.buildSpec.cellMappings,
+    formulaCells: [],
+    support: supportContent,
+    workbookContentSha256: zeroHash,
+  };
+
+  const hash = await computeWorkbookContentHash(workbook);
+  const parsedHash = parseSha256(hash);
+  if (!parsedHash.ok) {
+    return {
+      ok: false,
+      errors: [
+        { code: "HASH_FAILED", message: hash, affectedCells: [], severity: "error" },
+      ],
+    };
+  }
+
+  return {
+    ok: true,
+    workbook: { ...workbook, workbookContentSha256: parsedHash.value },
+  };
+}
+
+function generateSummarySheet(
+  input: WorkbookGenerationInput,
+  zeroHash: Sha256,
+): SummarySheetData {
+  return {
+    caseId: input.buildSpec.caseId,
+    architectureId: input.buildSpec.architectureId,
+    architectureContentSha256: input.buildSpec.architectureContentSha256,
+    buildSpecId: input.buildSpec.buildSpecId,
+    buildSpecContentSha256: input.buildSpec.buildSpecContentSha256,
+    populationProfileDecisionId:
+      input.populationProfile.effectiveDecisionId ?? null,
+    populationProfileContentSha256:
+      input.populationProfile.effectiveWorkbookProfileContentSha256 ?? zeroHash,
+    generatedAt: input.buildSpec.generatedAt,
+    generatorVersion: input.generatorVersion,
+    workbookContentSha256: zeroHash,
+  };
+}
+
+function generateTablesSheet(): TablesSheetData {
+  return {
+    rules: [],
+  };
+}
+
+function generateUDTableSheet(
+  input: WorkbookGenerationInput,
+): UDTableSheetData {
+  return {
+    namedRanges: input.buildSpec.namedRanges.map((nr) => ({
+      name: nr.rangeName,
+      scope: nr.scope,
+      target: nr.cellAddress,
+      genericField: nr.genericField ?? null,
+    })),
+    cellMappings: input.buildSpec.cellMappings.map((cm) => ({
+      mappingId: cm.mappingId,
+      cellAddress: cm.cellAddress,
+      iobValue: cm.iobClassification,
+      dataSource: cm.dataSource
+        ? `${cm.dataSource.sourceTab}!${cm.dataSource.sourceField}`
+        : null,
+      formulaId: cm.formulaId ?? null,
+    })),
+  };
+}
+
+async function computeWorkbookContentHash(workbook: V1Workbook): Promise<string> {
+  const { workbookContentSha256: omitted, ...content } = workbook;
+  void omitted;
+  return hashTyped(
+    { workbook: content },
+    { typeName: "V1WorkbookContent" },
+  );
+}

@@ -2,16 +2,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "build-spec.schema.json",
   "title": "V1 Build Specification",
-  "description": "Deterministic build specification for workbook generation",
+  "description": "Governed deterministic BuildSpec 2.0.0 consumed by the Formula Compiler",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schemaVersion",
     "buildSpecId",
     "architectureId",
+    "architectureContentSha256",
     "caseId",
     "ruleSetVersion",
     "generatedAt",
+    "architectureLineage",
     "formulas",
     "namedRanges",
     "cellMappings",
@@ -22,7 +24,7 @@
   "properties": {
     "schemaVersion": {
       "type": "string",
-      "enum": ["1.0.0", "2.0.0"]
+      "const": "2.0.0"
     },
     "buildSpecId": {
       "type": "string",
@@ -31,6 +33,10 @@
     "architectureId": {
       "type": "string",
       "format": "uuid"
+    },
+    "architectureContentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
     },
     "caseId": {
       "type": "string",
@@ -43,6 +49,7 @@
       "type": "string",
       "format": "date-time"
     },
+    "architectureLineage": { "$ref": "#/$defs/ArchitectureLineage" },
     "formulas": {
       "type": "array",
       "items": {
@@ -72,23 +79,6 @@
       "pattern": "^[a-f0-9]{64}$"
     }
   },
-  "allOf": [
-    {
-      "if": { "properties": { "schemaVersion": { "const": "2.0.0" } } },
-      "then": {
-        "properties": {
-          "formulas": {
-            "items": {
-              "allOf": [
-                { "$ref": "#/$defs/FormulaDefinition" },
-                { "required": ["formulaKind", "provenance"] }
-              ]
-            }
-          }
-        }
-      }
-    }
-  ],
   "$defs": {
     "FormulaDefinition": {
       "type": "object",
@@ -102,7 +92,9 @@
         "cellAddress",
         "dependencies",
         "iobClassification",
-        "justification"
+        "justification",
+        "formulaKind",
+        "provenance"
       ],
       "properties": {
         "formulaId": {
@@ -116,14 +108,15 @@
           "type": "string"
         },
         "genericField": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "formulaText": {
           "type": "string"
         },
         "cellAddress": {
           "type": "string",
-          "pattern": "^[A-Z]+[0-9]+$"
+          "pattern": "^\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}$"
         },
         "dependencies": {
           "type": "array",
@@ -152,7 +145,7 @@
       "required": [
         "sourcePlanRules",
         "derivationDescription",
-        "approvalRecordId",
+        "formulaApproval",
         "affectedTestIds",
         "regenerationImpact",
         "validationOracleIds"
@@ -164,7 +157,7 @@
           "items": { "$ref": "#/$defs/FormulaRuleProvenance" }
         },
         "derivationDescription": { "type": "string", "minLength": 1 },
-        "approvalRecordId": { "type": "string", "minLength": 1 },
+        "formulaApproval": { "$ref": "#/$defs/FormulaApprovalRecord" },
         "affectedTestIds": {
           "type": "array",
           "minItems": 1,
@@ -182,7 +175,7 @@
     },
     "FormulaRuleProvenance": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": [
         "ruleId",
         "ruleContentSha256",
@@ -196,7 +189,8 @@
         "confidence",
         "reviewStatus",
         "authorityOverrideId",
-        "unresolvedItemIds"
+        "unresolvedItemIds",
+        "linkedUnresolvedItemIds"
       ],
       "properties": {
         "ruleId": { "type": "string", "format": "uuid" },
@@ -219,7 +213,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "additionalProperties": false,
+            "additionalProperties": true,
             "required": ["dimension", "value"],
             "properties": {
               "dimension": { "type": "string", "minLength": 1 },
@@ -238,7 +232,39 @@
           "type": "array",
           "items": { "type": "string", "format": "uuid" },
           "uniqueItems": true
+        },
+        "linkedUnresolvedItemIds": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "uniqueItems": true
         }
+      }
+    },
+    "FormulaApprovalRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionId", "priorDecisionContentSha256", "decisionType", "resultingStatus", "formulaText", "target", "scenarioId", "iobClassification", "sourcePlanRules", "derivationDescription", "affectedTestIds", "regenerationImpact", "validationOracleIds", "humanActor", "rationale", "decidedAt", "schemaVersion"],
+      "properties": {
+        "decisionId": { "type": "string", "format": "uuid" },
+        "decisionContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorDecisionId": { "type": ["string", "null"], "format": "uuid" },
+        "priorDecisionContentSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "decisionType": { "enum": ["approve", "revoke", "supersede"] },
+        "resultingStatus": { "enum": ["approved", "revoked", "superseded"] },
+        "formulaText": { "type": "string", "minLength": 1 },
+        "target": { "type": "object", "required": ["tabName", "cellAddress", "genericField"], "properties": { "tabName": { "type": "string", "minLength": 1 }, "cellAddress": { "type": "string", "pattern": "^\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}$" }, "genericField": { "type": "string", "minLength": 1 } }, "additionalProperties": false },
+        "scenarioId": { "type": "string", "minLength": 1 },
+        "iobClassification": { "enum": ["O", "B"] },
+        "sourcePlanRules": { "type": "array", "minItems": 1, "items": { "type": "object", "required": ["ruleId", "ruleContentSha256", "relationship"], "properties": { "ruleId": { "type": "string", "format": "uuid" }, "ruleContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "relationship": { "enum": ["governing", "supporting"] } }, "additionalProperties": false } },
+        "derivationDescription": { "type": "string", "minLength": 1 },
+        "affectedTestIds": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "regenerationImpact": { "type": "string", "minLength": 1 },
+        "validationOracleIds": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "humanActor": { "$ref": "#/$defs/HumanActor" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "decidedAt": { "type": "string", "format": "date-time" },
+        "schemaVersion": { "const": "1.0.0" }
       }
     },
     "FormulaCitation": {
@@ -251,6 +277,17 @@
         "locator": { "type": "string", "minLength": 1 }
       }
     },
+    "HumanActor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actorType", "actorKey", "displayName", "authorityContext"],
+      "properties": {
+        "actorType": { "const": "human" },
+        "actorKey": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 },
+        "authorityContext": { "type": "string", "minLength": 1 }
+      }
+    },
     "NamedRangeDefinition": {
       "type": "object",
       "additionalProperties": false,
@@ -259,7 +296,9 @@
         "cellAddress",
         "tabName",
         "scope",
-        "genericField"
+        "genericField",
+        "scenarioId",
+        "provenance"
       ],
       "properties": {
         "rangeName": {
@@ -267,7 +306,7 @@
         },
         "cellAddress": {
           "type": "string",
-          "pattern": "^[A-Z]+[0-9]+$"
+          "pattern": "^\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}$"
         },
         "tabName": {
           "type": "string"
@@ -277,7 +316,7 @@
           "enum": ["workbook", "sheet"]
         },
         "genericField": {
-          "type": "string"
+          "type": ["string", "null"]
         },
         "scenarioId": {
           "type": ["string", "null"]
@@ -285,9 +324,10 @@
         "provenance": {
           "type": "object",
           "additionalProperties": false,
+          "required": ["source", "architectureNamedRange"],
           "properties": {
             "source": {
-              "type": "string"
+              "const": "architecture"
             },
             "architectureNamedRange": {
               "type": "string"
@@ -305,6 +345,8 @@
         "tabName",
         "cellAddress",
         "iobClassification",
+        "dataSource",
+        "formulaId",
         "scenarioId"
       ],
       "properties": {
@@ -320,7 +362,7 @@
         },
         "cellAddress": {
           "type": "string",
-          "pattern": "^[A-Z]+[0-9]+$"
+          "pattern": "^\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}$"
         },
         "iobClassification": {
           "type": "string",
@@ -343,7 +385,7 @@
     "DataSourceReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sourceType", "sourceTab", "sourceField"],
+      "required": ["sourceType", "sourceTab", "sourceField", "evidenceKey"],
       "properties": {
         "sourceType": {
           "type": "string",
@@ -359,6 +401,62 @@
           "type": ["string", "null"],
           "pattern": "^[a-f0-9]{64}$"
         }
+      }
+    },
+    "ArchitectureLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policies", "evidenceCatalogId", "evidenceCatalogContentSha256", "population", "caseControls", "authorityOverrides"],
+      "properties": {
+        "policies": { "type": "array", "items": { "$ref": "#/$defs/ArchitecturePolicyLineage" } },
+        "evidenceCatalogId": { "type": "string", "format": "uuid" },
+        "evidenceCatalogContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "population": { "type": "array", "items": { "$ref": "#/$defs/PopulationArchitectureLineage" } },
+        "caseControls": { "type": "array", "items": { "$ref": "#/$defs/ContentIdentity" } },
+        "authorityOverrides": { "type": "array", "items": { "$ref": "#/$defs/OverrideContentIdentity" } }
+      }
+    },
+    "ArchitecturePolicyLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyKind", "policyVersion", "policyContentSha256", "sourceFileSha256", "approvalDecisionId", "approvalDecisionContentSha256"],
+      "properties": {
+        "policyKind": { "enum": ["scenario-selection", "tab-selection", "iob-classification", "field-name-glossary"] },
+        "policyVersion": { "type": "string", "minLength": 1 },
+        "policyContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceFileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approvalDecisionId": { "type": "string", "format": "uuid" },
+        "approvalDecisionContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "PopulationArchitectureLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateKey", "artifactSha256", "workbookProfileContentSha256", "approvalDecisionId", "approvalDecisionContentSha256"],
+      "properties": {
+        "candidateKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "artifactSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "workbookProfileContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approvalDecisionId": { "type": "string", "minLength": 1 },
+        "approvalDecisionContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "ContentIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["controlId", "contentSha256"],
+      "properties": {
+        "controlId": { "type": "string", "format": "uuid" },
+        "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "OverrideContentIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["overrideId", "contentSha256"],
+      "properties": {
+        "overrideId": { "type": "string", "format": "uuid" },
+        "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
       }
     },
     "ExecutionOrder": {
@@ -426,17 +524,26 @@
     "ValidationError": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message"],
+      "required": ["code", "message", "field", "formulaId", "context"],
       "properties": {
         "code": {
           "type": "string",
           "enum": [
+            "ARCHITECTURE_HASH_MISMATCH",
+            "ARCHITECTURE_INVALID",
+            "ARCHITECTURE_RULE_SET_MISMATCH",
             "MISSING_FORMULA",
+            "DUPLICATE_FORMULA",
+            "DUPLICATE_MAPPING",
             "DUPLICATE_RANGE",
+            "FORMULA_GOVERNANCE_INVALID",
+            "FORMULA_PROVENANCE_INVALID",
             "UNSATISFIED_DEPENDENCY",
             "CIRCULAR_DEPENDENCY",
             "INVALID_CELL_ADDRESS",
-            "MISSING_DATA_SOURCE"
+            "MAPPING_MISMATCH",
+            "MISSING_DATA_SOURCE",
+            "SCHEMA_VALIDATION_FAILED"
           ]
         },
         "message": {
@@ -456,11 +563,11 @@
     "ValidationWarning": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message"],
+      "required": ["code", "message", "field", "context"],
       "properties": {
         "code": {
           "type": "string",
-          "enum": ["UNUSED_RANGE", "DEEP_DEPENDENCY", "LARGE_FORMULA"]
+          "enum": ["DEEP_DEPENDENCY", "LARGE_FORMULA"]
         },
         "message": {
           "type": "string"

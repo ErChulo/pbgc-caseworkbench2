@@ -6,6 +6,7 @@ import type {
 import { computeContentHash } from "../../src/domain/build-spec/serialization";
 import type { ClockPort, UuidPort } from "../../src/domain/ports";
 import type { Sha256, UtcTimestamp, Uuid } from "../../src/domain/shared/types";
+import { governedPlanRule } from "./build-spec";
 
 const uuid = (suffix: string) =>
   `00000000-0000-1000-8000-${suffix.padStart(12, "0")}` as Uuid;
@@ -19,11 +20,11 @@ export const fixedUuid: UuidPort = { generate: () => uuid("999") };
 export function approvedProvenance(
   overrides: Partial<FormulaProvenance> = {},
 ): FormulaProvenance {
+  const rule = governedPlanRule();
   return {
     sourcePlanRules: [
       {
-        ruleId: uuid("101"),
-        ruleContentSha256: hash("a"),
+        ...rule,
         relationship: "governing",
         citation: {
           artifactSha256: hash("b"),
@@ -33,18 +34,43 @@ export function approvedProvenance(
         effectiveDate: "2000-01-01",
         endDate: null,
         adoptionOrExecutionDate: "1999-12-15",
-        applicabilityConditions: [
-          { dimension: "calculation-scenario", value: "DOR" },
-        ],
         supersedesRuleId: null,
-        confidence: 1,
-        reviewStatus: "human-approved",
-        authorityOverrideId: null,
         unresolvedItemIds: [],
       },
     ],
     derivationDescription: "Synthetic reviewed formula derivation.",
-    approvalRecordId: "APPROVAL-SYNTHETIC-001",
+    formulaApproval: {
+      decisionId: uuid("701"),
+      decisionContentSha256: hash("7"),
+      appendOrdinal: 1,
+      priorDecisionId: null,
+      priorDecisionContentSha256: null,
+      decisionType: "approve",
+      resultingStatus: "approved",
+      formulaText: "=SYNTHETIC",
+      target: {
+        tabName: "RETIREES",
+        cellAddress: "C1",
+        genericField: "SYNTHETIC",
+      },
+      scenarioId: "DOR",
+      iobClassification: "O",
+      sourcePlanRules: [
+        {
+          ruleId: rule.ruleId,
+          ruleContentSha256: rule.ruleContentSha256,
+          relationship: "governing",
+        },
+      ],
+      derivationDescription: "Synthetic reviewed formula derivation.",
+      affectedTestIds: ["ORACLE-SYNTHETIC-001"],
+      regenerationImpact: "Regenerate compiled formulas.",
+      validationOracleIds: ["ORACLE-SYNTHETIC-001"],
+      humanActor: rule.authorHuman,
+      rationale: "Synthetic compiler fixture approval.",
+      decidedAt: fixedClock.now(),
+      schemaVersion: "1.0.0",
+    },
     affectedTestIds: ["ORACLE-SYNTHETIC-001"],
     regenerationImpact:
       "Regenerate compiled formulas and dependent workbook artifacts.",
@@ -138,9 +164,18 @@ export async function buildSpecV2(
     schemaVersion: "2.0.0",
     buildSpecId: uuid("1"),
     architectureId: uuid("2"),
+    architectureContentSha256: hash("2"),
     caseId: uuid("3"),
     ruleSetVersion: "synthetic-v1",
     generatedAt: fixedClock.now(),
+    architectureLineage: {
+      policies: [],
+      evidenceCatalogId: uuid("10"),
+      evidenceCatalogContentSha256: hash("1"),
+      population: [],
+      caseControls: [],
+      authorityOverrides: [],
+    },
     formulas,
     namedRanges: [],
     cellMappings: [...inputMappings, ...outputMappings],
