@@ -49,14 +49,15 @@ export function ManifestExport({
         </div>
       </dl>
       <p>
-        <strong>Processing status:</strong> {summary.accountingStatus}.
-        This label does not confer approval or release.
+        <strong>Processing status:</strong> {summary.accountingStatus}. This
+        label does not confer approval or release.
       </p>
       {summary.provisionalBlockReason !== null && (
         <p className="notice">
-          <strong>Safety review needed:</strong> {summary.provisionalBlockReason}{" "}
-          <strong>Review required:</strong> {summary.requiredReview}.{" "}
-          <strong>Next step:</strong> {summary.nextAction}
+          <strong>Safety review needed:</strong>{" "}
+          {summary.provisionalBlockReason} <strong>Review required:</strong>{" "}
+          {summary.requiredReview}. <strong>Next step:</strong>{" "}
+          {summary.nextAction}
         </p>
       )}
       <p>

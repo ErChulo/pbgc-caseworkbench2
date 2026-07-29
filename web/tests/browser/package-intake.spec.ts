@@ -75,9 +75,7 @@ test("interrupts large-file hashing at a safe boundary without claiming completi
     buffer: Buffer.alloc(24 * 1024 * 1024, 17),
   });
   await selection;
-  await expect(
-    page.getByRole("button", { name: "Stop safely" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop safely" })).toBeVisible();
   await page.getByRole("button", { name: "Stop safely" }).click();
   await expect(page.getByText("File inventory interrupted")).toBeVisible();
   await expect(

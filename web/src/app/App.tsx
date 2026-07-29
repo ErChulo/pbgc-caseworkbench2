@@ -902,15 +902,16 @@ export function App() {
           item.status === "provisional-blocked" || item.status === "failed",
       ).length,
       accountingStatus:
-        failures === 0 ? "Awaiting human review" : "Partial — some files failed",
+        failures === 0
+          ? "Awaiting human review"
+          : "Partial — some files failed",
       provisionalBlockReason:
         entries.length === 0
           ? "No evidence files were available for processing."
           : "Evidence is pending until all required reviews are complete.",
       requiredReview:
         "Review quarantine, classification, relationship, and population queues.",
-      nextAction:
-        "Complete all reviews, then export the final manifest.",
+      nextAction: "Complete all reviews, then export the final manifest.",
       deterministicManifestHash: snapshot.snapshotId,
       lineage: entries.map((entry, index) => ({
         nodeId: `artifact-${String(index + 1)}`,

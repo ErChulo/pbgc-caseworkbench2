@@ -33,8 +33,7 @@ export const GLOSSARY = {
   screeningPending: {
     plain: "Awaiting screening",
     technical: "screening-pending",
-    tooltip:
-      "This artifact has not yet been checked for safety issues.",
+    tooltip: "This artifact has not yet been checked for safety issues.",
   },
   finalQuarantine: {
     plain: "Permanently quarantined",
@@ -57,8 +56,7 @@ export const GLOSSARY = {
   superseded: {
     plain: "Replaced by newer decision",
     technical: "superseded",
-    tooltip:
-      "A newer decision has replaced this one in the review chain.",
+    tooltip: "A newer decision has replaced this one in the review chain.",
   },
   approved: {
     plain: "Approved",
@@ -99,8 +97,7 @@ export const GLOSSARY = {
   rejectAction: {
     plain: "Reject",
     technical: "reject",
-    tooltip:
-      "Reject this artifact's classification or relationship proposal.",
+    tooltip: "Reject this artifact's classification or relationship proposal.",
   },
   revokeAction: {
     plain: "Withdraw approval",
@@ -153,8 +150,7 @@ export const GLOSSARY = {
   artifactSha256: {
     plain: "File fingerprint",
     technical: "artifact SHA-256",
-    tooltip:
-      "The SHA-256 hash of the original artifact bytes.",
+    tooltip: "The SHA-256 hash of the original artifact bytes.",
   },
   snapshotRecordId: {
     plain: "Snapshot record",
@@ -221,6 +217,10 @@ export function tooltip(key: GlossaryKey): string {
  * Renders a plain-language label with a technical tooltip.
  * Use this in JSX: <Term key="sha256" />
  */
-export function Term({ glossaryKey }: { readonly glossaryKey: GlossaryKey }): string {
+export function Term({
+  glossaryKey,
+}: {
+  readonly glossaryKey: GlossaryKey;
+}): string {
   return GLOSSARY[glossaryKey].plain;
 }

@@ -43,14 +43,17 @@ export function FeasibilityStatus() {
       data-feasibility={passed ? "pass" : "fail"}
     >
       <p>
-        Browser: <strong>{passed ? "Compatible" : "Not fully compatible"}</strong>
+        Browser:{" "}
+        <strong>{passed ? "Compatible" : "Not fully compatible"}</strong>
         {!result.fileSystemAccess && " (limited mode)"}
       </p>
       <button
         type="button"
         className="feasibility-toggle"
         aria-expanded={expanded}
-        onClick={() => { setExpanded(!expanded); }}
+        onClick={() => {
+          setExpanded(!expanded);
+        }}
       >
         {expanded ? "Hide" : "Show"} technical details
       </button>

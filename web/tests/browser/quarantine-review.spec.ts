@@ -39,7 +39,9 @@ test("separates accounting, provisional security, and typed human disposition", 
   });
   await expect(quarantine.getByText("pending-human-disposition")).toBeVisible();
   await expect(quarantine.getByText("Safety review needed")).toBeVisible();
-  await expect(quarantine.getByText("No decision yet", { exact: true })).toBeVisible();
+  await expect(
+    quarantine.getByText("No decision yet", { exact: true }),
+  ).toBeVisible();
   await expect(quarantine.getByText("executable")).toBeVisible();
   await expect(
     page.getByText(/authorized reviewer must check/iu),
@@ -52,12 +54,8 @@ test("separates accounting, provisional security, and typed human disposition", 
   const riskItem = page.locator(".quarantine-list > li", {
     hasText: "synthetic-risk.exe",
   });
-  await riskItem
-    .getByRole("button", { name: "Release for use" })
-    .click();
-  await expect(
-    quarantine.getByText("Released", { exact: true }),
-  ).toBeVisible();
+  await riskItem.getByRole("button", { name: "Release for use" }).click();
+  await expect(quarantine.getByText("Released", { exact: true })).toBeVisible();
   await picker.setInputFiles({
     name: "synthetic-risk-copy.exe",
     mimeType: "application/octet-stream",
