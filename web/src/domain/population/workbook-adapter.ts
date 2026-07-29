@@ -1,5 +1,7 @@
 import type { PassiveExtraction } from "../../adapters/parsers/passive-result";
 import type { WorkbookCellObservation } from "../../adapters/parsers/workbook-parser";
+import { hashTyped } from "../manifests/canonical-json";
+import { parseSha256, type Sha256 } from "../shared/types";
 import { classifyRawValue, type RawValueKind } from "./tabular-adapter";
 
 export interface PopulationWorkbookCell extends WorkbookCellObservation {
@@ -17,6 +19,39 @@ export interface WorkbookPopulationProfile {
   readonly sheets: readonly PopulationWorkbookSheet[];
   readonly formulaExecutionCount: 0;
   readonly limitations: readonly string[];
+}
+
+export interface WorkbookNamedRangeObservation {
+  readonly name: string;
+  readonly sourceTab: string;
+  readonly cellAddress: string;
+  readonly definitionSheet: string | null;
+}
+
+export async function workbookProfileContentHash(
+  workbook: WorkbookPopulationProfile,
+  namedRanges: readonly WorkbookNamedRangeObservation[],
+): Promise<Sha256> {
+  const parsed = parseSha256(
+    await hashTyped(
+      {
+        workbook,
+        namedRanges: [...namedRanges].sort(
+          (left, right) =>
+            left.name.localeCompare(right.name) ||
+            left.sourceTab.localeCompare(right.sourceTab) ||
+            left.cellAddress.localeCompare(right.cellAddress) ||
+            String(left.definitionSheet).localeCompare(
+              String(right.definitionSheet),
+            ),
+        ),
+      },
+      { typeName: "WorkbookPopulationProfile" },
+    ),
+  );
+  if (!parsed.ok)
+    throw new Error("Workbook profile SHA-256 computation failed.");
+  return parsed.value;
 }
 
 export function adaptWorkbookExtraction(

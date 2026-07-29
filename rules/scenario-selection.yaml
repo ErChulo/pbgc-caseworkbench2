@@ -1,1 +1,143 @@
-rules: []
+# Scenario Selection Rules
+# Provisional calculation-scenario candidates and their trigger conditions.
+# Each scenario is selected when its triggerConditions are met and exclusionConditions are not.
+# For plan-rule operator "absent", only an explicit governed applicability value
+# of "absent" is negative evidence; an omitted dimension remains unknown.
+
+version: "1.0.0"
+
+governance:
+  reviewStatus: "provisional"
+
+scenarios:
+  - id: DOR
+    label: "Death of Retiree"
+    triggerConditions:
+      - dimension: "benefit-type"
+        operator: "present"
+        value: "retirement-benefit"
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: NRD
+    label: "Normal Retirement Date"
+    triggerConditions:
+      - dimension: "benefit-type"
+        operator: "present"
+        value: "retirement-benefit"
+        source: "plan-rule"
+      - dimension: "normal-retirement-age"
+        operator: "present"
+        value: true
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: ERD
+    label: "Early Retirement Date"
+    triggerConditions:
+      - dimension: "early-retirement-provision"
+        operator: "present"
+        value: true
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: EURD
+    label: "Early Unexpected Retirement Date"
+    triggerConditions:
+      - dimension: "benefit-type"
+        operator: "present"
+        value: "retirement-benefit"
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: DORNSF
+    label: "Death of Retiree No Survivor Benefit"
+    triggerConditions:
+      - dimension: "benefit-type"
+        operator: "present"
+        value: "retirement-benefit"
+        source: "plan-rule"
+      - dimension: "survivor-benefit"
+        operator: "equals"
+        value: false
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: QPSA
+    label: "Qualified Preretirement Survivor Annuity"
+    triggerConditions:
+      - dimension: "qpsa-provision"
+        operator: "present"
+        value: true
+        source: "plan-rule"
+    exclusionConditions:
+      - dimension: "participant-status"
+        operator: "equals"
+        value: "retired"
+        source: "population"
+    defaultEffectiveDateRange:
+      startDate: "1984-09-17"
+      endDate: null
+
+  - id: QPSALIAB
+    label: "QPSA Liability"
+    triggerConditions:
+      - dimension: "qpsa-provision"
+        operator: "present"
+        value: true
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1984-09-17"
+      endDate: null
+
+  - id: RBD
+    label: "Required Beginning Date"
+    triggerConditions:
+      - dimension: "required-beginning-date"
+        operator: "present"
+        value: true
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: XRD
+    label: "Expected Retirement Date"
+    triggerConditions:
+      - dimension: "benefit-type"
+        operator: "present"
+        value: "retirement-benefit"
+        source: "plan-rule"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null
+
+  - id: Single Run
+    label: "Single Calculation Run"
+    triggerConditions:
+      - dimension: "case-purpose"
+        operator: "equals"
+        value: "single-calculation"
+        source: "case-control"
+    exclusionConditions: []
+    defaultEffectiveDateRange:
+      startDate: "1974-09-02"
+      endDate: null

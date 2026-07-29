@@ -1,1 +1,134 @@
-allowed_values: [I, O, B, N, P, '']
+# I/O/B Classification Rules
+# Provisional candidates for classifying fields as I, O, B, N, or P.
+# Higher priority wins when rules conflict.
+
+version: "1.0.0"
+
+governance:
+  reviewStatus: "provisional"
+
+rules:
+  # CALC_INDICATOR is always B (Both) per Constitution Section 7.
+  - fieldPattern: "CALC_INDICATOR"
+    runPattern: "*"
+    iob: "B"
+    priority: 100
+    justification: "CALC_INDICATOR identifies valuation or recalculation context (Constitution Section 7)"
+
+  # CALCULATION is always N (Neither) per Constitution Section 7.
+  - fieldPattern: "CALCULATION"
+    runPattern: "*"
+    iob: "N"
+    priority: 100
+    justification: "CALCULATION identifies a documented calculation run or scenario (Constitution Section 7)"
+
+  # Input fields read from population data.
+  - fieldPattern: "DOB"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Date of birth is read from population data"
+
+  - fieldPattern: "BSEX"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Benefit sex is read from population data"
+
+  - fieldPattern: "COMP"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Compensation is read from population data"
+
+  - fieldPattern: "HC"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Hours credited is read from population data"
+
+  - fieldPattern: "YOS"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Years of service is read from population data"
+
+  - fieldPattern: "ASOF"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "As-of date is read from population data"
+
+  - fieldPattern: "DOR"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Death of retiree date is read from population data"
+
+  - fieldPattern: "DOE"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Date of event is read from population data"
+
+  - fieldPattern: "DOL"
+    runPattern: "*"
+    iob: "I"
+    priority: 50
+    justification: "Date of loss is read from population data"
+
+  # Output fields containing calculated results.
+  - fieldPattern: "BENEFIT"
+    runPattern: "*"
+    iob: "O"
+    priority: 50
+    justification: "Benefit amount is a calculated result"
+
+  - fieldPattern: "PV"
+    runPattern: "*"
+    iob: "O"
+    priority: 50
+    justification: "Present value is a calculated result"
+
+  - fieldPattern: "ACC_BEN"
+    runPattern: "*"
+    iob: "O"
+    priority: 50
+    justification: "Accrued benefit is a calculated result"
+
+  - fieldPattern: "FV"
+    runPattern: "*"
+    iob: "O"
+    priority: 50
+    justification: "Flat benefit is a calculated result"
+
+  # Neither: formulas that are intermediate calculations.
+  - fieldPattern: "NRD"
+    runPattern: "*"
+    iob: "N"
+    priority: 50
+    justification: "Normal retirement date is derived from DOB + NRD age"
+
+  - fieldPattern: "ERD"
+    runPattern: "*"
+    iob: "N"
+    priority: 50
+    justification: "Early retirement date is derived from DOB + ERD age"
+
+  - fieldPattern: "AGE"
+    runPattern: "*"
+    iob: "N"
+    priority: 50
+    justification: "Age is calculated from DOB and as-of date"
+
+  - fieldPattern: "SVC"
+    runPattern: "*"
+    iob: "N"
+    priority: 50
+    justification: "Service is calculated from service dates"
+
+  - fieldPattern: "MOB"
+    runPattern: "*"
+    iob: "N"
+    priority: 50
+    justification: "Month of benefit is calculated from dates"

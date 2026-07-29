@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { parseWorkbookPassive } from "../../../../src/adapters/parsers/workbook-parser";
 import { failedPassiveExtraction } from "../../../../src/adapters/parsers/passive-result";
-import { adaptWorkbookExtraction } from "../../../../src/domain/population/workbook-adapter";
+import {
+  adaptWorkbookExtraction,
+  workbookProfileContentHash,
+} from "../../../../src/domain/population/workbook-adapter";
 import { syntheticPopulationWorkbook } from "../../../fixtures/generators/populations";
 
 describe("T092 population workbook adapter", () => {
@@ -35,5 +38,25 @@ describe("T092 population workbook adapter", () => {
     );
     expect(profile.status).toBe("blocked");
     expect(profile.sheets).toEqual([]);
+  });
+
+  it("hashes sheets, cells, and named ranges deterministically", async () => {
+    const profile = adaptWorkbookExtraction(
+      parseWorkbookPassive(syntheticPopulationWorkbook()),
+    );
+    const range = {
+      name: "Synthetic_Name",
+      sourceTab: "Population",
+      cellAddress: "A1",
+      definitionSheet: null,
+    };
+    const ranges = [range];
+    const hash = await workbookProfileContentHash(profile, ranges);
+    expect(await workbookProfileContentHash(profile, ranges)).toBe(hash);
+    expect(
+      await workbookProfileContentHash(profile, [
+        { ...range, name: "Tampered_Name" },
+      ]),
+    ).not.toBe(hash);
   });
 });

@@ -1,0 +1,198 @@
+# Field Name Glossary
+# Provisional mappings from workbook descriptions to generic field names.
+# Used by the architecture selector to normalize field names across workbooks.
+
+version: "1.0.0"
+
+governance:
+  reviewStatus: "provisional"
+
+entries:
+  # Identity fields
+  - workbookPattern: "Participant Name"
+    genericField: "NAME"
+    description: "Participant full name"
+
+  - workbookPattern: "SSN"
+    genericField: "SSN"
+    description: "Social Security Number"
+
+  - workbookPattern: "Claim Number"
+    genericField: "CLAIM"
+    description: "Claim or case number"
+
+  # Date fields
+  - workbookPattern: "Date of Birth"
+    genericField: "DOB"
+    description: "Date of birth"
+
+  - workbookPattern: "DOB"
+    genericField: "DOB"
+    description: "Date of birth"
+
+  - workbookPattern: "Birth Date"
+    genericField: "DOB"
+    description: "Date of birth"
+
+  - workbookPattern: "Normal Retirement Date"
+    genericField: "NRD"
+    description: "Normal retirement date"
+
+  - workbookPattern: "NRD"
+    genericField: "NRD"
+    description: "Normal retirement date"
+
+  - workbookPattern: "Early Retirement Date"
+    genericField: "ERD"
+    description: "Early retirement date"
+
+  - workbookPattern: "ERD"
+    genericField: "ERD"
+    description: "Early retirement date"
+
+  - workbookPattern: "Date of Hire"
+    genericField: "DOH"
+    description: "Date of hire"
+
+  - workbookPattern: "Date of Separation"
+    genericField: "DOS"
+    description: "Date of separation from service"
+
+  - workbookPattern: "Date of Death"
+    genericField: "DOD"
+    description: "Date of death"
+
+  - workbookPattern: "Death Date"
+    genericField: "DOD"
+    description: "Date of death"
+
+  - workbookPattern: "As Of Date"
+    genericField: "ASOF"
+    description: "Valuation as-of date"
+
+  # Demographic fields
+  - workbookPattern: "Sex"
+    genericField: "BSEX"
+    description: "Benefit sex"
+
+  - workbookPattern: "Gender"
+    genericField: "BSEX"
+    description: "Benefit sex"
+
+  - workbookPattern: "Benefit Sex"
+    genericField: "BSEX"
+    description: "Benefit sex"
+
+  - workbookPattern: "BSEX"
+    genericField: "BSEX"
+    description: "Benefit sex"
+
+  # Service fields
+  - workbookPattern: "Years of Service"
+    genericField: "YOS"
+    description: "Years of credited service"
+
+  - workbookPattern: "YOS"
+    genericField: "YOS"
+    description: "Years of credited service"
+
+  - workbookPattern: "Credited Service"
+    genericField: "YOS"
+    description: "Years of credited service"
+
+  - workbookPattern: "Hours Credited"
+    genericField: "HC"
+    description: "Hours credited in plan year"
+
+  - workbookPattern: "HC"
+    genericField: "HC"
+    description: "Hours credited in plan year"
+
+  # Compensation fields
+  - workbookPattern: "Compensation"
+    genericField: "COMP"
+    description: "Plan compensation"
+
+  - workbookPattern: "COMP"
+    genericField: "COMP"
+    description: "Plan compensation"
+
+  - workbookPattern: "Average Compensation"
+    genericField: "AVGCOMP"
+    description: "Average plan compensation"
+
+  - workbookPattern: "High-3 Compensation"
+    genericField: "HICOMP"
+    description: "High-3 average compensation"
+
+  # Benefit fields
+  - workbookPattern: "Flat Benefit"
+    genericField: "FV"
+    description: "Flat benefit amount"
+
+  - workbookPattern: "FV"
+    genericField: "FV"
+    description: "Flat benefit amount"
+
+  - workbookPattern: "Accrued Benefit"
+    genericField: "ACC_BEN"
+    description: "Accrued benefit amount"
+
+  - workbookPattern: "Benefit Amount"
+    genericField: "BENEFIT"
+    description: "Calculated benefit amount"
+
+  - workbookPattern: "Monthly Benefit"
+    genericField: "BENEFIT"
+    description: "Monthly benefit amount"
+
+  - workbookPattern: "Present Value"
+    genericField: "PV"
+    description: "Present value of benefit"
+
+  - workbookPattern: "PV"
+    genericField: "PV"
+    description: "Present value of benefit"
+
+  # Calculation context fields
+  - workbookPattern: "CALC_INDICATOR"
+    genericField: "CALC_INDICATOR"
+    description: "Valuation or recalculation context identifier"
+
+  - workbookPattern: "Calculation Indicator"
+    genericField: "CALC_INDICATOR"
+    description: "Valuation or recalculation context identifier"
+
+  - workbookPattern: "CALCULATION"
+    genericField: "CALCULATION"
+    description: "Documented calculation run or scenario identifier"
+
+  - workbookPattern: "Calculation"
+    genericField: "CALCULATION"
+    description: "Documented calculation run or scenario identifier"
+
+  # Event fields
+  - workbookPattern: "Date of Event"
+    genericField: "DOE"
+    description: "Date of triggering event"
+
+  - workbookPattern: "DOE"
+    genericField: "DOE"
+    description: "Date of triggering event"
+
+  - workbookPattern: "Death of Retiree"
+    genericField: "DOR"
+    description: "Death of retiree event date"
+
+  - workbookPattern: "DOR"
+    genericField: "DOR"
+    description: "Death of retiree event date"
+
+  # Age fields
+  - workbookPattern: "Age"
+    genericField: "AGE"
+    description: "Current age"
+
+  - workbookPattern: "Current Age"
+    genericField: "AGE"
+    description: "Current age"

@@ -62,6 +62,8 @@ export type ApplicabilityDimension =
   | "freeze-or-restriction"
   | "amendment-period";
 
+export const planRuleAbsentApplicabilityValue = "absent" as const;
+
 export interface ApplicabilityCondition {
   readonly dimension: ApplicabilityDimension;
   readonly value: string;

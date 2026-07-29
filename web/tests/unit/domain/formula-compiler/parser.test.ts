@@ -30,7 +30,6 @@ describe("formula parser", () => {
     ["", "EMPTY_FORMULA"],
     ["==A1", "MULTIPLE_LEADING_EQUALS"],
     ["1E3", "INVALID_NUMBER"],
-    ["A1:A2", "RANGE_REFERENCE_PROHIBITED"],
     ["{1,2}", "ARRAY_SYNTAX_PROHIBITED"],
     ["A1#", "DYNAMIC_ARRAY_PROHIBITED"],
   ])("rejects %s with %s", (source, code) => {

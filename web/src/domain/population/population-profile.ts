@@ -52,6 +52,7 @@ export interface PopulationCandidateDecision {
   readonly priorDecisionContentSha256: Sha256 | null;
   readonly candidateKey: Sha256;
   readonly artifactSha256: Sha256;
+  readonly workbookProfileContentSha256: Sha256;
   readonly decisionType: "approve" | "reject" | "revoke" | "supersede";
   readonly humanActor: HumanActor;
   readonly rationale: string;
@@ -64,6 +65,7 @@ export interface PopulationCandidateDecision {
 export interface PopulationDecisionProjection {
   readonly status: PopulationGovernedStatus | "provisional";
   readonly effectiveDecisionId: string | null;
+  readonly effectiveWorkbookProfileContentSha256: Sha256 | null;
   readonly provenance: readonly string[];
 }
 
@@ -222,6 +224,7 @@ export async function populationDecisionContentHash(
         priorDecisionContentSha256: decision.priorDecisionContentSha256,
         candidateKey: decision.candidateKey,
         artifactSha256: decision.artifactSha256,
+        workbookProfileContentSha256: decision.workbookProfileContentSha256,
         decisionType: decision.decisionType,
         resultingStatus: decision.resultingStatus,
         ruleSetVersion: decision.ruleSetVersion,
@@ -234,6 +237,7 @@ export async function populationDecisionContentHash(
 
 export async function replayPopulationCandidateDecisions(
   candidate: PopulationCandidateProfile,
+  workbookProfileContentSha256: Sha256,
   decisions: readonly PopulationCandidateDecision[],
 ): Promise<Result<PopulationDecisionProjection, PopulationProfileError>> {
   if (!["proposed", "unresolved"].includes(candidate.candidateStatus))
@@ -254,11 +258,12 @@ export async function replayPopulationCandidateDecisions(
       );
     if (
       decision.candidateKey !== candidate.candidateKey ||
-      decision.artifactSha256 !== candidate.artifactSha256
+      decision.artifactSha256 !== candidate.artifactSha256 ||
+      decision.workbookProfileContentSha256 !== workbookProfileContentSha256
     )
       return fail(
         "MISMATCHED_SUBJECT",
-        "Population decision does not concern this exact candidate and artifact.",
+        "Population decision does not concern this exact candidate, source artifact, and workbook profile.",
       );
     if (
       seen.has(decision.decisionId) ||
@@ -301,6 +306,8 @@ export async function replayPopulationCandidateDecisions(
     value: Object.freeze({
       status: prior?.resultingStatus ?? "provisional",
       effectiveDecisionId: prior?.decisionId ?? null,
+      effectiveWorkbookProfileContentSha256:
+        prior?.workbookProfileContentSha256 ?? null,
       provenance: Object.freeze(
         decisions.map((decision) => decision.decisionId),
       ),

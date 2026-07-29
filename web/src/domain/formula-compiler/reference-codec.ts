@@ -1,6 +1,11 @@
 const cellPattern = /^(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]{0,6})$/u;
 const namePattern = /^[A-Za-z_][A-Za-z0-9_.]{0,254}$/u;
 
+export interface NormalizedCellRange {
+  readonly startAddress: string;
+  readonly endAddress: string;
+}
+
 function columnNumber(column: string): number {
   let value = 0;
   for (const character of column.toUpperCase())
@@ -19,6 +24,16 @@ export function normalizeCellAddress(value: string): string | null {
   const row = Number(rowText);
   if (columnNumber(column) > 16_384 || row > 1_048_576) return null;
   return `${absoluteColumn}${column}${absoluteRow}${String(row)}`;
+}
+
+export function normalizeCellRange(value: string): NormalizedCellRange | null {
+  const parts = value.split(":");
+  if (parts.length !== 2) return null;
+  const startAddress = normalizeCellAddress(parts[0] ?? "");
+  const endAddress = normalizeCellAddress(parts[1] ?? "");
+  return startAddress === null || endAddress === null
+    ? null
+    : { startAddress, endAddress };
 }
 
 export function isValidName(value: string): boolean {

@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/v1-architecture.schema.json",
+  "title": "V1 Architecture",
+  "description": "The deterministic, auditable V1 calculation architecture: selected tabs, runs/scenarios, field inventory with per-run I/O/B classification, formula dependencies, and named ranges.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "architectureId",
+    "caseId",
+    "builtAt",
+    "schemaVersion",
+    "ruleSetVersion",
+    "lineage",
+    "sourceTabs",
+    "runs",
+    "cells",
+    "formulaDependencies",
+    "namedRanges",
+    "architectureContentSha256"
+  ],
+  "properties": {
+    "architectureId": {
+      "$ref": "governed-records.schema.json#/$defs/uuid"
+    },
+    "caseId": {
+      "$ref": "governed-records.schema.json#/$defs/uuid"
+    },
+    "builtAt": {
+      "$ref": "governed-records.schema.json#/$defs/timestamp"
+    },
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "ruleSetVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lineage": {
+      "$ref": "#/$defs/lineage"
+    },
+    "sourceTabs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sourceTab"
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/runDescriptor"
+      }
+    },
+    "cells": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/cellDescriptor"
+      },
+      "minProperties": 1
+    },
+    "formulaDependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/formulaDependency"
+      }
+    },
+    "namedRanges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/namedRange"
+      }
+    },
+    "architectureContentSha256": {
+      "$ref": "governed-records.schema.json#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policies",
+        "evidenceCatalogId",
+        "evidenceCatalogContentSha256",
+        "population",
+        "caseControls",
+        "authorityOverrides"
+      ],
+      "properties": {
+        "policies": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/policyLineage" }
+        },
+        "evidenceCatalogId": {
+          "$ref": "governed-records.schema.json#/$defs/uuid"
+        },
+        "evidenceCatalogContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "population": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/populationLineage" }
+        },
+        "caseControls": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/idHash" }
+        },
+        "authorityOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/overrideHash" }
+        }
+      }
+    },
+    "policyLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyKind",
+        "policyVersion",
+        "policyContentSha256",
+        "sourceFileSha256",
+        "approvalDecisionId",
+        "approvalDecisionContentSha256"
+      ],
+      "properties": {
+        "policyKind": {
+          "enum": [
+            "scenario-selection",
+            "tab-selection",
+            "iob-classification",
+            "field-name-glossary"
+          ]
+        },
+        "policyVersion": { "type": "string", "minLength": 1 },
+        "policyContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "sourceFileSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "approvalDecisionId": {
+          "$ref": "governed-records.schema.json#/$defs/uuid"
+        },
+        "approvalDecisionContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        }
+      }
+    },
+    "populationLineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidateKey",
+        "artifactSha256",
+        "workbookProfileContentSha256",
+        "approvalDecisionId",
+        "approvalDecisionContentSha256"
+      ],
+      "properties": {
+        "candidateKey": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "artifactSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "workbookProfileContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "approvalDecisionId": { "type": "string", "minLength": 1 },
+        "approvalDecisionContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        }
+      }
+    },
+    "idHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["controlId", "contentSha256"],
+      "properties": {
+        "controlId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "contentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        }
+      }
+    },
+    "overrideHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["overrideId", "contentSha256"],
+      "properties": {
+        "overrideId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "contentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        }
+      }
+    },
+    "sourceTab": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tabName",
+        "role",
+        "workbookProfileContentSha256",
+        "populationCandidateKey",
+        "populationArtifactSha256",
+        "fieldCount",
+        "recordCount"
+      ],
+      "properties": {
+        "tabName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": { "enum": ["population", "support"] },
+        "workbookProfileContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "populationCandidateKey": {
+          "oneOf": [
+            { "$ref": "governed-records.schema.json#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "populationArtifactSha256": {
+          "oneOf": [
+            { "$ref": "governed-records.schema.json#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "fieldCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recordCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "runDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "runLabel",
+        "effectiveDateRange",
+        "justifications",
+        "applicableTabs"
+      ],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effectiveDateRange": {
+          "$ref": "#/$defs/dateRange"
+        },
+        "justifications": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/runJustification" }
+        },
+        "applicableTabs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "dateRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startDate", "endDate"],
+      "properties": {
+        "startDate": {
+          "type": "string",
+          "format": "date"
+        },
+        "endDate": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "runJustification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "referenceId", "referenceContentSha256"],
+      "properties": {
+        "source": {
+          "enum": ["plan-rule", "case-control", "population"]
+        },
+        "referenceId": {
+          "anyOf": [
+            {
+              "$ref": "governed-records.schema.json#/$defs/uuid"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "referenceContentSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        }
+      }
+    },
+    "cellDescriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "sourceTab",
+        "cellAddress",
+        "genericField",
+        "description",
+        "hasFormula",
+        "formulaText",
+        "perRunClassification"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[^:]+::[A-Z]+[1-9][0-9]*$"
+        },
+        "sourceTab": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cellAddress": {
+          "type": "string",
+          "pattern": "^[A-Z]+[1-9][0-9]*$"
+        },
+        "genericField": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hasFormula": {
+          "type": "boolean"
+        },
+        "formulaText": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "perRunClassification": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/ioBClassification"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "hasFormula": { "const": true } },
+            "required": ["hasFormula"]
+          },
+          "then": {
+            "properties": {
+              "formulaText": { "type": "string", "minLength": 1 }
+            }
+          },
+          "else": {
+            "properties": { "formulaText": { "type": "null" } }
+          }
+        }
+      ]
+    },
+    "ioBClassification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "iob", "justification", "ruleVersion"],
+      "properties": {
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iob": {
+          "$ref": "#/$defs/ioBValue"
+        },
+        "justification": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ruleVersion": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ioBValue": {
+      "type": "string",
+      "enum": ["I", "O", "B", "N", "P", ""]
+    },
+    "formulaDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dependentKey", "dependencyKey", "runId", "referenceType"],
+      "properties": {
+        "dependentKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependencyKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "referenceType": {
+          "enum": ["cell", "named-range", "external"]
+        }
+      }
+    },
+    "namedRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "cellAddress", "sourceTab", "scope", "genericField"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cellAddress": {
+          "type": "string",
+          "pattern": "^[A-Z]+[1-9][0-9]*$"
+        },
+        "sourceTab": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "enum": ["workbook", "sheet"]
+        },
+        "genericField": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
