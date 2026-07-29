@@ -56,10 +56,9 @@ export async function validateCompiledArtifact(
     const compiledIdSet = new Set(compiledIds);
     const blockedIdSet = new Set(blockedIds);
     const issues: string[] = [];
-    const approvedPolicyContentSha256 = (await hashTyped(
-      excelScalarV1Policy,
-      { typeName: "CompilerPolicy" },
-    )) as Sha256;
+    const approvedPolicyContentSha256 = (await hashTyped(excelScalarV1Policy, {
+      typeName: "CompilerPolicy",
+    })) as Sha256;
     if (
       payload.compiler.policyId !== excelScalarV1Policy.policyId ||
       payload.compiler.policyVersion !== excelScalarV1Policy.policyVersion ||

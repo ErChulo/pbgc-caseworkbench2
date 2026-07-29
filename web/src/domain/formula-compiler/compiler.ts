@@ -356,20 +356,22 @@ export async function compileBuildSpec(
     typeName: "CompilerPolicy",
   })) as Sha256;
   if (policyContentSha256 !== approvedPolicyContentSha256) {
-    const diagnostics = await materializeDiagnostics([{
-      code: "COMPILER_POLICY_HASH_MISMATCH",
-      category: "integrity",
-      severity: "critical",
-      blocksDownstream: true,
-      formulaId: null,
-      scenarioId: null,
-      sourceSpan: null,
-      message: "Compiler policy content does not match the approved policy.",
-      context: {
-        expected: approvedPolicyContentSha256,
-        actual: policyContentSha256,
+    const diagnostics = await materializeDiagnostics([
+      {
+        code: "COMPILER_POLICY_HASH_MISMATCH",
+        category: "integrity",
+        severity: "critical",
+        blocksDownstream: true,
+        formulaId: null,
+        scenarioId: null,
+        sourceSpan: null,
+        message: "Compiler policy content does not match the approved policy.",
+        context: {
+          expected: approvedPolicyContentSha256,
+          actual: policyContentSha256,
+        },
       },
-    }]);
+    ]);
     return { status: "blocked", artifact: null, diagnostics };
   }
   const sourceHash = await computeContentHash(buildSpec);
