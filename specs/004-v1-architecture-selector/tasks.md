@@ -163,7 +163,7 @@
 - [x] T047 [P] Create `docs/feature-004-validation-report.md` — record Constitution compliance, validation results
 - [x] T048 [P] Create `docs/feature-004-constitution-review.md` — document how each Constitution section (3, 5, 6, 7, 12, 14) is honored
 - [x] T049 Run `npm run test:integration` — verify architecture-selection.test.ts passes
-- [ ] T050 Commit all Feature 004 work with descriptive commit messages
+- [x] T050 Commit all Feature 004 work with descriptive commit messages
 
 ---
 
