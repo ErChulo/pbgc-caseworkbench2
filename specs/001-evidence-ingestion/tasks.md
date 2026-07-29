@@ -174,7 +174,7 @@
 - [x] T065 [P] Create `docs/feature-001-constitution-review.md` — document how each Constitution section (3-16) is honored
 - [x] T066 Run `npm run test:integration` — verify evidence-ingestion.test.ts passes
 - [x] T067 Run targeted Playwright evidence review — verify evidence-review.spec.ts passes 2/2 in Chromium; Edge was not run
-- [ ] T068 Commit all Feature 001 work with descriptive commit messages
+- [x] T068 Commit all Feature 001 work with descriptive commit messages
 
 ---
 
