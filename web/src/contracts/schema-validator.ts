@@ -10,6 +10,8 @@ import evidenceManifestSchema from "./schemas/evidence-manifest.schema.json";
 import extractionResultSchema from "./schemas/extraction-result.schema.json";
 import governedRecordsSchema from "./schemas/governed-records.schema.json";
 import normalizedEvidenceSchema from "./schemas/normalized-evidence.schema.json";
+import compiledFormulaArtifactSchema from "./schemas/compiled-formula-artifact.schema.json";
+import buildSpecSchema from "./schemas/build-spec.schema.json";
 
 export interface ContractValidationIssue {
   readonly code: string;
@@ -40,6 +42,8 @@ const schemas = [
   extractionResultSchema,
   governedRecordsSchema,
   normalizedEvidenceSchema,
+  compiledFormulaArtifactSchema,
+  buildSpecSchema,
 ] as const;
 
 const ajv = new Ajv2020({
@@ -62,6 +66,8 @@ const validators: Readonly<Record<string, ValidateFunction | undefined>> = {
   evidenceManifest: ajv.getSchema(evidenceManifestSchema.$id),
   extractionResult: ajv.getSchema(extractionResultSchema.$id),
   normalizedEvidence: ajv.getSchema(normalizedEvidenceSchema.$id),
+  compiledFormulaArtifact: ajv.getSchema(compiledFormulaArtifactSchema.$id),
+  buildSpec: ajv.getSchema(buildSpecSchema.$id),
   unresolvedItem: ajv.getSchema(`${governedId}#/$defs/unresolvedItem`),
   quarantineDecision: ajv.getSchema(`${governedId}#/$defs/quarantineDecision`),
   artifactEligibilityDecision: ajv.getSchema(

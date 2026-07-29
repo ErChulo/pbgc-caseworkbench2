@@ -30,6 +30,49 @@ const canonicalDecimalPattern =
   /^(?!-0$)-?(?:0|[1-9][0-9]*)(?:\.[0-9]*[1-9])?$/u;
 
 const registeredRules: Readonly<Record<string, ArrayRule>> = {
+  "compiled-formula-artifact.schema.json:compiledFormulas": set(
+    ["formulaId"],
+    "formulaId",
+  ),
+  "compiled-formula-artifact.schema.json:blockedFormulas": set(
+    ["formulaId"],
+    "formulaId",
+  ),
+  "compiled-formula-artifact.schema.json:diagnostics": set(
+    ["formulaId", "code", "diagnosticKey"],
+    "diagnosticKey",
+  ),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].dependencies":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].causalFormulaIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].diagnosticKeys":
+    set(),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].resolvedReferences":
+    ordered(),
+  "compiled-formula-artifact.schema.json:executionOrder": ordered(),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].provenance.sourcePlanRules":
+    set(["relationship", "ruleId", "ruleContentSha256"], "ruleContentSha256"),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].provenance.sourcePlanRules":
+    set(["relationship", "ruleId", "ruleContentSha256"], "ruleContentSha256"),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].provenance.affectedTestIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].provenance.validationOracleIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].provenance.affectedTestIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].provenance.validationOracleIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].provenance.sourcePlanRules[].applicabilityConditions":
+    set(["dimension", "value"], ["dimension", "value"]),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].provenance.sourcePlanRules[].applicabilityConditions":
+    set(["dimension", "value"], ["dimension", "value"]),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].provenance.sourcePlanRules[].unresolvedItemIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:blockedFormulas[].provenance.sourcePlanRules[].unresolvedItemIds":
+    stringSet(),
+  "compiled-formula-artifact.schema.json:compiledFormulas[].resolvedReferences[].provenanceRuleContentSha256Values":
+    set(),
   "deidentified-export.schema.json:sourceArtifactSha256Values": set(),
   "deidentified-export.schema.json:allowedOutputFields": stringSet(),
   "deidentified-export.schema.json:removedDirectIdentifiers": stringSet(),
