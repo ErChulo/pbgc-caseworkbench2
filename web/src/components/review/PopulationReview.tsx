@@ -2,6 +2,7 @@ import type {
   PopulationCandidateProfile,
   PopulationDecisionProjection,
 } from "../../domain/population/population-profile";
+import type { Sha256 } from "../../domain/shared/types";
 import { Tooltip } from "../Tooltip";
 import {
   ACTION_LABELS,
@@ -14,6 +15,7 @@ import {
 export interface PopulationReviewItem {
   readonly displayName: string;
   readonly candidate: PopulationCandidateProfile;
+  readonly workbookProfileContentSha256: Sha256;
   readonly projection: PopulationDecisionProjection;
   readonly structuralFinding: string;
 }

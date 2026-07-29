@@ -17,6 +17,9 @@ import evidenceCatalogSchema from "./schemas/evidence-catalog.schema.json";
 import planRuleRecordSchema from "./schemas/plan-rule-record.schema.json";
 import provisionCandidateSchema from "./schemas/provision-candidate.schema.json";
 import evidenceUnresolvedItemSchema from "./schemas/unresolved-item.schema.json";
+import v1ArchitectureSchema from "./schemas/v1-architecture.schema.json";
+import architecturePolicyApprovalSchema from "./schemas/architecture-policy-approval.schema.json";
+import { validateV1ArchitectureSemantics } from "../domain/architecture/semantic-validator";
 
 export interface ContractValidationIssue {
   readonly code: string;
@@ -54,6 +57,8 @@ const schemas = [
   planRuleRecordSchema,
   provisionCandidateSchema,
   evidenceUnresolvedItemSchema,
+  v1ArchitectureSchema,
+  architecturePolicyApprovalSchema,
 ] as const;
 
 const ajv = new Ajv2020({
@@ -115,6 +120,14 @@ const validators: Readonly<Record<string, ValidateFunction | undefined>> = {
   evidenceUnresolvedItem: ajv.getSchema(evidenceUnresolvedItemSchema.$id),
   "unresolved-item.schema.json": ajv.getSchema(
     evidenceUnresolvedItemSchema.$id,
+  ),
+  v1Architecture: ajv.getSchema(v1ArchitectureSchema.$id),
+  "v1-architecture.schema.json": ajv.getSchema(v1ArchitectureSchema.$id),
+  architecturePolicyApproval: ajv.getSchema(
+    architecturePolicyApprovalSchema.$id,
+  ),
+  "architecture-policy-approval.schema.json": ajv.getSchema(
+    architecturePolicyApprovalSchema.$id,
   ),
   unresolvedItem: ajv.getSchema(`${governedId}#/$defs/unresolvedItem`),
   quarantineDecision: ajv.getSchema(`${governedId}#/$defs/quarantineDecision`),
@@ -433,6 +446,17 @@ function semanticIssues(
         );
       }
     }
+  }
+
+  if (
+    contract === "v1Architecture" ||
+    contract === "v1-architecture.schema.json"
+  ) {
+    result.push(
+      ...validateV1ArchitectureSemantics(value).map((item) =>
+        issue(item.code, item.message, item.path),
+      ),
+    );
   }
 
   return result;

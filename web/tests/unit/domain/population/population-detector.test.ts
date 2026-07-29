@@ -132,6 +132,7 @@ describe("T093 population candidate identity and governance", () => {
     const before = structuredClone(detected.candidate);
     const replay = await replayPopulationCandidateDecisions(
       detected.candidate,
+      detected.candidate.candidateKey,
       [initial, revoked],
     );
     expect(replay).toMatchObject({
@@ -141,37 +142,49 @@ describe("T093 population candidate identity and governance", () => {
     expect(detected.candidate).toEqual(before);
     expect(
       (
-        await replayPopulationCandidateDecisions(detected.candidate, [
-          {
-            ...initial,
-            humanActor: {
-              ...initial.humanActor,
-              actorType: "system" as "human",
+        await replayPopulationCandidateDecisions(
+          detected.candidate,
+          detected.candidate.candidateKey,
+          [
+            {
+              ...initial,
+              humanActor: {
+                ...initial.humanActor,
+                actorType: "system" as "human",
+              },
             },
-          },
-        ])
+          ],
+        )
       ).ok,
     ).toBe(false);
     expect(
       (
-        await replayPopulationCandidateDecisions(detected.candidate, [
-          { ...initial, appendOrdinal: 2 },
-        ])
+        await replayPopulationCandidateDecisions(
+          detected.candidate,
+          detected.candidate.candidateKey,
+          [{ ...initial, appendOrdinal: 2 }],
+        )
       ).ok,
     ).toBe(false);
     expect(
       (
-        await replayPopulationCandidateDecisions(detected.candidate, [
-          { ...initial, candidateKey: sha("c".repeat(64)) },
-        ])
+        await replayPopulationCandidateDecisions(
+          detected.candidate,
+          detected.candidate.candidateKey,
+          [{ ...initial, candidateKey: sha("c".repeat(64)) }],
+        )
       ).ok,
     ).toBe(false);
     expect(
       (
-        await replayPopulationCandidateDecisions(detected.candidate, [
-          initial,
-          { ...revoked, priorDecisionContentSha256: sha("d".repeat(64)) },
-        ])
+        await replayPopulationCandidateDecisions(
+          detected.candidate,
+          detected.candidate.candidateKey,
+          [
+            initial,
+            { ...revoked, priorDecisionContentSha256: sha("d".repeat(64)) },
+          ],
+        )
       ).ok,
     ).toBe(false);
   });
@@ -204,6 +217,7 @@ async function decision(
     priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
     candidateKey: candidate.candidateKey,
     artifactSha256: candidate.artifactSha256,
+    workbookProfileContentSha256: candidate.candidateKey,
     decisionType,
     resultingStatus,
     ruleSetVersion: "feature-009-population-v1",

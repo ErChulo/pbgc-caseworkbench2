@@ -1,1 +1,57 @@
-rules: []
+# Tab Selection Rules
+# Provisional candidates for determining which population tabs to include.
+# Each rule maps population characteristics to tab inclusion.
+
+version: "1.0.0"
+
+governance:
+  reviewStatus: "provisional"
+
+rules:
+  - tabPattern: "Retirees"
+    requiredFields:
+      - "DOB"
+      - "NRD"
+      - "BSEX"
+      - "COMP"
+      - "FV"
+    populationRequirement: "retired-participants"
+    description: "Retired participants receiving benefits"
+
+  - tabPattern: "Separated Vesteds"
+    requiredFields:
+      - "DOB"
+      - "NRD"
+      - "BSEX"
+      - "COMP"
+      - "FV"
+    populationRequirement: "separated-vested-participants"
+    description: "Separated vested participants with deferred benefits"
+
+  - tabPattern: "Def_Act Vested"
+    requiredFields:
+      - "DOB"
+      - "NRD"
+      - "BSEX"
+      - "COMP"
+      - "FV"
+    populationRequirement: "active-vested-participants"
+    description: "Active vested participants"
+
+  - tabPattern: "Def_Act Non-Vested"
+    requiredFields:
+      - "DOB"
+      - "BSEX"
+      - "COMP"
+    populationRequirement: "active-non-vested-participants"
+    description: "Active non-vested participants"
+
+  - tabPattern: "Terminated Vested"
+    requiredFields:
+      - "DOB"
+      - "NRD"
+      - "BSEX"
+      - "COMP"
+      - "FV"
+    populationRequirement: "terminated-vested-participants"
+    description: "Terminated vested participants"

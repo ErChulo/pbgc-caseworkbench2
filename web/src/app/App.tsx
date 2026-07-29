@@ -93,7 +93,10 @@ import {
   type PopulationReviewItem,
 } from "../components/review/PopulationReview";
 import { adaptTabularExtraction } from "../domain/population/tabular-adapter";
-import { adaptWorkbookExtraction } from "../domain/population/workbook-adapter";
+import {
+  adaptWorkbookExtraction,
+  workbookProfileContentHash,
+} from "../domain/population/workbook-adapter";
 import {
   detectTabularPopulation,
   detectWorkbookPopulation,
@@ -904,11 +907,15 @@ export function App({
           : []),
       ];
       if (blockingFindings.length === 0 && passive?.status === "success") {
-        const population =
+        const workbookProfile =
           passive.parserId === "workbook-passive"
+            ? adaptWorkbookExtraction(passive)
+            : null;
+        const population =
+          workbookProfile !== null
             ? await detectWorkbookPopulation(
                 hashed.value.sha256,
-                adaptWorkbookExtraction(passive),
+                workbookProfile,
                 "unknown",
               )
             : passive.mediaType === "text/csv" ||
@@ -922,6 +929,10 @@ export function App({
                 )
               : null;
         if (population !== null) {
+          const workbookProfileContentSha256 =
+            workbookProfile === null
+              ? population.candidate.candidateKey
+              : await workbookProfileContentHash(workbookProfile, []);
           setPopulationItems((current) => [
             ...current.filter(
               (candidate) =>
@@ -930,9 +941,11 @@ export function App({
             {
               displayName: item.path,
               candidate: population.candidate,
+              workbookProfileContentSha256,
               projection: {
                 status: "provisional",
                 effectiveDecisionId: null,
+                effectiveWorkbookProfileContentSha256: null,
                 provenance: [],
               },
               structuralFinding:
@@ -1491,6 +1504,7 @@ export function App({
       priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
       candidateKey: item.candidate.candidateKey,
       artifactSha256: item.candidate.artifactSha256,
+      workbookProfileContentSha256: item.workbookProfileContentSha256,
       decisionType: action,
       resultingStatus,
       ruleSetVersion: "feature-009-population-v1",
@@ -1508,10 +1522,11 @@ export function App({
       rationale,
       decisionTimestamp: dependencies.clock.now(),
     };
-    const replay = await replayPopulationCandidateDecisions(item.candidate, [
-      ...history,
-      decision,
-    ]);
+    const replay = await replayPopulationCandidateDecisions(
+      item.candidate,
+      item.workbookProfileContentSha256,
+      [...history, decision],
+    );
     if (!replay.ok) throw new Error(replay.error.safeMessage);
     await appendReviewEvent(decision);
     populationHistory.current.set(key, [...history, decision]);

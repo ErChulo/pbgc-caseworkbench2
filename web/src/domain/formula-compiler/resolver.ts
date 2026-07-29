@@ -145,6 +145,21 @@ export function resolveFormulaReferences(
       return;
     }
     if (node.kind !== "reference") return;
+    if (node.name.startsWith("[") || node.sheetName?.startsWith("[")) {
+      fail(
+        "EXTERNAL_REFERENCE_PROHIBITED",
+        "reference",
+        "External workbook references are prohibited.",
+        node,
+        {
+          referenceText: source.slice(
+            node.span.startOffset,
+            node.span.endOffset,
+          ),
+        },
+      );
+      return;
+    }
     const requestedSheet = node.sheetName
       ? sheetNames.get(node.sheetName.toUpperCase())
       : formula.tabName;

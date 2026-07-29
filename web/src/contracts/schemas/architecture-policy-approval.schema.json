@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/architecture-policy-approval.schema.json",
+  "title": "Architecture Policy Approval",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decisionId",
+    "decisionContentSha256",
+    "appendOrdinal",
+    "priorDecisionId",
+    "priorDecisionContentSha256",
+    "decisionType",
+    "resultingStatus",
+    "policyKind",
+    "policyVersion",
+    "policyContentSha256",
+    "sourceFileSha256",
+    "evidenceCatalogId",
+    "evidenceCatalogContentSha256",
+    "evidenceCitations",
+    "humanActor",
+    "rationale",
+    "decidedAt",
+    "schemaVersion"
+  ],
+  "properties": {
+    "decisionId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+    "decisionContentSha256": {
+      "$ref": "governed-records.schema.json#/$defs/sha256"
+    },
+    "appendOrdinal": { "type": "integer", "minimum": 1 },
+    "priorDecisionId": {
+      "oneOf": [
+        { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        { "type": "null" }
+      ]
+    },
+    "priorDecisionContentSha256": {
+      "oneOf": [
+        { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        { "type": "null" }
+      ]
+    },
+    "decisionType": { "enum": ["approve", "revoke", "supersede"] },
+    "resultingStatus": { "enum": ["approved", "revoked", "superseded"] },
+    "policyKind": {
+      "enum": [
+        "scenario-selection",
+        "tab-selection",
+        "iob-classification",
+        "field-name-glossary"
+      ]
+    },
+    "policyVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "policyContentSha256": {
+      "$ref": "governed-records.schema.json#/$defs/sha256"
+    },
+    "sourceFileSha256": {
+      "$ref": "governed-records.schema.json#/$defs/sha256"
+    },
+    "evidenceCatalogId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+    "evidenceCatalogContentSha256": {
+      "$ref": "governed-records.schema.json#/$defs/sha256"
+    },
+    "evidenceCitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/citation" }
+    },
+    "humanActor": { "$ref": "#/$defs/humanActor" },
+    "rationale": { "type": "string", "minLength": 1 },
+    "decidedAt": { "$ref": "governed-records.schema.json#/$defs/timestamp" },
+    "schemaVersion": { "const": "1.0.0" }
+  },
+  "$defs": {
+    "humanActor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actorType", "actorKey", "displayName", "authorityContext"],
+      "properties": {
+        "actorType": { "const": "human" },
+        "actorKey": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 },
+        "authorityContext": { "type": "string", "minLength": 1 }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceArtifactSha256",
+        "sourceLocator",
+        "effectiveDate",
+        "adoptionDate",
+        "supersedesArtifactSha256"
+      ],
+      "properties": {
+        "sourceArtifactSha256": {
+          "$ref": "governed-records.schema.json#/$defs/sha256"
+        },
+        "sourceLocator": { "type": "string", "minLength": 1 },
+        "effectiveDate": { "type": "string", "format": "date" },
+        "adoptionDate": {
+          "oneOf": [{ "type": "string", "format": "date" }, { "type": "null" }]
+        },
+        "supersedesArtifactSha256": {
+          "oneOf": [
+            { "$ref": "governed-records.schema.json#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

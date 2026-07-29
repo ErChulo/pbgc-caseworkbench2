@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const sourceDirectories = [
   resolve("specs/001-evidence-ingestion/contracts"),
   resolve("specs/009-case-intake-normalization/contracts"),
+  resolve("specs/004-v1-architecture-selector/contracts"),
   resolve("specs/005-v1-build-spec/contracts"),
   resolve("specs/006-formula-compiler/contracts"),
 ];

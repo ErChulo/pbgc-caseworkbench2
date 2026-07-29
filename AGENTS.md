@@ -64,6 +64,10 @@ This policy applies to all future tasks unless explicitly overridden by the user
 <!-- SPECKIT START -->
 For Feature 001 technical context, architecture, project structure, and planned
 commands, read `specs/001-evidence-ingestion/plan.md`.
+For Feature 004 technical context, architecture, project structure, and planned
+commands, read `specs/004-v1-architecture-selector/plan.md`.
 For Feature 009 technical context, architecture, project structure, and planned
 commands, read `specs/009-case-intake-normalization/plan.md`.
+For Feature 006 technical context, architecture, project structure, and planned
+commands, read `specs/006-formula-compiler/plan.md`.
 <!-- SPECKIT END -->

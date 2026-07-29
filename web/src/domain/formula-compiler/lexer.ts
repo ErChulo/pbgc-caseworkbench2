@@ -189,9 +189,28 @@ export function lexFormula(source: string, policy: CompilerPolicy): LexResult {
       add("number", start, index);
       continue;
     }
-    if (/[A-Za-z_$]/u.test(char)) {
+    if (char === "[") {
+      index += 1;
+      while (index < source.length && source[index] !== "]") index += 1;
+      if (source[index] !== "]")
+        return {
+          ok: false,
+          issues: [
+            issue(
+              "EXTERNAL_REFERENCE_INVALID",
+              "External workbook reference is not terminated.",
+              span(start, source.length),
+            ),
+          ],
+        };
       index += 1;
       while (/[A-Za-z0-9_.$]/u.test(source[index] ?? "")) index += 1;
+      add("identifier", start, index);
+      continue;
+    }
+    if (/[A-Za-z_$]/u.test(char)) {
+      index += 1;
+      while (/[A-Za-z0-9_.$:]/u.test(source[index] ?? "")) index += 1;
       add("identifier", start, index);
       continue;
     }
@@ -227,11 +246,9 @@ export function lexFormula(source: string, policy: CompilerPolicy): LexResult {
       continue;
     }
     const prohibited: Record<string, string> = {
-      "[": "EXTERNAL_REFERENCE_PROHIBITED",
       "]": "EXTERNAL_REFERENCE_PROHIBITED",
       "{": "ARRAY_SYNTAX_PROHIBITED",
       "}": "ARRAY_SYNTAX_PROHIBITED",
-      ":": "RANGE_REFERENCE_PROHIBITED",
       "#": "DYNAMIC_ARRAY_PROHIBITED",
       "@": "DYNAMIC_ARRAY_PROHIBITED",
     };
