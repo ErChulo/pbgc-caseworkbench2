@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/normalized-evidence.schema.json",
+  "title": "Normalized Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "evidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceKey", "artifactSha256", "citationId", "sourceLocator", "evidenceKind"],
+      "properties": {
+        "evidenceKey": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        "artifactSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        "citationId": { "type": "string", "minLength": 1 },
+        "sourceLocator": { "type": "string", "minLength": 1 },
+        "evidenceKind": { "type": "string", "minLength": 1 },
+        "observedTextOrValue": {}
+      },
+      "x-evidence-key-invariant": "evidenceKey is the lowercase SHA-256 of PBGC Case Workbench Canonicalization Profile v1 deterministic {artifactSha256, citationId, sourceLocator, evidenceKind, observedTextOrValue when present}; evidenceKey itself and all operational metadata are excluded. Strings undergo NFC preprocessing; object keys, JSON numbers, nested arrays, null, and absence follow the profile. The reference resolves by evidenceKey to exactly one manifest-local populationEvidenceObservation that has the same evidenceKey and agrees on every deterministic field and canonical byte.",
+      "x-exact-decimal-rule": "A value whose lexical decimal precision is material must be represented as a canonical decimal string matching governed-records.schema.json#/$defs/canonicalDecimalString, never as a JSON number."
+    },
+    "populationEvidenceObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceKey", "citationId", "artifactSha256", "sourceLocator", "evidenceKind"],
+      "properties": {
+        "evidenceKey": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        "citationId": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        "sourceLocator": { "type": "string", "minLength": 1 },
+        "evidenceKind": { "type": "string", "minLength": 1 },
+        "observedTextOrValue": {}
+      },
+      "x-evidence-key-invariant": "evidenceKey is the single identity shared with PopulationCandidate evidence references and is the lowercase SHA-256 of PBGC Case Workbench Canonicalization Profile v1 deterministic {artifactSha256, citationId, sourceLocator, evidenceKind, observedTextOrValue when present}; the key and operational metadata are excluded. Absence differs from null. Each evidenceKey and citationId is unique in the registry, and artifactSha256 resolves to exactly one manifest artifact."
+    },
+    "populationCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidateKey", "artifactSha256", "candidateStatus", "detectorIdentity", "detectorVersion", "confidence", "evidence", "observedFields", "recordCounts", "sensitivity", "correctionsOrImputationsApplied"],
+      "properties": {
+        "candidateKey": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        "artifactSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+        "candidateStatus": { "enum": ["proposed", "unresolved"] },
+        "detectorIdentity": { "type": "string", "minLength": 1 },
+        "detectorVersion": { "type": "string", "minLength": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceReference" }, "uniqueItems": true },
+        "observedFields": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "recordCounts": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+        "sensitivity": { "enum": ["authorized-real", "de-identified", "synthetic-mock", "unknown"] },
+        "correctionsOrImputationsApplied": { "type": "boolean", "const": false }
+      },
+      "x-candidate-key-invariant": "candidateKey is the lowercase SHA-256 of PBGC Case Workbench Canonicalization Profile v1 deterministic PopulationCandidate content excluding candidateKey and operational/computed fields. Only values explicitly typed by a schema as PopulationCandidate receive the intrinsic evidence-set rule: validate evidenceKey, sort by evidenceKey then canonical item bytes, and reject duplicate keys/content and indistinguishable elements. Object shape alone never confers the type. artifactSha256 must equal an enclosing normalized-evidence sourceSha256 when applicable. Changed candidate or evidence content changes the applicable evidenceKey and candidateKey."
+    }
+  },
+  "required": ["schemaVersion", "sourceSha256", "sourceLocator", "normalizerIdentity", "normalizerVersion", "ruleSetVersion", "status", "deterministicPayload", "contentHash", "validationResults", "operationalMetadata"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "sourceSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+    "sourceLocator": { "type": "string", "minLength": 1 },
+    "normalizerIdentity": { "type": "string", "minLength": 1 },
+    "normalizerVersion": { "type": "string", "minLength": 1 },
+    "ruleSetVersion": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["complete", "partial", "unsupported", "failed", "blocked", "quarantined"] },
+    "deterministicPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observations"],
+      "properties": {
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["observationKey", "kind", "sourceLocator", "observedValue", "valueType", "normalizationRuleId", "normalizationRuleVersion"],
+            "properties": {
+              "observationKey": { "type": "string", "minLength": 1 },
+              "kind": { "type": "string", "minLength": 1 },
+              "sourceLocator": { "type": "string", "minLength": 1 },
+              "observedValue": {},
+              "valueType": { "enum": ["string", "decimal-string", "integer", "boolean", "date", "date-time", "null", "structured", "binary-metadata", "formula-text"] },
+              "normalizedValue": {},
+              "normalizationRuleId": { "type": "string", "minLength": 1 },
+              "normalizationRuleVersion": { "type": "string", "minLength": 1 },
+              "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "populationCandidate": { "oneOf": [{ "$ref": "#/$defs/populationCandidate" }, { "type": "null" }] }
+      }
+    },
+    "contentHash": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+    "validationResults": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/validationResult" } },
+    "operationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordId", "generatedAt", "attemptId", "validationExecutionRecords"],
+      "properties": {
+        "recordId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "generatedAt": { "$ref": "governed-records.schema.json#/$defs/timestamp" },
+        "attemptId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "validationExecutionRecords": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/validationExecutionRecord" } }
+      }
+    }
+  },
+  "x-deterministic-array-semantics": {
+    "deterministicPayload.observations": "order-significant; preserve parser-declared source order established by source locator and occurrence; implementations must not reorder",
+    "deterministicPayload.populationCandidate.evidence": "set-like; validate each lowercase evidenceKey against canonical deterministic evidence-reference content, sort ascending by evidenceKey then canonical item bytes, and reject duplicate evidenceKey, duplicate canonical content, indistinguishable normalized elements, malformed keys, and stale artifact/citation/location references; null evidence items are invalid and absence of the required array is invalid",
+    "deterministicPayload.populationCandidate.observedFields": "order-significant; preserve physical source-field order; implementations must not reorder",
+    "deterministicPayload.populationCandidate.recordCounts": "order-significant; positions correspond to the preserved source sheet/section order",
+    "validationResults": "set-like; sort by validationKey then canonical item bytes; reject duplicate validationKey"
+  },
+  "x-intrinsic-type-array-semantics": {
+    "PopulationCandidate.evidence": "set-like wherever a schema explicitly types the value as PopulationCandidate; sort by evidenceKey ascending then PBGC Case Workbench Canonicalization Profile v1 item bytes; reject duplicate evidenceKey, duplicate canonical content, and indistinguishable elements. Candidate-shaped arbitrary objects are not duck typed and use ordinary recursive rules."
+  },
+  "x-canonicalization-profile": "PBGC Case Workbench Canonicalization Profile v1",
+  "x-numeric-canonicalization": "All deterministic JSON numbers use RFC 8785 JSON Canonicalization Scheme number serialization over finite IEEE-754 binary64 values: equivalent inputs such as 1, 1.0, and 1e0 serialize identically; negative zero serializes as 0; NaN and infinities are invalid; source-language lexical formatting is never hashed. Exact decimals whose lexical precision is material use canonical decimal strings instead.",
+  "x-recursive-deterministic-json": "Object keys canonicalize recursively. Intrinsic type-level array rules apply in every embedding and cannot be overridden by a generic fallback. Arrays at exact registered paths use those rules. Every otherwise-unregistered array, including arrays nested at any depth inside observedValue, normalizedValue, or evidence objects, is order-significant by default and preserves element order. Exact path rules do not propagate to descendants."
+}

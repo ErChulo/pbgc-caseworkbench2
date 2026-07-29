@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/deidentified-export.schema.json",
+  "title": "De-identified or Synthetic Export",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "deterministicPayload", "deterministicPayloadSha256", "operationalMetadata"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "deterministicPayload": { "$ref": "#/$defs/deterministicPayload" },
+    "deterministicPayloadSha256": { "$ref": "#/$defs/sha256" },
+    "operationalMetadata": { "$ref": "#/$defs/operationalMetadata" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "humanActor": { "$ref": "governed-records.schema.json#/$defs/humanActor" },
+    "fieldTransformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceField", "outputField", "method", "ruleVersion"],
+      "properties": {
+        "sourceField": { "type": "string", "minLength": 1 },
+        "outputField": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "minLength": 1 },
+        "ruleVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "retainedGeneralizedQuasiField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fieldName", "transformationOrGeneralization", "justification", "residualRiskResult", "validationStatus"],
+      "properties": {
+        "fieldName": { "type": "string", "minLength": 1 },
+        "transformationOrGeneralization": { "type": "string", "minLength": 1 },
+        "justification": { "type": "string", "minLength": 1 },
+        "residualRiskResult": { "enum": ["acceptable-non-identifying", "rejected-identifying", "inconclusive"] },
+        "validationStatus": { "enum": ["passed", "failed", "blocked", "inconclusive", "unsupported", "error"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "residualRiskResult": { "const": "acceptable-non-identifying" } }, "required": ["residualRiskResult"] },
+          "then": { "properties": { "validationStatus": { "const": "passed" } } }
+        }
+      ]
+    },
+    "exportRecord": {
+      "type": "object",
+      "required": ["generalKey"],
+      "properties": {
+        "generalKey": { "type": "string", "minLength": 1 }
+      },
+      "propertyNames": {
+        "not": {
+          "enum": ["name", "firstName", "middleName", "lastName", "fullName", "ssn", "socialSecurityNumber", "address", "streetAddress", "email", "phone", "telephone", "employeeId", "participantId"]
+        }
+      }
+    },
+    "deterministicPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exportMode", "sourceWorkspaceReference", "sourceSnapshotSha256", "sourceArtifactSha256Values", "exportPurpose", "permittedDestinationCategory", "sensitivityDesignation", "allowedOutputFields", "removedDirectIdentifiers", "removedIndirectIdentifiers", "transformedOrGeneralizedFields", "retainedGeneralizedQuasiFields", "residualRiskStatements", "limitationStatements", "validationStatus", "validationFindings", "validatorIdentity", "validatorVersion", "rawParticipantPiiExcluded", "rawDirectOrIndirectIdentifiersExcluded", "records"],
+      "properties": {
+        "exportMode": { "enum": ["de-identified-real-data", "synthetic-mock-data"] },
+        "sourceWorkspaceReference": { "type": "string", "minLength": 1 },
+        "sourceSnapshotSha256": { "$ref": "#/$defs/sha256" },
+        "sourceArtifactSha256Values": { "type": "array", "items": { "$ref": "#/$defs/sha256" }, "minItems": 1, "uniqueItems": true },
+        "exportPurpose": { "type": "string", "minLength": 1 },
+        "permittedDestinationCategory": { "enum": ["external-llm-development", "external-llm-testing", "external-llm-demonstration", "external-llm-prompt-validation", "approved-non-llm-analysis"] },
+        "sensitivityDesignation": { "enum": ["de-identified-real-data", "synthetic-mock-data"] },
+        "allowedOutputFields": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true },
+        "removedDirectIdentifiers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "removedIndirectIdentifiers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+        "transformedOrGeneralizedFields": { "type": "array", "items": { "$ref": "#/$defs/fieldTransformation" } },
+        "retainedGeneralizedQuasiFields": { "type": "array", "items": { "$ref": "#/$defs/retainedGeneralizedQuasiField" } },
+        "residualRiskStatements": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+        "limitationStatements": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+        "validationStatus": { "enum": ["passed", "failed", "blocked", "inconclusive", "unsupported", "error"] },
+        "validationFindings": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/validationResult" } },
+        "validatorIdentity": { "type": "string", "minLength": 1 },
+        "validatorVersion": { "type": "string", "minLength": 1 },
+        "rawParticipantPiiExcluded": { "const": true },
+        "rawDirectOrIndirectIdentifiersExcluded": { "const": true },
+        "records": { "type": "array", "items": { "$ref": "#/$defs/exportRecord" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "exportMode": { "const": "de-identified-real-data" } }, "required": ["exportMode"] },
+          "then": {
+              "properties": { "sensitivityDesignation": { "const": "de-identified-real-data" }, "removedDirectIdentifiers": { "minItems": 1 } }
+          }
+        },
+        {
+          "if": { "properties": { "exportMode": { "const": "synthetic-mock-data" } }, "required": ["exportMode"] },
+          "then": { "properties": { "sensitivityDesignation": { "const": "synthetic-mock-data" } } }
+        }
+      ],
+      "x-semantic-invariants": [
+        "Every record property is listed in allowedOutputFields",
+        "No raw direct identifier, raw indirect identifier, or field outside the approved allowlist is present",
+        "Every retainedGeneralizedQuasiFields entry names a transformed or generalized non-identifying output field and has acceptable-non-identifying residual risk with passed validation before external use",
+        "validationStatus must be passed before export"
+      ]
+    },
+    "exportApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approvalId", "decisionContentSha256", "appendOrdinal", "priorApprovalId", "priorApprovalContentSha256", "actor", "decision", "decidedAt", "rationale", "deterministicPayloadSha256", "ruleSetVersion", "schemaVersion"],
+      "properties": {
+        "approvalId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decision": { "enum": ["approved", "rejected", "revoked"] },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "deterministicPayloadSha256": { "$ref": "#/$defs/sha256" },
+        "priorApprovalId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorApprovalContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "decision": { "enum": ["approved", "rejected"] } }, "required": ["decision"] }, "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorApprovalId": { "type": "null" }, "priorApprovalContentSha256": { "type": "null" } } } },
+        { "if": { "properties": { "decision": { "const": "revoked" } }, "required": ["decision"] }, "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorApprovalId": { "$ref": "#/$defs/uuid" }, "priorApprovalContentSha256": { "$ref": "#/$defs/sha256" } } } }
+      ],
+      "x-decision-content-hash": "decisionContentSha256 hashes canonical {appendOrdinal, priorApprovalContentSha256, deterministicPayloadSha256, decision, ruleSetVersion, schemaVersion}; approvalId/priorApprovalId UUIDs, actor, rationale, and timestamp are excluded"
+    },
+    "exportProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventId", "action", "actor", "occurredAt", "sourceContext"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/uuid" },
+        "action": { "enum": ["created", "validated", "approved", "rejected", "revoked", "exported"] },
+        "actor": { "$ref": "governed-records.schema.json#/$defs/actor" },
+        "occurredAt": { "$ref": "#/$defs/timestamp" },
+        "sourceContext": { "type": "object" }
+      }
+    },
+    "operationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exportRecordId", "sourceCaseOrWorkspaceRecordId", "createdAt", "provenance", "humanApprovalHistory"],
+      "properties": {
+        "exportRecordId": { "$ref": "#/$defs/uuid" },
+        "sourceCaseOrWorkspaceRecordId": { "type": "string", "minLength": 1 },
+        "createdAt": { "$ref": "#/$defs/timestamp" },
+        "sessionIdentifier": { "type": ["string", "null"] },
+        "provenance": { "type": "array", "items": { "$ref": "#/$defs/exportProvenance" }, "minItems": 1 },
+        "humanApprovalHistory": { "type": "array", "items": { "$ref": "#/$defs/exportApproval" } }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "deterministicPayload": { "properties": { "exportMode": { "const": "de-identified-real-data" } }, "required": ["exportMode"] } } },
+      "then": { "properties": { "operationalMetadata": { "properties": { "humanApprovalHistory": { "minItems": 1 } } } } }
+    }
+  ],
+  "x-hash-invariant": "deterministicPayloadSha256 is the lowercase SHA-256 of PBGC Case Workbench Canonicalization Profile v1 deterministicPayload bytes; operationalMetadata is excluded",
+  "x-canonicalization-profile": "PBGC Case Workbench Canonicalization Profile v1",
+  "x-arbitrary-record-rule": "exportRecord is arbitrary de-identified record content, is never inferred or duck typed as PopulationCandidate from object shape, and uses the project profile's recursive rules; records and every otherwise-unregistered nested array are order-significant. A PopulationCandidate may be exported only through a future separately named schema type that explicitly registers its intrinsic evidence rule.",
+  "x-cross-record-invariants": [
+    "Every operationalMetadata.humanApprovalHistory record has deterministicPayloadSha256 equal to the enclosing deterministicPayloadSha256",
+    "A de-identified-real-data package cannot be eligible for external use unless gapless timestamp-independent replay of humanApprovalHistory ends in approved and remains bound to that exact deterministic payload hash"
+  ],
+  "x-deterministic-array-semantics": {
+    "sourceArtifactSha256Values": "set-like; sort ascending lowercase hexadecimal; reject duplicates",
+    "allowedOutputFields": "set-like; trim and NFC-normalize, sort by case-folded field name then original NFC value; reject case-fold-equivalent duplicates",
+    "removedDirectIdentifiers": "set-like; same field-name normalization and sorting as allowedOutputFields; reject duplicates",
+    "removedIndirectIdentifiers": "set-like; same field-name normalization and sorting as allowedOutputFields; reject duplicates",
+    "transformedOrGeneralizedFields": "set-like; sort by NFC outputField, sourceField, method, ruleVersion; reject duplicate outputField",
+    "retainedGeneralizedQuasiFields": "set-like; sort by NFC fieldName then canonical item bytes; reject duplicate fieldName",
+    "residualRiskStatements": "order-significant; author-declared explanatory order is preserved",
+    "limitationStatements": "order-significant; author-declared explanatory order is preserved",
+    "validationFindings": "set-like; sort by validationKey then canonical item bytes; reject duplicate validationKey",
+    "records": "order-significant; preserve declared record sequence, which is established by the approved export procedure; implementations must not reorder"
+  },
+  "x-numeric-canonicalization": "PBGC Case Workbench Canonicalization Profile v1 uses RFC 8785 specifically to serialize all finite deterministic JSON numbers; 1, 1.0, and 1e0 canonicalize identically, negative zero serializes as 0, NaN/infinities are invalid, and source lexemes are not hashed. Exact lexical decimals must match governed-records canonicalDecimalString.",
+  "x-export-approval-transition-matrix": "Initial approved→effective approved or rejected→effective rejected. approved→revoked→effective revoked. Rejected and revoked are terminal for that payload; a corrected payload requires a new deterministicPayloadSha256 and chain. Every noninitial approval increments appendOrdinal exactly once and references the immediately preceding same-payload approval ID/content hash; gaps, branches, cycles, broken/stale hashes, cross-payload links, system actors, and invalid transitions are rejected; timestamps never order replay.",
+  "x-recursive-deterministic-json": "Object keys canonicalize recursively. Arrays at exact registered paths use those rules. Every otherwise-unregistered array, including arrays nested at any depth in arbitrary allowlisted export-record field values or validation evidence, is order-significant by default and preserves element order. Exact path rules do not propagate to descendants."
+}

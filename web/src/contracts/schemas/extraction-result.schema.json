@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/extraction-result.schema.json",
+  "title": "Extraction Result",
+  "x-canonicalization-profile": "PBGC Case Workbench Canonicalization Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["extractionKey", "sourceSha256", "parserIdentity", "parserVersion", "status", "observations", "limitations", "ruleSetVersion"],
+  "properties": {
+    "extractionKey": { "type": "string", "minLength": 1 },
+    "sourceSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+    "parserIdentity": { "type": "string", "minLength": 1 },
+    "parserVersion": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["complete", "partial", "unsupported", "encrypted", "corrupt", "unsafe", "blocked", "failed"] },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observationKey", "sourceLocator", "observedValue", "valueType"],
+        "properties": {
+          "observationKey": { "type": "string", "minLength": 1 },
+          "sourceLocator": { "type": "string", "minLength": 1 },
+          "observedValue": {},
+          "valueType": { "enum": ["string", "decimal-string", "integer", "boolean", "date", "date-time", "null", "structured", "binary-metadata", "formula-text"] }
+        }
+      }
+    },
+    "limitations": { "type": "array", "items": { "type": "string" } },
+    "failureReason": { "type": ["string", "null"] },
+    "ruleSetVersion": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "enum": ["unsupported", "encrypted", "corrupt", "unsafe", "blocked", "failed"] } }, "required": ["status"] },
+      "then": { "required": ["failureReason"], "properties": { "failureReason": { "type": "string", "minLength": 1 } } }
+    }
+  ],
+  "x-deterministic-array-semantics": {
+    "observations": "order-significant; preserve parser-established physical source order using source locator and occurrence; implementations must not reorder",
+    "limitations": "set-like; trim and NFC-normalize, sort by case-folded text then original NFC text; reject case-fold-equivalent duplicates"
+  },
+  "x-numeric-canonicalization": "Finite JSON numbers in observedValue use RFC 8785 serialization; equivalent notation hashes identically, negative zero serializes as 0, and NaN/infinities are invalid. When valueType is decimal-string, observedValue must be a string matching governed-records canonicalDecimalString because lexical decimal precision is material.",
+  "x-recursive-deterministic-json": "Object keys canonicalize recursively. Arrays at exact registered paths use those rules. Every otherwise-unregistered array, including arrays nested at any depth inside observedValue, is order-significant by default and preserves element order. Exact path rules do not propagate to descendants."
+}

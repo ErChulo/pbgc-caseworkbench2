@@ -1,0 +1,620 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json",
+  "title": "Governed Evidence Records",
+  "x-deterministic-embedded-array-semantics": {
+    "validationResult.evidence": "order-significant; preserve check-produced evidence order; nested arrays recursively preserve submitted order",
+    "validationResult.limitations": "set-like; trim/NFC-normalize, case-fold sort then original NFC and canonical bytes; reject equivalent duplicates",
+    "screeningFinding.evidence": "order-significant; preserve rule-produced evidentiary order; nested arrays recursively preserve submitted order",
+    "screeningFinding.limitations": "set-like; same normalized string rule as validation limitations",
+    "screeningOutcome.findingKeys": "set-like; sort by NFC identifier then canonical bytes; reject duplicates",
+    "classificationProposal.supportingEvidence": "order-significant; preserve classifier-declared evidentiary order; nested arrays recursively preserve submitted order",
+    "evidenceRelationship.supportingEvidence": "order-significant; preserve rule-declared evidentiary order; nested arrays recursively preserve submitted order",
+    "unresolvedItem.subjectKeys": "set-like; sort by NFC identifier then canonical bytes; reject duplicates",
+    "unresolvedItem.evidence": "order-significant; preserve reviewer-facing evidentiary order; nested arrays recursively preserve submitted order",
+    "unresolvedItem.competingPossibilities": "order-significant; preserve declared comparison order; nested arrays recursively preserve submitted order",
+    "recursiveDefault": "For every otherwise-unregistered array nested at any depth in deterministic governed-record values or evidence objects, preserve element order as order-significant; recursively canonicalize all object keys; exact registered rules override only their exact path"
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "canonicalDecimalString": {
+      "type": "string",
+      "pattern": "^(?!-0$)-?(0|[1-9][0-9]*)(\\.[0-9]*[1-9])?$",
+      "description": "Exact canonical decimal: no exponent, leading plus, unnecessary integer leading zero, trailing fractional zero, trailing decimal point, or negative zero."
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actorType", "actorKey", "displayName", "authorityContext"],
+      "properties": {
+        "actorType": { "enum": ["human", "system"] },
+        "actorKey": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string", "minLength": 1 },
+        "authorityContext": { "type": "string", "minLength": 1 },
+        "version": { "type": ["string", "null"] }
+      }
+    },
+    "humanActor": {
+      "allOf": [
+        { "$ref": "#/$defs/actor" },
+        {
+          "properties": { "actorType": { "const": "human" } },
+          "required": ["actorType"]
+        }
+      ]
+    },
+    "statusEvent": {
+      "type": "object",
+      "description": "Append-only transition evidence only. This generic event cannot itself authorize or block governed downstream use; the applicable typed human decision record is required.",
+      "additionalProperties": false,
+      "required": ["eventId", "subjectType", "subjectId", "actor", "occurredAt", "priorStatus", "resultingStatus", "rationale"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/uuid" },
+        "subjectType": { "type": "string", "minLength": 1 },
+        "subjectId": { "type": "string", "minLength": 1 },
+        "actor": { "$ref": "#/$defs/actor" },
+        "occurredAt": { "$ref": "#/$defs/timestamp" },
+        "priorStatus": { "type": ["string", "null"] },
+        "resultingStatus": { "type": "string", "minLength": 1 },
+        "rationale": { "type": "string" },
+        "ruleSetVersion": { "type": ["string", "null"] }
+      }
+    },
+    "provenanceRecord": {
+      "type": "object",
+      "description": "Operational provenance only; this record cannot confer governed approval or downstream eligibility.",
+      "additionalProperties": false,
+      "required": ["provenanceId", "subjectKey", "action", "actor", "occurredAt", "sourceContext"],
+      "properties": {
+        "provenanceId": { "$ref": "#/$defs/uuid" },
+        "subjectKey": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "action": { "enum": ["received", "preserved", "verified", "accessed", "extracted", "normalized", "reviewed", "exported"] },
+        "actor": { "$ref": "#/$defs/actor" },
+        "occurredAt": { "$ref": "#/$defs/timestamp" },
+        "sourceContext": { "type": "object" }
+      }
+    },
+    "validationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validationKey", "subjectKey", "findingCode", "outcome", "severity", "evidence", "limitations", "blocksDownstream", "ruleSetVersion"],
+      "properties": {
+        "validationKey": { "type": "string", "minLength": 1 },
+        "subjectKey": { "type": "string", "minLength": 1 },
+        "findingCode": { "type": "string", "minLength": 1 },
+        "checkPerformed": { "type": "string", "minLength": 1 },
+        "checkDefinitionId": { "type": "string", "minLength": 1 },
+        "checkDefinitionVersion": { "type": "string", "minLength": 1 },
+        "outcome": { "enum": ["passed", "failed", "blocked", "inconclusive", "unsupported", "error"] },
+        "severity": { "enum": ["informational", "warning", "error", "critical"] },
+        "evidence": { "type": "array", "items": { "type": "object" } },
+        "limitations": { "type": "array", "items": { "type": "string" } },
+        "blocksDownstream": { "type": "boolean" },
+        "affectedArtifactSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "deterministicResultPayload": { "type": ["object", "null"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "enum": ["blocked", "inconclusive", "unsupported", "error"] } }, "required": ["outcome"] },
+          "then": { "properties": { "blocksDownstream": { "const": true } } }
+        }
+      ],
+      "anyOf": [
+        { "required": ["checkPerformed"] },
+        { "required": ["checkDefinitionId", "checkDefinitionVersion"] }
+      ]
+    },
+    "validationExecutionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validationKey", "checkedAt", "actor"],
+      "properties": {
+        "validationKey": { "type": "string", "minLength": 1 },
+        "checkedAt": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/actor" }
+      }
+    },
+    "screeningFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["findingKey", "artifactSha256", "findingCode", "category", "severity", "evidence", "limitations", "ruleSetVersion"],
+      "properties": {
+        "findingKey": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "findingCode": { "type": "string", "minLength": 1 },
+        "category": { "enum": ["authorized-pii", "unauthorized-pii", "excessive-pii", "secret", "macro", "script", "executable", "embedded-object", "external-link", "encrypted", "malware-indicator", "type-mismatch", "archive-risk", "other"] },
+        "severity": { "enum": ["informational", "warning", "error", "critical"] },
+        "evidence": { "type": "array", "items": { "type": "object" } },
+        "limitations": { "type": "array", "items": { "type": "string" } },
+        "ruleSetVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "screeningOutcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcomeKey", "artifactSha256", "outcome", "safetyState", "findingKeys", "blocksDownstream", "ruleSetVersion"],
+      "properties": {
+        "outcomeKey": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "outcome": { "enum": ["passed", "failed", "blocked", "inconclusive", "unsupported", "error"] },
+        "safetyState": { "enum": ["clear", "screening-pending", "rescreen-required", "provisional-quarantine", "provisional-safety-block"] },
+        "findingKeys": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "blocksDownstream": { "type": "boolean" },
+        "ruleSetVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "enum": ["failed", "blocked", "inconclusive", "unsupported", "error"] } }, "required": ["outcome"] },
+          "then": { "properties": { "blocksDownstream": { "const": true } } }
+        },
+        {
+          "if": { "properties": { "safetyState": { "enum": ["screening-pending", "rescreen-required", "provisional-quarantine", "provisional-safety-block"] } }, "required": ["safetyState"] },
+          "then": { "properties": { "blocksDownstream": { "const": true } } }
+        }
+      ]
+    },
+    "screeningExecutionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcomeKey", "screenedAt", "actor"],
+      "properties": {
+        "outcomeKey": { "type": "string", "minLength": 1 },
+        "screenedAt": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/actor" }
+      }
+    },
+    "quarantineDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionId", "priorDecisionContentSha256", "artifactSha256", "findingKeys", "action", "actor", "decidedAt", "rationale", "priorStatus", "resultingStatus"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "findingKeys": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true },
+        "action": { "enum": ["final-quarantine", "continue-quarantine", "release", "reject", "revoke", "inherit-release", "supersede"] },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "priorStatus": { "type": "string" },
+        "resultingStatus": { "enum": ["released", "final-quarantine", "rejected", "revoked", "superseded"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "action": { "enum": ["final-quarantine", "continue-quarantine"] } }, "required": ["action"] },
+          "then": { "properties": { "resultingStatus": { "const": "final-quarantine" } } }
+        },
+        {
+          "if": { "properties": { "action": { "enum": ["release", "inherit-release"] } }, "required": ["action"] },
+          "then": { "properties": { "resultingStatus": { "const": "released" } } }
+        },
+        {
+          "if": { "properties": { "action": { "const": "reject" } }, "required": ["action"] },
+          "then": { "properties": { "resultingStatus": { "const": "rejected" } } }
+        },
+        {
+          "if": { "properties": { "action": { "const": "revoke" } }, "required": ["action"] },
+          "then": { "properties": { "resultingStatus": { "const": "revoked" } } }
+        },
+        {
+          "if": { "properties": { "action": { "const": "supersede" } }, "required": ["action"] },
+          "then": { "properties": { "resultingStatus": { "const": "superseded" } } }
+        },
+        { "if": { "properties": { "appendOrdinal": { "const": 1 } }, "required": ["appendOrdinal"] }, "then": { "properties": { "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" }, "action": { "enum": ["final-quarantine", "release", "reject"] } } }, "else": { "properties": { "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } }
+      ],
+      "x-prior-decision-invariants": [
+        "priorDecisionId and priorDecisionContentSha256 are the sole same-chain predecessor linkage; every noninitial record resolves them to the immediately preceding same-artifact quarantine decision and every initial record has both null",
+        "continue-quarantine, release, revoke, inherit-release, and supersede are accepted only when the transition matrix permits the prior effective state; inherit-release requires unchanged bytes and a current effective release",
+        "decisionContentSha256 hashes canonical {appendOrdinal, priorDecisionContentSha256, artifactSha256, findingKeys, action, priorStatus, resultingStatus}; decision UUID, actor, rationale, and timestamp are excluded",
+        "The chain is gapless, non-branching, and replayed by appendOrdinal and predecessor ID/content hash rather than timestamp",
+        "Automated provisional safety blocking is a screeningOutcome and never creates a quarantineDecision"
+      ]
+    },
+    "artifactEligibilityDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionId", "priorDecisionContentSha256", "artifactSha256", "decisionType", "actor", "decidedAt", "rationale", "resultingGovernedStatus", "ruleSetVersion", "schemaVersion", "sourceQuarantineDecisionId", "sourceQuarantineDecisionContentSha256"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "decisionType": { "enum": ["approve", "reject", "revoke", "supersede", "inherit-approval"] },
+        "sourceQuarantineDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "sourceQuarantineDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "resultingGovernedStatus": { "enum": ["eligible", "rejected", "revoked", "superseded"] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "sourceQuarantineDecisionId": { "type": "null" } }, "required": ["sourceQuarantineDecisionId"] }, "then": { "properties": { "sourceQuarantineDecisionContentSha256": { "type": "null" } } }, "else": { "properties": { "sourceQuarantineDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decisionType": { "const": "inherit-approval" } }, "required": ["decisionType"] }, "then": { "properties": { "sourceQuarantineDecisionId": { "$ref": "#/$defs/uuid" }, "sourceQuarantineDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decisionType": { "enum": ["approve", "reject", "inherit-approval"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" } } } },
+        { "if": { "properties": { "decisionType": { "enum": ["revoke", "supersede"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decisionType": { "enum": ["approve", "inherit-approval"] } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "eligible" } } } },
+        { "if": { "properties": { "decisionType": { "const": "reject" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "rejected" } } } },
+        { "if": { "properties": { "decisionType": { "const": "revoke" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "revoked" } } } },
+        { "if": { "properties": { "decisionType": { "const": "supersede" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "superseded" } } } }
+      ],
+      "x-decision-chain-invariants": [
+        "decisionContentSha256 hashes canonical {appendOrdinal, priorDecisionContentSha256, artifactSha256, decisionType, sourceQuarantineDecisionContentSha256, resultingGovernedStatus, ruleSetVersion, schemaVersion}; sourceQuarantineDecisionId is operational linkage and is excluded",
+        "When sourceQuarantineDecisionId is non-null it resolves to exactly one prior quarantine decision whose recomputed decisionContentSha256 equals sourceQuarantineDecisionContentSha256, whose artifactSha256 matches exactly, and whose effective state permits the requested transition; both source fields are null only when no quarantine decision is applicable",
+        "Replay is human-only, gapless, non-branching, same-artifact, and independent of timestamps",
+        "Approval of an artifact subject to quarantine requires an effective same-artifact human release decision through sourceQuarantineDecisionId",
+        "inherit-approval is initial ordinal 1 with no eligibility-chain predecessor; it derives eligibility solely from the separate current-effective typed quarantine release identified operationally by sourceQuarantineDecisionId and deterministically by sourceQuarantineDecisionContentSha256 for the same exact bytes",
+        "Effective eligibility exists only when replay ends in eligible and every applicable quarantine/release decision remains effective"
+      ]
+    },
+    "classificationProposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposalKey", "artifactSha256", "dimension", "proposedValue", "status", "confidence", "supportingEvidence", "classifierId", "classifierVersion", "ruleSetVersion"],
+      "properties": {
+        "proposalKey": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "dimension": { "enum": ["document-category", "source-role"] },
+        "proposedValue": { "type": "string", "not": { "const": "authoritative" }, "minLength": 1 },
+        "status": { "enum": ["proposed", "unresolved"] },
+        "authorityCandidate": { "type": "boolean", "default": false },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "supportingEvidence": { "type": "array", "items": { "type": "object" }, "minItems": 1 },
+        "classifierId": { "type": "string", "minLength": 1 },
+        "classifierVersion": { "type": "string", "minLength": 1 },
+        "ruleSetVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "dimension": { "const": "source-role" } }, "required": ["dimension"] },
+          "then": {
+            "properties": {
+              "proposedValue": { "enum": ["authority-candidate", "historical", "training", "illustrative", "test", "unresolved"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "proposedValue": { "const": "authority-candidate" } }, "required": ["proposedValue"] },
+          "then": { "required": ["authorityCandidate"], "properties": { "authorityCandidate": { "const": true } } }
+        }
+      ]
+    },
+    "classificationApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["approvalId", "decisionContentSha256", "appendOrdinal", "priorApprovalId", "priorApprovalContentSha256", "proposalKey", "artifactSha256", "decisionType", "status", "actor", "decidedAt", "rationale", "ruleSetVersion", "schemaVersion"],
+      "properties": {
+        "approvalId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorApprovalContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "proposalKey": { "type": "string", "minLength": 1 },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "decisionType": { "enum": ["approve", "reject", "revoke", "supersede"] },
+        "status": { "enum": ["approved", "rejected", "revoked", "superseded"] },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "priorApprovalId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "decisionType": { "enum": ["approve", "reject"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorApprovalId": { "type": "null" }, "priorApprovalContentSha256": { "type": "null" } } } },
+        { "if": { "properties": { "decisionType": { "enum": ["revoke", "supersede"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorApprovalId": { "$ref": "#/$defs/uuid" }, "priorApprovalContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decisionType": { "const": "approve" } }, "required": ["decisionType"] }, "then": { "properties": { "status": { "const": "approved" } } } },
+        { "if": { "properties": { "decisionType": { "const": "reject" } }, "required": ["decisionType"] }, "then": { "properties": { "status": { "const": "rejected" } } } },
+        { "if": { "properties": { "decisionType": { "const": "revoke" } }, "required": ["decisionType"] }, "then": { "properties": { "status": { "const": "revoked" } } } },
+        { "if": { "properties": { "decisionType": { "const": "supersede" } }, "required": ["decisionType"] }, "then": { "properties": { "status": { "const": "superseded" } } } }
+      ],
+      "x-decision-chain-invariants": [
+        "ClassificationProposal remains proposed or unresolved and is never mutated by review",
+        "decisionContentSha256 hashes canonical {appendOrdinal, priorApprovalContentSha256, proposalKey, artifactSha256, decisionType, status, ruleSetVersion, schemaVersion}",
+        "Effective classification status is replayed from one gapless non-branching same-proposal human chain independent of timestamps"
+      ]
+    },
+    "classificationProposalRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposalKey", "proposedAt", "actor"],
+      "properties": {
+        "proposalKey": { "type": "string", "minLength": 1 },
+        "proposedAt": { "$ref": "#/$defs/timestamp" },
+        "actor": { "$ref": "#/$defs/actor" }
+      }
+    },
+    "authorityDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A separate human authority decision. The proposal and classification approval must resolve to the same artifactSha256; this cross-record invariant is enforced by manifest semantic validation.",
+      "required": ["authorityDecisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionContentSha256", "sourceRoleProposalId", "sourceRoleProposalContentSha256", "classificationApprovalId", "classificationApprovalContentSha256", "artifactSha256", "sourceRoleProposalArtifactSha256", "classificationApprovalArtifactSha256", "approver", "decision", "decisionTimestamp", "rationale", "ruleSetVersion", "schemaVersion", "priorDecisionId"],
+      "properties": {
+        "authorityDecisionId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "sourceRoleProposalId": { "type": "string", "minLength": 1 },
+        "sourceRoleProposalContentSha256": { "$ref": "#/$defs/sha256" },
+        "classificationApprovalId": { "$ref": "#/$defs/uuid" },
+        "classificationApprovalContentSha256": { "$ref": "#/$defs/sha256" },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "sourceRoleProposalArtifactSha256": { "$ref": "#/$defs/sha256" },
+        "classificationApprovalArtifactSha256": { "$ref": "#/$defs/sha256" },
+        "approver": { "$ref": "#/$defs/humanActor" },
+        "decision": { "enum": ["approved", "rejected", "revoked", "superseded"] },
+        "decisionTimestamp": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] }
+      },
+      "allOf": [
+        { "if": { "properties": { "decision": { "enum": ["approved", "rejected"] } }, "required": ["decision"] }, "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" } } } },
+        { "if": { "properties": { "decision": { "enum": ["revoked", "superseded"] } }, "required": ["decision"] }, "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        {
+          "if": { "properties": { "decision": { "enum": ["revoked", "superseded"] } }, "required": ["decision"] },
+          "then": { "properties": { "priorDecisionId": { "$ref": "#/$defs/uuid" } } }
+        }
+      ],
+      "x-cross-record-invariants": [
+        "sourceRoleProposalId resolves to a source-role authority-candidate proposal",
+        "classificationApprovalId resolves to a human approved classification for sourceRoleProposalId",
+        "artifactSha256 equals sourceRoleProposalArtifactSha256 and classificationApprovalArtifactSha256",
+        "sourceRoleProposalId and classificationApprovalId are operational linkage only; each resolves uniquely and its recomputed deterministic content hash equals the paired sourceRoleProposalContentSha256 or classificationApprovalContentSha256",
+        "decisionContentSha256 hashes canonical {appendOrdinal, priorDecisionContentSha256, sourceRoleProposalContentSha256, classificationApprovalContentSha256, artifactSha256, decision, ruleSetVersion, schemaVersion}; all UUIDs and operational identifiers, actor, rationale, and timestamp are excluded"
+      ]
+    },
+    "evidenceRelationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relationshipKey", "fromSha256", "toSha256", "relationshipType", "status", "supportingEvidence", "ruleSetVersion"],
+      "properties": {
+        "relationshipKey": { "type": "string", "minLength": 1 },
+        "fromSha256": { "$ref": "#/$defs/sha256" },
+        "toSha256": { "$ref": "#/$defs/sha256" },
+        "relationshipType": { "enum": ["exact-duplicate", "near-duplicate", "amendment", "supersession", "replacement", "authority", "conflict", "effective-period"] },
+        "status": { "enum": ["proposed", "unresolved"] },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "supportingEvidence": { "type": "array", "items": { "type": "object" } },
+        "ruleSetVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "relationshipDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionId", "priorDecisionContentSha256", "relationshipKey", "fromSha256", "toSha256", "decisionType", "actor", "decidedAt", "rationale", "evidenceConsidered", "resultingGovernedStatus", "ruleSetVersion", "schemaVersion"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "relationshipKey": { "type": "string", "minLength": 1 },
+        "fromSha256": { "$ref": "#/$defs/sha256" },
+        "toSha256": { "$ref": "#/$defs/sha256" },
+        "decisionType": { "enum": ["approve", "reject", "revoke", "supersede"] },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "evidenceConsidered": { "type": "array", "items": { "type": "object" } },
+        "resultingGovernedStatus": { "enum": ["approved", "rejected", "revoked", "superseded"] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "decisionType": { "enum": ["approve", "reject"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" } } } },
+        { "if": { "properties": { "decisionType": { "enum": ["revoke", "supersede"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decisionType": { "const": "approve" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "approved" } } } },
+        { "if": { "properties": { "decisionType": { "const": "reject" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "rejected" } } } },
+        { "if": { "properties": { "decisionType": { "const": "revoke" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "revoked" } } } },
+        { "if": { "properties": { "decisionType": { "const": "supersede" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "superseded" } } } }
+      ],
+      "x-decision-chain-invariants": [
+        "The source EvidenceRelationship remains proposed or unresolved and is never mutated to a final status",
+        "decisionContentSha256 hashes canonical {appendOrdinal, priorDecisionContentSha256, relationshipKey, fromSha256, toSha256, decisionType, resultingGovernedStatus, ruleSetVersion, schemaVersion}",
+        "Ordinal 1 has no predecessor; each later decision increments exactly once and references the immediately prior decision ID/content hash for the same relationship and artifact pair",
+        "Replay rejects gaps, branches, cycles, wrong subject or target, wrong decision type, stale hashes, system actors, and ineffective/revoked/superseded approvals",
+        "Downstream use is allowed only when replay yields a current effective approved decision"
+      ]
+    },
+    "populationCandidateDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionId", "priorDecisionContentSha256", "candidateKey", "artifactSha256", "decisionType", "actor", "decidedAt", "rationale", "resultingGovernedStatus", "ruleSetVersion", "schemaVersion"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "candidateKey": { "$ref": "#/$defs/sha256" },
+        "artifactSha256": { "$ref": "#/$defs/sha256" },
+        "decisionType": { "enum": ["approve", "reject", "revoke", "supersede"] },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "resultingGovernedStatus": { "enum": ["approved", "rejected", "revoked", "superseded"] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "decisionType": { "enum": ["approve", "reject"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "const": 1 }, "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" } } } },
+        { "if": { "properties": { "decisionType": { "enum": ["revoke", "supersede"] } }, "required": ["decisionType"] }, "then": { "properties": { "appendOrdinal": { "minimum": 2 }, "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decisionType": { "const": "approve" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "approved" } } } },
+        { "if": { "properties": { "decisionType": { "const": "reject" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "rejected" } } } },
+        { "if": { "properties": { "decisionType": { "const": "revoke" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "revoked" } } } },
+        { "if": { "properties": { "decisionType": { "const": "supersede" } }, "required": ["decisionType"] }, "then": { "properties": { "resultingGovernedStatus": { "const": "superseded" } } } }
+      ],
+      "x-decision-chain-invariants": [
+        "The source population candidate remains proposed or unresolved and is never mutated to a final status",
+        "decisionContentSha256 hashes canonical {appendOrdinal, priorDecisionContentSha256, candidateKey, artifactSha256, decisionType, resultingGovernedStatus, ruleSetVersion, schemaVersion}",
+        "Ordinal 1 has no predecessor; each later decision increments exactly once and references the immediately prior decision ID/content hash for the same candidate and artifactSha256",
+        "Replay rejects gaps, branches, cycles, wrong candidate/artifact, wrong decision type, stale hashes, system actors, and ineffective/revoked/superseded approvals",
+        "Downstream use is allowed only when replay yields a current effective approved decision"
+      ]
+    },
+    "unresolvedItemDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionContentSha256", "appendOrdinal", "priorDecisionId", "priorDecisionContentSha256", "itemKey", "decision", "actor", "decidedAt", "rationale", "priorStatus", "resultingStatus", "ruleSetVersion", "schemaVersion"],
+      "properties": {
+        "decisionId": { "$ref": "#/$defs/uuid" },
+        "decisionContentSha256": { "$ref": "#/$defs/sha256" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "itemKey": { "type": "string", "minLength": 1 },
+        "decision": { "enum": ["resolved", "accepted-risk", "reopened", "superseded"] },
+        "actor": { "$ref": "#/$defs/humanActor" },
+        "decidedAt": { "$ref": "#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "priorStatus": { "type": "string" },
+        "resultingStatus": { "type": "string" },
+        "priorDecisionId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "priorDecisionContentSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "ruleSetVersion": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        { "if": { "properties": { "appendOrdinal": { "const": 1 } }, "required": ["appendOrdinal"] }, "then": { "properties": { "priorDecisionId": { "type": "null" }, "priorDecisionContentSha256": { "type": "null" }, "decision": { "enum": ["resolved", "accepted-risk"] } } }, "else": { "properties": { "priorDecisionId": { "$ref": "#/$defs/uuid" }, "priorDecisionContentSha256": { "$ref": "#/$defs/sha256" } } } },
+        { "if": { "properties": { "decision": { "const": "resolved" } }, "required": ["decision"] }, "then": { "properties": { "resultingStatus": { "const": "resolved" } } } },
+        { "if": { "properties": { "decision": { "const": "accepted-risk" } }, "required": ["decision"] }, "then": { "properties": { "resultingStatus": { "const": "accepted-risk" } } } },
+        { "if": { "properties": { "decision": { "const": "reopened" } }, "required": ["decision"] }, "then": { "properties": { "resultingStatus": { "const": "reopened" } } } },
+        { "if": { "properties": { "decision": { "const": "superseded" } }, "required": ["decision"] }, "then": { "properties": { "resultingStatus": { "const": "superseded" } } } }
+      ],
+      "x-decision-content-hash": "decisionContentSha256 hashes canonical {appendOrdinal, priorDecisionContentSha256, itemKey, decision, priorStatus, resultingStatus, ruleSetVersion, schemaVersion}; decision/prior UUIDs, actor, rationale, and timestamp are excluded",
+      "x-transition-invariant": "Ordinal 1 permits resolved or accepted-risk with null predecessors. Every successor requires the immediate predecessor ID/content hash; the unresolvedItemDecision transition matrix validates predecessor effective state, including reopened to resolved or accepted-risk."
+    },
+    "unresolvedItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemKey", "scope", "subjectKeys", "issueType", "evidence", "competingPossibilities", "downstreamConsequence", "status"],
+      "properties": {
+        "itemKey": { "type": "string", "minLength": 1 },
+        "scope": { "type": "object" },
+        "subjectKeys": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "issueType": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "array", "items": { "type": "object" } },
+        "competingPossibilities": { "type": "array", "items": { "type": "object" } },
+        "downstreamConsequence": { "type": "string" },
+        "responsibleQueueOrReviewer": { "type": ["string", "null"] },
+        "status": { "enum": ["open", "assigned"] }
+      }
+    },
+    "containmentEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["edgeKey", "parentArtifactSha256", "childArtifactSha256", "memberPath", "sequence", "extractorIdentity", "extractorVersion", "outcome"],
+      "properties": {
+        "edgeKey": { "type": "string", "minLength": 1 },
+        "parentArtifactSha256": { "$ref": "#/$defs/sha256" },
+        "childArtifactSha256": { "$ref": "#/$defs/sha256" },
+        "memberPath": { "type": "string", "minLength": 1 },
+        "normalizedMemberPath": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "extractorIdentity": { "type": "string", "minLength": 1 },
+        "extractorVersion": { "type": "string", "minLength": 1 },
+        "compressedSize": { "type": ["integer", "null"], "minimum": 0 },
+        "expandedSize": { "type": ["integer", "null"], "minimum": 0 },
+        "crcOrEquivalent": { "type": ["string", "null"] },
+        "outcome": { "const": "extracted" }
+      }
+    },
+    "failedMemberObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observationKey", "parentArtifactSha256", "memberPath", "sequence", "extractorIdentity", "extractorVersion", "outcome", "failureReason"],
+      "properties": {
+        "observationKey": { "type": "string", "minLength": 1 },
+        "parentArtifactSha256": { "$ref": "#/$defs/sha256" },
+        "memberPath": { "type": "string", "minLength": 1 },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "extractorIdentity": { "type": "string", "minLength": 1 },
+        "extractorVersion": { "type": "string", "minLength": 1 },
+        "compressedSize": { "type": ["integer", "null"], "minimum": 0 },
+        "expandedSize": { "type": ["integer", "null"], "minimum": 0 },
+        "crcOrEquivalent": { "type": ["string", "null"] },
+        "outcome": { "enum": ["unsupported", "encrypted", "corrupt", "blocked-limit", "failed"] },
+        "failureReason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "originLedgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordId", "originClassification"],
+      "properties": {
+        "recordId": { "type": "string", "minLength": 1 },
+        "originClassification": { "enum": ["source-artifact", "extracted-member"] }
+      }
+    },
+    "terminalDispositionLedgerEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordId", "terminalDisposition"],
+      "properties": {
+        "recordId": { "type": "string", "minLength": 1 },
+        "terminalDisposition": { "enum": ["accepted-for-processing", "provisional-safety-block", "pending-human-disposition", "final-human-disposition-recorded", "failed", "duplicate", "excluded"] }
+      },
+      "description": "Accounting-only reconciliation classification. It never grants release, authority, or any governed human-final status."
+    },
+    "reconciliationTotals": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Every discovered record appears exactly once in the origin ledger and exactly once in the terminal-disposition ledger. Each ledger independently balances to discoveredRecordTotal; one entry in each separate ledger is required and is not double counting.",
+      "required": ["discoveredRecordTotal", "originLedger", "terminalDispositionLedger", "sourceArtifacts", "extractedMembers", "acceptedForProcessingRecords", "provisionalSafetyBlockedRecords", "pendingHumanDispositionRecords", "finalHumanDispositionRecordedRecords", "failedRecords", "duplicateRecords", "excludedRecords"],
+      "properties": {
+        "discoveredRecordTotal": { "type": "integer", "minimum": 0 },
+        "originLedger": { "type": "array", "items": { "$ref": "#/$defs/originLedgerEntry" } },
+        "terminalDispositionLedger": { "type": "array", "items": { "$ref": "#/$defs/terminalDispositionLedgerEntry" } },
+        "sourceArtifacts": { "type": "integer", "minimum": 0 },
+        "extractedMembers": { "type": "integer", "minimum": 0 },
+        "acceptedForProcessingRecords": { "type": "integer", "minimum": 0 },
+        "provisionalSafetyBlockedRecords": { "type": "integer", "minimum": 0 },
+        "pendingHumanDispositionRecords": { "type": "integer", "minimum": 0 },
+        "finalHumanDispositionRecordedRecords": { "type": "integer", "minimum": 0 },
+        "failedRecords": { "type": "integer", "minimum": 0 },
+        "duplicateRecords": { "type": "integer", "minimum": 0 },
+        "excludedRecords": { "type": "integer", "minimum": 0 }
+      },
+      "x-semantic-invariants": [
+        "originLedger contains exactly discoveredRecordTotal entries and each recordId occurs exactly once",
+        "terminalDispositionLedger contains exactly discoveredRecordTotal entries and each recordId occurs exactly once",
+        "The set of recordId values in originLedger equals the set in terminalDispositionLedger",
+        "sourceArtifacts plus extractedMembers equals discoveredRecordTotal and agrees with originLedger category counts",
+        "acceptedForProcessingRecords plus provisionalSafetyBlockedRecords plus pendingHumanDispositionRecords plus finalHumanDispositionRecordedRecords plus failedRecords plus duplicateRecords plus excludedRecords equals discoveredRecordTotal and agrees with terminalDispositionLedger category counts",
+        "A record appearing once in each of the two separate ledgers is required and is not double counting",
+        "Unsupported or unresolved records are represented in exactly one terminal accounting category with typed validation or unresolved-item detail and are not double counted",
+        "Terminal accounting classification never confers released, final-quarantine, rejected, revoked, superseded, authority, approval, or downstream eligibility",
+        "US2 may balance both ledgers using provisional-safety-block or pending-human-disposition while all governed records remain provisional; US3 typed human decisions establish final governed states separately"
+      ]
+    }
+  },
+  "x-numeric-canonicalization": {
+    "jsonNumbers": "All finite deterministic JSON numbers use RFC 8785 JSON Canonicalization Scheme serialization over representable IEEE-754 binary64 values. Equivalent notation such as 1, 1.0, and 1e0 produces identical bytes; negative zero serializes as 0; NaN and positive or negative infinity are invalid; source-language number lexemes are never hashed.",
+    "exactDecimals": "Any decimal whose lexical precision is material is encoded as canonicalDecimalString, not a JSON number. The grammar prohibits exponent notation, leading plus, unnecessary integer leading zero, unnecessary trailing fractional zero, trailing decimal point, and negative zero.",
+    "scope": "These rules apply recursively to every deterministic value and key derivation, including nested observed values, evidence keys, candidate keys, validation evidence, acquisition facts, and export fields."
+  },
+  "x-canonicalization-profile": {
+    "name": "PBGC Case Workbench Canonicalization Profile v1",
+    "rules": "Include only contract-declared deterministic fields and exclude operational UUIDs, timestamps, actors, UI/runtime state, storage paths, and transport metadata; NFC-preprocess strings; recursively order object keys by normalized project key rules; apply registered set-like and order-significant arrays; preserve every unregistered array as order-significant recursively; reject prohibited duplicates; distinguish null from absence; serialize UTF-8; use RFC 8785 number serialization; and encode exact lexical decimals with canonicalDecimalString."
+  },
+  "x-complete-decision-transition-matrices": {
+    "commonReplay": "Every chain is append-only and same-subject. Ordinal 1 has no predecessor ID/content hash; each later ordinal increments exactly one and references the immediately preceding decision ID and recomputed deterministic content hash. Replay order is ordinal, never timestamp. Duplicate ordinals, gaps, branches, cycles, broken/stale predecessors, cross-subject links, invalid transitions, and superseding a non-effective decision are rejected.",
+    "classificationApproval": "Initial approve→approved or reject→rejected. approved→revoke→revoked or supersede→superseded; rejected→supersede→superseded; revoked→supersede→superseded. Rejection cannot be revoked; superseded is terminal for that proposal.",
+    "relationshipDecision": "Initial approve→approved or reject→rejected. approved→revoke→revoked or supersede→superseded; rejected→supersede→superseded; revoked→supersede→superseded. Rejection cannot be revoked; superseded is terminal for that relationship proposal.",
+    "populationCandidateDecision": "Initial approve→approved or reject→rejected. approved→revoke→revoked or supersede→superseded; rejected→supersede→superseded; revoked→supersede→superseded. Rejection cannot be revoked; superseded is terminal for that exact candidateKey and artifactSha256.",
+    "quarantineDecision": "Initial final-quarantine→final-quarantine, release→released, or reject→rejected. final-quarantine→continue-quarantine→final-quarantine, release→released, or supersede→superseded; released→revoke→revoked, inherit-release→released, or supersede→superseded; rejected→supersede→superseded; revoked→supersede→superseded. inherit-release requires the same unchanged artifact bytes and current effective release. Superseded is terminal.",
+    "artifactEligibilityDecision": "Initial approve→eligible, inherit-approval→eligible, or reject→rejected. Initial inherit-approval has no eligibility predecessor and requires a separate current-effective typed quarantine release ID/content hash for the same bytes. eligible→revoke→revoked or supersede→superseded; rejected→supersede→superseded; revoked→supersede→superseded. Later decisions use the ordinary eligibility predecessor chain. Superseded is terminal.",
+    "authorityDecision": "Initial approved or rejected. approved→revoked or superseded; rejected→superseded; revoked→superseded. Rejection cannot be revoked; superseded is terminal. Every noninitial record requires the immediately prior authority decision ID/content hash for the same proposal, classification approval, and artifact. Authority is effective only while the linked classification approval is the current effective same-artifact approval; its revocation, supersession, ineffectiveness, stale hash, or changed bytes immediately blocks dependent authority, and renewal requires a new valid typed authority decision.",
+    "unresolvedItemDecision": "Initial resolved or accepted-risk. resolved or accepted-risk→reopened; reopened→resolved, accepted-risk, or superseded; resolved or accepted-risk→superseded. Superseded is terminal; every noninitial record links to the immediately prior same-item decision.",
+    "effectiveness": "Approved, eligible, released, final-quarantine, rejected, resolved, and accepted-risk are effective only when they are the replay result of their valid chain. Revoked and superseded terminate the prior effective state; no timestamp changes effectiveness."
+  }
+}

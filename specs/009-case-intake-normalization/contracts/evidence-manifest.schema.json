@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/evidence-manifest.schema.json",
+  "title": "Evidence Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "producerVersion", "ruleSetVersion", "snapshotId", "deterministicPayload", "contentManifestId", "operationalMetadata", "reconciliationTotals", "validationSummary"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "producerVersion": { "type": "string", "minLength": 1 },
+    "ruleSetVersion": { "type": "string", "minLength": 1 },
+    "snapshotId": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+    "deterministicPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Canonicalizable content-derived state. Random UUIDs, timestamps, session identifiers, and UI state are prohibited here by contract and canonicalization tests.",
+      "required": ["snapshot", "artifacts", "containmentEdges", "failedMemberObservations", "extractionResults", "screeningFindings", "screeningOutcomes", "classificationProposals", "evidenceRelationships", "populationEvidenceObservations", "populationCandidates", "unresolvedItems", "validationResults", "acquisitionPayloadReferences"],
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["snapshotId", "entries"],
+          "properties": {
+            "snapshotId": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["submittedPath", "sizeBytes", "sha256"],
+                "properties": {
+                  "submittedPath": { "type": "string" },
+                  "sizeBytes": { "type": "integer", "minimum": 0 },
+                  "sha256": { "$ref": "governed-records.schema.json#/$defs/sha256" }
+                }
+              }
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["artifactKey", "sha256", "sizeBytes", "mediaType", "objectPath", "artifactRole", "processingStatus", "downstreamEligibility"],
+            "properties": {
+              "artifactKey": { "type": "string", "minLength": 1 },
+              "sha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+              "sizeBytes": { "type": "integer", "minimum": 0 },
+              "mediaType": { "type": "string" },
+              "objectPath": { "type": "string", "pattern": "^objects/sha256/[a-f0-9]{2}/[a-f0-9]{64}$" },
+              "artifactRole": { "enum": ["submitted-container", "submitted-file", "extracted-member"] },
+              "processingStatus": { "enum": ["pending", "preserved", "screening", "quarantined", "extracting", "normalized", "unsupported", "unreadable", "failed", "completed"] },
+              "downstreamEligibility": { "enum": ["blocked", "proposed-only", "pending-human-decision"] },
+              "exactDuplicateOfSha256": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] }
+            }
+          }
+        },
+        "containmentEdges": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/containmentEdge" } },
+        "failedMemberObservations": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/failedMemberObservation" } },
+        "extractionResults": { "type": "array", "items": { "$ref": "extraction-result.schema.json" } },
+        "screeningFindings": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/screeningFinding" } },
+        "screeningOutcomes": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/screeningOutcome" } },
+        "classificationProposals": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/classificationProposal" } },
+        "evidenceRelationships": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/evidenceRelationship" } },
+        "populationEvidenceObservations": { "type": "array", "items": { "$ref": "normalized-evidence.schema.json#/$defs/populationEvidenceObservation" } },
+        "populationCandidates": { "type": "array", "items": { "$ref": "normalized-evidence.schema.json#/$defs/populationCandidate" } },
+        "unresolvedItems": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/unresolvedItem" } },
+        "validationResults": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/validationResult" } },
+        "acquisitionPayloadReferences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requestPayloadSha256", "packagePayloadSha256", "proposalPayloadSha256", "artifactSha256Values", "requestingModuleIdentifier", "rerunTrigger", "extractionSchemaRegistration", "extractionInstructionRegistration"],
+            "properties": {
+              "requestPayloadSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+              "packagePayloadSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+              "proposalPayloadSha256": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] },
+              "artifactSha256Values": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/sha256" }, "uniqueItems": true },
+              "requestingModuleIdentifier": { "type": "string", "minLength": 1 },
+              "rerunTrigger": { "$ref": "evidence-acquisition.schema.json#/$defs/rerunTrigger" },
+              "extractionSchemaRegistration": { "$ref": "evidence-acquisition.schema.json#/$defs/extractionSchemaRegistration" },
+              "extractionInstructionRegistration": { "$ref": "evidence-acquisition.schema.json#/$defs/extractionInstructionRegistration" }
+            }
+          }
+        }
+      }
+    },
+    "contentManifestId": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+    "operationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestRecordId", "snapshotRecordId", "caseUuid", "attemptId", "generatedAt", "statusHistory", "provenanceRecords", "screeningExecutionRecords", "validationExecutionRecords", "classificationProposalRecords", "quarantineDecisions", "artifactEligibilityDecisions", "classificationApprovals", "relationshipDecisions", "authorityDecisions", "populationCandidateDecisions", "unresolvedItemDecisions", "acquisitionRecordReferences", "acquisitionLineageNodes", "acquisitionLineageEdges", "proposalDecisionRecords", "governedPromotedFacts"],
+      "properties": {
+        "manifestRecordId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "snapshotRecordId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "caseUuid": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "attemptId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+        "generatedAt": { "$ref": "governed-records.schema.json#/$defs/timestamp" },
+        "userSessionId": { "type": ["string", "null"] },
+        "uiState": { "type": ["object", "null"] },
+        "executionMetadata": { "type": ["object", "null"] },
+        "statusHistory": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/statusEvent" } },
+        "provenanceRecords": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/provenanceRecord" } },
+        "screeningExecutionRecords": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/screeningExecutionRecord" } },
+        "validationExecutionRecords": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/validationExecutionRecord" } },
+        "classificationProposalRecords": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/classificationProposalRecord" } },
+        "quarantineDecisions": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/quarantineDecision" } },
+        "artifactEligibilityDecisions": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/artifactEligibilityDecision" } },
+        "classificationApprovals": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/classificationApproval" } },
+        "relationshipDecisions": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/relationshipDecision" } },
+        "authorityDecisions": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/authorityDecision" } },
+        "populationCandidateDecisions": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/populationCandidateDecision" } },
+        "unresolvedItemDecisions": { "type": "array", "items": { "$ref": "governed-records.schema.json#/$defs/unresolvedItemDecision" } },
+        "acquisitionRecordReferences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requestRecordId", "packageRecordId", "proposalRecordId", "requestPayloadSha256", "packagePayloadSha256", "proposalPayloadSha256"],
+            "properties": {
+              "requestRecordId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+              "packageRecordId": { "$ref": "governed-records.schema.json#/$defs/uuid" },
+              "proposalRecordId": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+              "requestPayloadSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+              "packagePayloadSha256": { "$ref": "governed-records.schema.json#/$defs/sha256" },
+              "proposalPayloadSha256": { "oneOf": [{ "$ref": "governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] }
+            }
+          }
+        },
+        "acquisitionLineageNodes": { "type": "array", "items": { "$ref": "evidence-acquisition.schema.json#/$defs/acquisitionLineageNode" } },
+        "acquisitionLineageEdges": { "type": "array", "items": { "$ref": "evidence-acquisition.schema.json#/$defs/acquisitionLineageEdge" } },
+        "proposalDecisionRecords": { "type": "array", "items": { "$ref": "evidence-acquisition.schema.json#/$defs/proposalDecisionRecord" } },
+        "governedPromotedFacts": { "type": "array", "items": { "$ref": "evidence-acquisition.schema.json#/$defs/governedPromotedFact" } }
+      }
+    },
+    "reconciliationTotals": { "$ref": "governed-records.schema.json#/$defs/reconciliationTotals" },
+    "validationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "failed", "blocked", "inconclusive", "unsupported", "error", "blocksDownstream"],
+      "properties": {
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "blocked": { "type": "integer", "minimum": 0 },
+        "inconclusive": { "type": "integer", "minimum": 0 },
+        "unsupported": { "type": "integer", "minimum": 0 },
+        "error": { "type": "integer", "minimum": 0 },
+        "blocksDownstream": { "type": "boolean" }
+      }
+    }
+  },
+  "x-acquisition-lineage-invariants": [
+    "Every proposal node has one incoming package-to-proposal edge from a package linked to its request",
+    "Every proposal decision resolves to one proposal with the same proposalSha256",
+    "Every governed promoted fact resolves to an effective approved proposal decision for its proposalSha256",
+    "Every artifact SHA-256 cited by a proposal or promoted fact occurs in its linked acquisition payload reference and manifest artifacts",
+    "Every requesting-module identifier and rerun-trigger key remains connected from request through promoted fact",
+    "All acquisition lineage nodeId and edgeId values are unique and every edge endpoint resolves to exactly one node",
+    "Every promoted fact identifies one existing factKey and valid JSON Pointer in proposedExtractedFacts, and its factContentSha256 matches canonical {factKey, factJsonPointer, value}",
+    "Every promoted fact citationId resolves to a citation on the same proposal and its artifactSha256 occurs in that promoted fact",
+    "Promotion under a revoked or non-effective approval, ambiguous multi-fact promotion, and duplicate promotion to conflicting governed records are invalid",
+    "Orphan proposals, decisions without proposals, promoted facts without effective approval, mismatched artifact hashes, broken rerun-trigger lineage, and duplicate node identifiers are invalid"
+  ],
+  "x-terminal-ledger-semantics": [
+    "terminalDispositionLedger is accounting-only and cannot confer release, authority, approval, or a governed human-final disposition",
+    "accepted-for-processing means only that accounting processing may continue; provisional-safety-block and pending-human-disposition remain downstream blocked",
+    "US2 may balance reconciliation with provisional accounting categories while every governed record remains provisional",
+    "Only typed human decisions recorded separately in operationalMetadata establish released, final-quarantine, rejected, revoked, or superseded governed states"
+  ],
+  "x-governed-decision-projection-invariants": [
+    "EvidenceRelationship.status and normalized populationCandidate.candidateStatus are proposal-only and cannot store approved, rejected, revoked, superseded, released, or final-quarantine",
+    "ClassificationProposal.status is proposal-only; effective classification status is replayed from its typed human ClassificationApproval chain without mutating the proposal",
+    "Effective relationship and population-candidate status is a computed projection from the applicable gapless typed human decision chain and never mutates deterministic source evidence",
+    "Every decision chain preserves exact subject key, target identity where applicable, artifact SHA-256 values, decision type, decisionContentSha256, predecessor ID/content hash, rule-set/schema versions, and human actor",
+    "Orphan approval, system approval, missing decision, wrong decision type, wrong subject or target, stale or mismatched decision content hash, branch, cycle, gap, or ineffective/revoked/superseded approval blocks governed downstream use",
+    "Every PopulationCandidateDecision candidateKey resolves to exactly one populationCandidates source record in this manifest, whose recomputed candidateKey and artifactSha256 match; zero or multiple matches, changed content, or stale keys are invalid",
+    "Every population evidenceReference resolves by evidenceKey to exactly one populationEvidenceObservations entry with the same recomputed evidenceKey; the reference and observation agree exactly on artifactSha256, citationId, sourceLocator, evidenceKind, observedTextOrValue presence, and canonical bytes",
+    "Every populationEvidenceObservation evidenceKey and citationId is unique, its evidenceKey recomputes from its canonical deterministic content, and its artifactSha256 resolves to exactly one artifact in the manifest validated artifact set",
+    "Missing, zero/multiple, duplicate-key, duplicate-citation, artifact-mismatched, locator-mismatched, changed-content, stale-evidenceKey, unresolved-artifact, and incomplete-manifest population evidence is invalid",
+    "An incomplete manifest cannot claim an approved governed projection; downstream use requires replay to one current effective approved same-subject decision",
+    "UnresolvedItem deterministic source status is open or assigned only; resolved, accepted-risk, reopened, and superseded are computed projections available only through a complete effective UnresolvedItemDecision chain",
+    "Authority is effective only while its classificationApprovalId resolves to the current effective same-artifact classification approval with matching recomputed content hash; revocation, supersession, ineffectiveness, stale hashes, or changed bytes invalidate dependent authority, and renewal requires a new typed AuthorityDecision with current exact lineage",
+    "Exact-duplicate byte linkage may be established cryptographically through exactDuplicateOfSha256 but does not mutate EvidenceRelationship.status or constitute human governed approval"
+  ],
+  "x-artifact-eligibility-invariants": [
+    "Artifact downstreamEligibility stores only blocked, proposed-only, or pending-human-decision and never stores approved or another human-final value",
+    "Effective artifact eligibility is a computed projection from the current effective same-artifact ArtifactEligibilityDecision chain plus any applicable human quarantine/release chain and is never copied into deterministic artifact source evidence",
+    "Replay validates artifactSha256, decision type, decisionContentSha256, appendOrdinal, predecessor ID/content hash, effective state, and release/quarantine/revocation/supersession lineage",
+    "Missing/system/stale/mismatched/ineffective/revoked/branched/superseded decisions and incomplete manifests remain blocked",
+    "Changed bytes create a new artifact SHA-256 and decision lifecycle and can never inherit eligibility from prior bytes"
+  ],
+  "x-deterministic-array-semantics": {
+    "deterministicPayload.snapshot.entries": "set-like; sort by NFC submittedPath, then sha256, then sizeBytes; reject duplicate submittedPath after path normalization",
+    "deterministicPayload.artifacts": "set-like; sort by artifactKey, then sha256; reject duplicate artifactKey",
+    "deterministicPayload.containmentEdges": "order-significant; preserve extraction sequence established by parent artifact then sequence; ties are invalid",
+    "deterministicPayload.failedMemberObservations": "order-significant; preserve extractor observation sequence by parent artifact then sequence; ties are invalid",
+    "deterministicPayload.extractionResults": "set-like; sort by source artifact SHA-256, source locator, then rule/method version and canonical item bytes; reject duplicate stable result keys",
+    "deterministicPayload.screeningFindings": "set-like; sort by findingKey then artifactSha256; reject duplicate findingKey",
+    "deterministicPayload.screeningOutcomes": "set-like; sort by outcomeKey then artifactSha256; reject duplicate outcomeKey",
+    "deterministicPayload.classificationProposals": "set-like; sort by proposalKey then artifactSha256; reject duplicate proposalKey",
+    "deterministicPayload.evidenceRelationships": "set-like; sort by relationshipKey and canonical item bytes; reject duplicate relationshipKey",
+    "deterministicPayload.populationEvidenceObservations": "set-like; validate evidenceKey against canonical observation content, sort by evidenceKey, then citationId, artifactSha256, sourceLocator, and canonical item bytes; reject duplicate evidenceKey, duplicate citationId, duplicate canonical content, and indistinguishable normalized elements; null items and missing required registry are invalid",
+    "deterministicPayload.populationCandidates": "set-like; validate candidateKey against canonical candidate content, sort ascending by candidateKey then artifactSha256 and canonical item bytes, and reject duplicate candidateKey, duplicate canonical content, zero/multiple identity matches, stale keys, and indistinguishable normalized elements",
+    "deterministicPayload.populationCandidates[].evidence": "intrinsic PopulationCandidate set-like rule; validate evidenceKey, sort ascending by evidenceKey then canonical item bytes, and reject duplicate keys/content and indistinguishable normalized elements; this identical rule applies in every embedding and overrides the generic recursive fallback",
+    "deterministicPayload.unresolvedItems": "set-like; sort by itemKey and canonical item bytes; reject duplicate itemKey",
+    "deterministicPayload.validationResults": "set-like; sort by validationKey and canonical item bytes; reject duplicate validationKey",
+    "deterministicPayload.acquisitionPayloadReferences": "set-like; sort by requestPayloadSha256, packagePayloadSha256, proposalPayloadSha256 with null before hashes; reject duplicate hash tuples",
+    "deterministicPayload.acquisitionPayloadReferences[].artifactSha256Values": "set-like; sort ascending lowercase hexadecimal; reject duplicates",
+    "reconciliationTotals.originLedger": "set-like; sort by recordId; reject duplicate recordId",
+    "reconciliationTotals.terminalDispositionLedger": "set-like; sort by recordId; reject duplicate recordId"
+  },
+  "x-operational-lineage-array-ordering": {
+    "operationalMetadata.acquisitionLineageNodes": "set-like projection; sort by nodeId then nodeType; reject duplicate nodeId; node contentSha256 follows node-type deterministic hash semantics",
+    "operationalMetadata.acquisitionLineageEdges": "set-like projection; sort by edgeId then fromNodeId then toNodeId; reject duplicate edgeId",
+    "operationalMetadata.proposalDecisionRecords": "order-significant append chain; sort/replay only by appendOrdinal and reject gaps, duplicates, branches, or cycles; timestamps never order the chain",
+    "operationalMetadata.governedPromotedFacts": "set-like projection; sort by proposalSha256, factKey, factJsonPointer, targetGovernedRecordType, targetGovernedRecordId; reject conflicting duplicate promotion keys",
+    "note": "These operational container arrays are excluded from contentManifestId. Their referenced node/fact content hashes are deterministic and use the rules in evidence-acquisition.schema.json."
+  },
+  "x-canonicalization-profile": "PBGC Case Workbench Canonicalization Profile v1",
+  "x-numeric-canonicalization": "The profile uses RFC 8785 number serialization for finite JSON numbers; equivalent notation hashes identically, negative zero serializes as 0, and NaN/infinities are invalid. Exact lexical decimals use governed-records canonicalDecimalString values.",
+  "x-recursive-deterministic-json": "Object keys canonicalize recursively. Intrinsic type-level array rules, including PopulationCandidate.evidence, apply in every embedding and take precedence over generic fallback. Arrays at exact registered paths use those rules. Every otherwise-unregistered array nested at any depth in deterministic manifest values or referenced deterministic records is order-significant by default and preserves element order. Exact path rules override only their exact array scope."
+}

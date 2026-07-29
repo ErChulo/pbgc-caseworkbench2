@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+package-lock.json
+reference/
+.codegraph/
+# T018 runtime contracts must remain byte-identical to approved source schemas.
+web/src/contracts/schemas/
