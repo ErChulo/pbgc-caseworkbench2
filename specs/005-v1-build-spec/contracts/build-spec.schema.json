@@ -1,0 +1,477 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "build-spec.schema.json",
+  "title": "V1 Build Specification",
+  "description": "Deterministic build specification for workbook generation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "buildSpecId",
+    "architectureId",
+    "caseId",
+    "ruleSetVersion",
+    "generatedAt",
+    "formulas",
+    "namedRanges",
+    "cellMappings",
+    "executionOrder",
+    "validation",
+    "buildSpecContentSha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "enum": ["1.0.0", "2.0.0"]
+    },
+    "buildSpecId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "architectureId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "caseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "ruleSetVersion": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "formulas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/FormulaDefinition"
+      }
+    },
+    "namedRanges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/NamedRangeDefinition"
+      }
+    },
+    "cellMappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CellMapping"
+      }
+    },
+    "executionOrder": {
+      "$ref": "#/$defs/ExecutionOrder"
+    },
+    "validation": {
+      "$ref": "#/$defs/ValidationResult"
+    },
+    "buildSpecContentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "schemaVersion": { "const": "2.0.0" } } },
+      "then": {
+        "properties": {
+          "formulas": {
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/FormulaDefinition" },
+                { "required": ["formulaKind", "provenance"] }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "FormulaDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formulaId",
+        "scenarioId",
+        "tabName",
+        "genericField",
+        "formulaText",
+        "cellAddress",
+        "dependencies",
+        "iobClassification",
+        "justification"
+      ],
+      "properties": {
+        "formulaId": {
+          "type": "string",
+          "pattern": "^FORMULA-.+$"
+        },
+        "scenarioId": {
+          "type": "string"
+        },
+        "tabName": {
+          "type": "string"
+        },
+        "genericField": {
+          "type": "string"
+        },
+        "formulaText": {
+          "type": "string"
+        },
+        "cellAddress": {
+          "type": "string",
+          "pattern": "^[A-Z]+[0-9]+$"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "iobClassification": {
+          "type": "string",
+          "enum": ["I", "O", "B", "N", "P", ""]
+        },
+        "justification": {
+          "type": "string"
+        },
+        "formulaKind": {
+          "const": "scalar"
+        },
+        "provenance": {
+          "$ref": "#/$defs/FormulaProvenance"
+        }
+      }
+    },
+    "FormulaProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePlanRules",
+        "derivationDescription",
+        "approvalRecordId",
+        "affectedTestIds",
+        "regenerationImpact",
+        "validationOracleIds"
+      ],
+      "properties": {
+        "sourcePlanRules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/FormulaRuleProvenance" }
+        },
+        "derivationDescription": { "type": "string", "minLength": 1 },
+        "approvalRecordId": { "type": "string", "minLength": 1 },
+        "affectedTestIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "regenerationImpact": { "type": "string", "minLength": 1 },
+        "validationOracleIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "FormulaRuleProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ruleId",
+        "ruleContentSha256",
+        "relationship",
+        "citation",
+        "effectiveDate",
+        "endDate",
+        "adoptionOrExecutionDate",
+        "applicabilityConditions",
+        "supersedesRuleId",
+        "confidence",
+        "reviewStatus",
+        "authorityOverrideId",
+        "unresolvedItemIds"
+      ],
+      "properties": {
+        "ruleId": { "type": "string", "format": "uuid" },
+        "ruleContentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "relationship": { "enum": ["governing", "supporting"] },
+        "citation": { "$ref": "#/$defs/FormulaCitation" },
+        "effectiveDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "endDate": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "adoptionOrExecutionDate": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "applicabilityConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "value"],
+            "properties": {
+              "dimension": { "type": "string", "minLength": 1 },
+              "value": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "supersedesRuleId": { "type": ["string", "null"], "format": "uuid" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reviewStatus": { "enum": ["human-approved", "provisional"] },
+        "authorityOverrideId": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "unresolvedItemIds": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "FormulaCitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "sourceRole", "locator"],
+      "properties": {
+        "artifactSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sourceRole": { "type": "string", "minLength": 1 },
+        "locator": { "type": "string", "minLength": 1 }
+      }
+    },
+    "NamedRangeDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rangeName",
+        "cellAddress",
+        "tabName",
+        "scope",
+        "genericField"
+      ],
+      "properties": {
+        "rangeName": {
+          "type": "string"
+        },
+        "cellAddress": {
+          "type": "string",
+          "pattern": "^[A-Z]+[0-9]+$"
+        },
+        "tabName": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["workbook", "sheet"]
+        },
+        "genericField": {
+          "type": "string"
+        },
+        "scenarioId": {
+          "type": ["string", "null"]
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string"
+            },
+            "architectureNamedRange": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "CellMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mappingId",
+        "field",
+        "tabName",
+        "cellAddress",
+        "iobClassification",
+        "scenarioId"
+      ],
+      "properties": {
+        "mappingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "field": {
+          "type": "string"
+        },
+        "tabName": {
+          "type": "string"
+        },
+        "cellAddress": {
+          "type": "string",
+          "pattern": "^[A-Z]+[0-9]+$"
+        },
+        "iobClassification": {
+          "type": "string",
+          "enum": ["I", "O", "B", "N", "P", ""]
+        },
+        "dataSource": {
+          "oneOf": [
+            { "$ref": "#/$defs/DataSourceReference" },
+            { "type": "null" }
+          ]
+        },
+        "formulaId": {
+          "type": ["string", "null"]
+        },
+        "scenarioId": {
+          "type": "string"
+        }
+      }
+    },
+    "DataSourceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceType", "sourceTab", "sourceField"],
+      "properties": {
+        "sourceType": {
+          "type": "string",
+          "enum": ["population", "case-control", "evidence"]
+        },
+        "sourceTab": {
+          "type": "string"
+        },
+        "sourceField": {
+          "type": "string"
+        },
+        "evidenceKey": {
+          "type": ["string", "null"],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "ExecutionOrder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order",
+        "levelCount",
+        "maxDepth",
+        "hasCycles",
+        "cycleNodes"
+      ],
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "levelCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hasCycles": {
+          "type": "boolean"
+        },
+        "cycleNodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ValidationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isValid", "errors", "warnings", "validatedAt"],
+      "properties": {
+        "isValid": {
+          "type": "boolean"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ValidationError"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ValidationWarning"
+          }
+        },
+        "validatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ValidationError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "MISSING_FORMULA",
+            "DUPLICATE_RANGE",
+            "UNSATISFIED_DEPENDENCY",
+            "CIRCULAR_DEPENDENCY",
+            "INVALID_CELL_ADDRESS",
+            "MISSING_DATA_SOURCE"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "field": {
+          "type": ["string", "null"]
+        },
+        "formulaId": {
+          "type": ["string", "null"]
+        },
+        "context": {
+          "type": "object"
+        }
+      }
+    },
+    "ValidationWarning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["UNUSED_RANGE", "DEEP_DEPENDENCY", "LARGE_FORMULA"]
+        },
+        "message": {
+          "type": "string"
+        },
+        "field": {
+          "type": ["string", "null"]
+        },
+        "context": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

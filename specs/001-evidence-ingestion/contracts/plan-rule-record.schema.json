@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/plan-rule-record.schema.json",
+  "title": "Plan Rule Record",
+  "description": "An effective-dated, source-cited, immutable authoritative rule. Authored by a human; primary citation must be a released case-evidence artifact unless an AuthorityOverride authorizes otherwise; never silently covers a period outside its effective dates; predecessor and successor remain immutable across supersession.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ruleId", "governingRestatement", "primaryCitation", "supportingCitations", "effectiveDate", "endDate", "adoptionOrExecutionDate", "applicabilityConditions", "supersessionChain", "confidence", "authorityOverrideId", "authorHuman", "authoredAt", "reviewStatus", "linkedUnresolvedItemIds", "ruleSetVersion", "schemaVersion", "ruleContentSha256"],
+  "properties": {
+    "ruleId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+    "governingRestatement": { "type": "string", "minLength": 1 },
+    "primaryCitation": { "$ref": "#/$defs/ruleCitation" },
+    "supportingCitations": { "type": "array", "items": { "$ref": "#/$defs/ruleCitation" } },
+    "effectiveDate": { "type": "string", "format": "date" },
+    "endDate": { "oneOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+    "adoptionOrExecutionDate": { "oneOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+    "applicabilityConditions": { "type": "array", "items": { "$ref": "#/$defs/applicabilityCondition" } },
+    "supersessionChain": { "type": "array", "items": { "$ref": "#/$defs/supersessionLink" } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "authorityOverrideId": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+    "authorHuman": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/humanActor" },
+    "authoredAt": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/timestamp" },
+    "reviewStatus": { "enum": ["human-approved", "provisional"] },
+    "linkedUnresolvedItemIds": { "type": "array", "items": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" } },
+    "ruleSetVersion": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": "1.0.0" },
+    "ruleContentSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }
+  },
+  "$defs": {
+    "ruleCitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "artifactLocator", "sourceRole", "provisionIdentifier", "citationLocator"],
+      "properties": {
+        "artifactSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+        "artifactLocator": { "type": "string", "minLength": 1 },
+        "sourceRole": { "$ref": "evidence-catalog.schema.json#/$defs/sourceRole" },
+        "provisionIdentifier": { "type": ["string", "null"] },
+        "citationLocator": { "type": "string", "minLength": 1 }
+      }
+    },
+    "applicabilityCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dimension", "value", "evidence"],
+      "properties": {
+        "dimension": { "enum": ["participant-group", "benefit-purpose", "service-definition", "actuarial-equivalence-purpose", "freeze-or-restriction", "amendment-period"] },
+        "value": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/ruleCitation" } }
+      }
+    },
+    "supersessionLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ordinal", "predecessorRuleId", "predecessorRuleContentSha256", "successorRuleId", "successorRuleContentSha256", "effectiveDate", "linkType"],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1 },
+        "predecessorRuleId": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+        "predecessorRuleContentSha256": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] },
+        "successorRuleId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "successorRuleContentSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+        "effectiveDate": { "type": "string", "format": "date" },
+        "linkType": { "enum": ["initial", "supersession", "amendment", "re-authoring", "repeal", "reinstate", "branch"] }
+      }
+    }
+  }
+}

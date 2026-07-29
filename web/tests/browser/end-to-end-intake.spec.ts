@@ -35,9 +35,7 @@ test("handles nested archives, interruption, and unchanged resumption", async ({
       buffer: Buffer.alloc(24 * 1024 * 1024, 17),
     },
   ]);
-  await expect(
-    page.getByRole("button", { name: "Stop safely" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Stop safely" })).toBeVisible();
   await page.getByRole("button", { name: "Stop safely" }).click();
   await expect(page.getByText("File inventory interrupted")).toBeVisible();
   await expect(
@@ -92,16 +90,12 @@ test("completes quarantine, classification, population, and manifest export", as
   const quarantine = page
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: "Quarantine queue" }) });
-  const classification = page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { name: "Classification review" }),
-    });
-  const population = page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { name: "Population candidate review" }),
-    });
+  const classification = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Classification review" }),
+  });
+  const population = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Population candidate review" }),
+  });
 
   await expect(
     page.getByRole("heading", { name: "Quarantine queue" }),
@@ -131,9 +125,7 @@ test("completes quarantine, classification, population, and manifest export", as
   });
   await expect(releaseButton).toBeEnabled();
   await releaseButton.click();
-  await expect(
-    riskItem.getByText("Released", { exact: true }),
-  ).toBeVisible();
+  await expect(riskItem.getByText("Released", { exact: true })).toBeVisible();
 
   await classification.getByLabel("Reviewer name").fill("authorized-reviewer");
   await classification

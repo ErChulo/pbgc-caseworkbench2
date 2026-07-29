@@ -1,26 +1,35 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const schemaDirectory = resolve(
-  "specs/009-case-intake-normalization/contracts",
-);
-const names = (await readdir(schemaDirectory))
-  .filter((name) => name.endsWith(".schema.json"))
-  .sort();
-const schemas = new Map();
+const contractDirectories = [
+  resolve("specs/009-case-intake-normalization/contracts"),
+  resolve("specs/005-v1-build-spec/contracts"),
+  resolve("specs/006-formula-compiler/contracts"),
+];
 
-for (const name of names) {
-  const schema = JSON.parse(
-    await readFile(resolve(schemaDirectory, name), "utf8"),
-  );
-  if (schema.$schema !== "https://json-schema.org/draft/2020-12/schema") {
-    throw new Error(`${name} is not declared as Draft 2020-12.`);
+const schemas = new Map();
+let totalCount = 0;
+
+for (const directory of contractDirectories) {
+  const names = (await readdir(directory))
+    .filter((name) => name.endsWith(".schema.json"))
+    .sort();
+
+  for (const name of names) {
+    if (schemas.has(name)) {
+      throw new Error(`Duplicate schema name: ${name}`);
+    }
+    const schema = JSON.parse(await readFile(resolve(directory, name), "utf8"));
+    if (schema.$schema !== "https://json-schema.org/draft/2020-12/schema") {
+      throw new Error(`${name} is not declared as Draft 2020-12.`);
+    }
+    schemas.set(name, schema);
+    totalCount++;
   }
-  schemas.set(name, schema);
 }
 
-if (schemas.size !== 7)
-  throw new Error(`Expected seven design schemas; found ${schemas.size}.`);
+if (totalCount !== 9)
+  throw new Error(`Expected nine design schemas; found ${totalCount}.`);
 
 function resolvePointer(document, pointer, source) {
   let value = document;
@@ -53,5 +62,5 @@ function visit(value, source) {
 
 for (const [name, schema] of schemas) visit(schema, name);
 console.log(
-  "Seven Draft 2020-12 design schemas parsed and all local references resolved.",
+  `Nine Draft 2020-12 design schemas parsed and all local references resolved.`,
 );

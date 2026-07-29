@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "compiled-formula-artifact.schema.json",
+  "title": "Compiled Formula Artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "artifactType",
+    "deterministicPayload",
+    "contentSha256",
+    "operationalMetadata"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "artifactType": { "const": "compiled-formula-artifact" },
+    "deterministicPayload": { "$ref": "#/$defs/CompiledFormulaPayload" },
+    "contentSha256": { "$ref": "#/$defs/Sha256" },
+    "operationalMetadata": { "$ref": "#/$defs/OperationalMetadata" }
+  },
+  "$defs": {
+    "Sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "SourceSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startOffset", "endOffset", "offsetUnit"],
+      "properties": {
+        "startOffset": { "type": "integer", "minimum": 0 },
+        "endOffset": { "type": "integer", "minimum": 0 },
+        "offsetUnit": { "const": "utf16-code-unit" }
+      }
+    },
+    "FormulaCitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "sourceRole", "locator"],
+      "properties": {
+        "artifactSha256": { "$ref": "#/$defs/Sha256" },
+        "sourceRole": { "type": "string", "minLength": 1 },
+        "locator": { "type": "string", "minLength": 1 }
+      }
+    },
+    "FormulaRuleProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ruleId",
+        "ruleContentSha256",
+        "relationship",
+        "citation",
+        "effectiveDate",
+        "endDate",
+        "adoptionOrExecutionDate",
+        "applicabilityConditions",
+        "supersedesRuleId",
+        "confidence",
+        "reviewStatus",
+        "authorityOverrideId",
+        "unresolvedItemIds"
+      ],
+      "properties": {
+        "ruleId": { "type": "string", "format": "uuid" },
+        "ruleContentSha256": { "$ref": "#/$defs/Sha256" },
+        "relationship": { "enum": ["governing", "supporting"] },
+        "citation": { "$ref": "#/$defs/FormulaCitation" },
+        "effectiveDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "endDate": { "type": ["string", "null"] },
+        "adoptionOrExecutionDate": { "type": ["string", "null"] },
+        "applicabilityConditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["dimension", "value"],
+            "properties": {
+              "dimension": { "type": "string", "minLength": 1 },
+              "value": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "supersedesRuleId": { "type": ["string", "null"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "reviewStatus": { "enum": ["human-approved", "provisional"] },
+        "authorityOverrideId": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "unresolvedItemIds": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "FormulaProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourcePlanRules",
+        "derivationDescription",
+        "approvalRecordId",
+        "affectedTestIds",
+        "regenerationImpact",
+        "validationOracleIds"
+      ],
+      "properties": {
+        "sourcePlanRules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/FormulaRuleProvenance" }
+        },
+        "derivationDescription": { "type": "string", "minLength": 1 },
+        "approvalRecordId": { "type": "string", "minLength": 1 },
+        "affectedTestIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "regenerationImpact": { "type": "string", "minLength": 1 },
+        "validationOracleIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "Target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tabName",
+        "cellAddress",
+        "genericField",
+        "iobClassification"
+      ],
+      "properties": {
+        "tabName": { "type": "string", "minLength": 1 },
+        "cellAddress": {
+          "type": "string",
+          "pattern": "^\\$?[A-Z]{1,3}\\$?[1-9][0-9]{0,6}$"
+        },
+        "genericField": { "type": "string", "minLength": 1 },
+        "iobClassification": { "enum": ["O", "B"] }
+      }
+    },
+    "ResolvedReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "originalText",
+        "normalizedText",
+        "sourceSpan",
+        "referenceKind",
+        "resolvedIdentity",
+        "scenarioId",
+        "target",
+        "provenanceRuleContentSha256Values"
+      ],
+      "properties": {
+        "originalText": { "type": "string", "minLength": 1 },
+        "normalizedText": { "type": "string", "minLength": 1 },
+        "sourceSpan": { "$ref": "#/$defs/SourceSpan" },
+        "referenceKind": {
+          "enum": ["cell", "named-range", "formula", "input", "function"]
+        },
+        "resolvedIdentity": { "type": "string", "minLength": 1 },
+        "scenarioId": { "type": "string", "minLength": 1 },
+        "target": { "type": "object" },
+        "provenanceRuleContentSha256Values": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Sha256" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "CompiledFormula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formulaId",
+        "status",
+        "scenarioId",
+        "target",
+        "sourceFormulaText",
+        "canonicalFormulaText",
+        "dependencies",
+        "resolvedReferences",
+        "provenance"
+      ],
+      "properties": {
+        "formulaId": { "type": "string", "pattern": "^FORMULA-.+$" },
+        "status": { "const": "compiled" },
+        "scenarioId": { "type": "string", "minLength": 1 },
+        "target": { "$ref": "#/$defs/Target" },
+        "sourceFormulaText": { "type": "string", "minLength": 1 },
+        "canonicalFormulaText": { "type": "string", "minLength": 1 },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "resolvedReferences": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ResolvedReference" }
+        },
+        "provenance": { "$ref": "#/$defs/FormulaProvenance" }
+      }
+    },
+    "BlockedFormula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "formulaId",
+        "status",
+        "scenarioId",
+        "target",
+        "sourceFormulaText",
+        "causalFormulaIds",
+        "diagnosticKeys",
+        "provenance"
+      ],
+      "properties": {
+        "formulaId": { "type": "string", "pattern": "^FORMULA-.+$" },
+        "status": { "enum": ["failed", "dependency-blocked", "cycle-blocked"] },
+        "scenarioId": { "type": "string", "minLength": 1 },
+        "target": { "$ref": "#/$defs/Target" },
+        "sourceFormulaText": { "type": "string" },
+        "causalFormulaIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "diagnosticKeys": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Sha256" },
+          "uniqueItems": true
+        },
+        "provenance": { "$ref": "#/$defs/FormulaProvenance" }
+      }
+    },
+    "CompilationDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diagnosticKey",
+        "code",
+        "category",
+        "severity",
+        "blocksDownstream",
+        "formulaId",
+        "scenarioId",
+        "sourceSpan",
+        "message",
+        "context"
+      ],
+      "properties": {
+        "diagnosticKey": { "$ref": "#/$defs/Sha256" },
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]+$" },
+        "category": {
+          "enum": [
+            "contract",
+            "integrity",
+            "provenance",
+            "syntax",
+            "function-policy",
+            "reference",
+            "dependency",
+            "compiler"
+          ]
+        },
+        "severity": {
+          "enum": ["informational", "warning", "error", "critical"]
+        },
+        "blocksDownstream": { "type": "boolean" },
+        "formulaId": { "type": ["string", "null"] },
+        "scenarioId": { "type": ["string", "null"] },
+        "sourceSpan": {
+          "oneOf": [{ "$ref": "#/$defs/SourceSpan" }, { "type": "null" }]
+        },
+        "message": { "type": "string", "minLength": 1 },
+        "context": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        }
+      }
+    },
+    "CompiledFormulaPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceBuildSpec",
+        "compiler",
+        "status",
+        "compiledFormulas",
+        "blockedFormulas",
+        "executionOrder",
+        "diagnostics"
+      ],
+      "properties": {
+        "sourceBuildSpec": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schemaVersion",
+            "buildSpecId",
+            "buildSpecContentSha256",
+            "architectureId",
+            "caseId"
+          ],
+          "properties": {
+            "schemaVersion": { "const": "2.0.0" },
+            "buildSpecId": { "type": "string", "format": "uuid" },
+            "buildSpecContentSha256": { "$ref": "#/$defs/Sha256" },
+            "architectureId": { "type": "string", "format": "uuid" },
+            "caseId": { "type": "string", "format": "uuid" }
+          }
+        },
+        "compiler": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "compilerId",
+            "compilerVersion",
+            "policyId",
+            "policyVersion",
+            "policyContentSha256",
+            "canonicalizationProfile"
+          ],
+          "properties": {
+            "compilerId": { "const": "pbgc-caseworkbench-formula-compiler" },
+            "compilerVersion": { "type": "string", "minLength": 1 },
+            "policyId": { "type": "string", "minLength": 1 },
+            "policyVersion": { "type": "string", "minLength": 1 },
+            "policyContentSha256": { "$ref": "#/$defs/Sha256" },
+            "canonicalizationProfile": {
+              "const": "pbgc-caseworkbench-canonical-json-v1"
+            }
+          }
+        },
+        "status": { "enum": ["complete", "partial", "blocked"] },
+        "compiledFormulas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CompiledFormula" }
+        },
+        "blockedFormulas": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/BlockedFormula" }
+        },
+        "executionOrder": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CompilationDiagnostic" }
+        }
+      }
+    },
+    "OperationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compilationRunId", "generatedAt"],
+      "properties": {
+        "compilationRunId": { "type": "string", "format": "uuid" },
+        "generatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/unresolved-item.schema.json",
+  "title": "Unresolved Item",
+  "description": "First-class record of ambiguous interpretation, conflicting source, missing sequencing, hidden-content flag, or stale/superseded source. Never a hidden default; never collapsed to a single interpretation while open.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["itemId", "kind", "affectedScope", "competingInterpretations", "consequence", "linkedUnresolvedItemIds", "reviewerHuman", "assignee", "openAt", "resolutionHistory", "itemContentSha256", "status"],
+  "properties": {
+    "itemId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+    "kind": { "enum": ["ambiguous-text", "conflicting-provisions", "missing-sequencing", "undefined-term", "hidden-content-flag", "stale-source", "superseded-source", "missing-required-value", "ambiguous-source-role", "other"] },
+    "affectedScope": { "type": "string", "minLength": 1 },
+    "competingInterpretations": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/interpretation" }
+    },
+    "consequence": { "type": "string", "minLength": 1 },
+    "linkedUnresolvedItemIds": { "type": "array", "items": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" } },
+    "reviewerHuman": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/humanActor" }, { "type": "null" }] },
+    "assignee": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/humanActor" }, { "type": "null" }] },
+    "openAt": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/timestamp" },
+    "resolutionHistory": { "type": "array", "items": { "$ref": "#/$defs/resolutionEvent" } },
+    "itemContentSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+    "status": { "enum": ["open", "resolved", "superseded"] }
+  },
+  "if": { "properties": { "status": { "const": "open" } }, "required": ["status"] },
+  "then": { "properties": { "resolutionHistory": { "maxItems": 0 } } },
+  "$defs": {
+    "interpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interpretationId", "statement", "evidence", "sourceCandidateId"],
+      "properties": {
+        "interpretationId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "statement": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "array", "items": { "$ref": "plan-rule-record.schema.json#/$defs/ruleCitation" } },
+        "sourceCandidateId": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] }
+      }
+    },
+    "resolutionEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventId", "appendOrdinal", "priorEventId", "priorEventContentSha256", "decisionType", "resultingStatus", "actor", "decidedAt", "rationale", "consumedAssumptions", "eventContentSha256"],
+      "properties": {
+        "eventId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "appendOrdinal": { "type": "integer", "minimum": 1 },
+        "priorEventId": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" }, { "type": "null" }] },
+        "priorEventContentSha256": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] },
+        "decisionType": { "enum": ["accept", "supersede", "reject", "branch"] },
+        "resultingStatus": { "enum": ["open", "resolved", "superseded"] },
+        "actor": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/humanActor" },
+        "decidedAt": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/timestamp" },
+        "rationale": { "type": "string", "minLength": 1 },
+        "consumedAssumptions": { "type": "array", "items": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" } },
+        "eventContentSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }
+      }
+    }
+  }
+}

@@ -33,7 +33,9 @@ test("profiles a synthetic population locally and records a separate human decis
   await expect(
     population.getByText("Needs investigation", { exact: true }).first(),
   ).toBeVisible();
-  await expect(population.getByText(/generalKey, status, service/u)).toBeVisible();
+  await expect(
+    population.getByText(/generalKey, status, service/u),
+  ).toBeVisible();
   await expect(population.getByText("Awaiting review").first()).toBeVisible();
 
   await population.getByLabel("Reviewer name").fill("population-reviewer");

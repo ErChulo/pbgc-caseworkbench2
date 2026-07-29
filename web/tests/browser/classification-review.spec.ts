@@ -32,16 +32,12 @@ test("reviews classification and relationship proposals with immutable human his
   await expect(
     page.getByRole("heading", { name: "Classification review" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Awaiting review").first(),
-  ).toBeVisible();
+  await expect(page.getByText("Awaiting review").first()).toBeVisible();
 
-  const classification = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Classification review" }) });
-  await classification
-    .getByLabel("Reviewer name")
-    .fill("authorized-reviewer");
+  const classification = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Classification review" }),
+  });
+  await classification.getByLabel("Reviewer name").fill("authorized-reviewer");
   await classification
     .getByLabel("Rationale")
     .fill("Synthetic document category reviewed.");
@@ -70,9 +66,9 @@ test("reviews classification and relationship proposals with immutable human his
   await expect(
     page.getByRole("heading", { name: "Relationship review" }),
   ).toBeVisible();
-  const relationship = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Relationship review" }) });
+  const relationship = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Relationship review" }),
+  });
   await relationship.getByLabel("Reviewer name").fill("relationship-reviewer");
   await relationship
     .getByLabel("Rationale")

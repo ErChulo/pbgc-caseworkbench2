@@ -53,9 +53,9 @@ export function plainStatus(status: string): string {
       return GLOSSARY.revoked.plain;
     case "superseded":
       return GLOSSARY.superseded.plain;
-  case "provisional":
-    return GLOSSARY.proposed.plain;
-  default:
+    case "provisional":
+      return GLOSSARY.proposed.plain;
+    default:
       return status;
   }
 }

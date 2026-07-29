@@ -54,9 +54,9 @@ export function PopulationReview({
         </span>
       </div>
       <p>
-        Detection is suggestion-only. Values remain exactly as observed; missing,
-        blank, malformed, formula text, leading-zero text, and literal zero are
-        not corrected or imputed.
+        Detection is suggestion-only. Values remain exactly as observed;
+        missing, blank, malformed, formula text, leading-zero text, and literal
+        zero are not corrected or imputed.
       </p>
       <div className="shared-reviewer">
         <label htmlFor="population-reviewer">

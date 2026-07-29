@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pbgc-case-workbench.local/schemas/evidence-catalog.schema.json",
+  "title": "Evidence Catalog",
+  "description": "The typed, hash-anchored catalog of every screened-and-released Feature 009 artifact eligible to back a plan-rule candidate. Built by reading Feature 009 reactive inventory; never re-screens, re-hashes, or re-extracts originals.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["catalogId", "caseId", "builtAt", "schemaVersion", "caseEvidence", "referenceOnly", "excludedQuarantined", "catalogContentSha256"],
+  "properties": {
+    "catalogId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+    "caseId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+    "builtAt": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/timestamp" },
+    "schemaVersion": { "const": "1.0.0" },
+    "caseEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceArtifact" } },
+    "referenceOnly": { "type": "array", "items": { "$ref": "#/$defs/evidenceArtifact" } },
+    "excludedQuarantined": { "type": "array", "items": { "$ref": "#/$defs/excludedQuarantinedEntry" } },
+    "catalogContentSha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+    "ruleSetVersion": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "sourceRole": {
+      "type": "string",
+      "enum": ["executed-plan-document", "amendment", "collective-bargaining-agreement", "notice", "actuarial-report", "certified-case-report", "supporting-administrative-report", "approved-historical-calculation-artifact", "regulation", "training-reference", "other"]
+    },
+    "evidenceArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "sha256", "sizeBytes", "locator", "mediaType", "receiptId", "exactDuplicateOfSha256", "containedBySha256", "sourceRole", "reviewStatus", "importedAt"],
+      "properties": {
+        "artifactId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "sha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+        "sizeBytes": { "type": "integer", "minimum": 0 },
+        "locator": { "type": "string", "minLength": 1 },
+        "mediaType": { "type": ["string", "null"] },
+        "receiptId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "exactDuplicateOfSha256": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] },
+        "containedBySha256": { "oneOf": [{ "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" }, { "type": "null" }] },
+        "sourceRole": { "$ref": "#/$defs/sourceRole" },
+        "reviewStatus": { "enum": ["provisional", "released", "stale"] },
+        "importedAt": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/timestamp" }
+      }
+    },
+    "excludedQuarantinedEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "sha256", "quarantineDecisionId", "linkedUnresolvedItemId"],
+      "properties": {
+        "artifactId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "sha256": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/sha256" },
+        "quarantineDecisionId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" },
+        "linkedUnresolvedItemId": { "$ref": "https://pbgc-case-workbench.local/schemas/governed-records.schema.json#/$defs/uuid" }
+      }
+    }
+  }
+}

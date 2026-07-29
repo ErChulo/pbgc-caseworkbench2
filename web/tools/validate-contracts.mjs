@@ -1,9 +1,11 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const sourceDirectory = resolve(
-  "specs/009-case-intake-normalization/contracts",
-);
+const sourceDirectories = [
+  resolve("specs/009-case-intake-normalization/contracts"),
+  resolve("specs/005-v1-build-spec/contracts"),
+  resolve("specs/006-formula-compiler/contracts"),
+];
 const runtimeDirectory = resolve("web/src/contracts/schemas");
 const draft202012 = "https://json-schema.org/draft/2020-12/schema";
 
@@ -13,12 +15,18 @@ async function schemaNames(directory) {
     .sort();
 }
 
-const sourceNames = await schemaNames(sourceDirectory);
+let sourceNames = [];
+for (const directory of sourceDirectories) {
+  const names = await schemaNames(directory);
+  sourceNames.push(...names);
+}
+sourceNames.sort();
+
 const runtimeNames = await schemaNames(runtimeDirectory);
 
-if (sourceNames.length !== 7) {
+if (sourceNames.length !== 9) {
   throw new Error(
-    `Expected seven approved source schemas; found ${sourceNames.length}.`,
+    `Expected nine approved source schemas; found ${sourceNames.length}.`,
   );
 }
 if (JSON.stringify(runtimeNames) !== JSON.stringify(sourceNames)) {
@@ -29,7 +37,24 @@ if (JSON.stringify(runtimeNames) !== JSON.stringify(sourceNames)) {
 
 const schemas = new Map();
 for (const name of sourceNames) {
-  const sourceBytes = await readFile(resolve(sourceDirectory, name));
+  let foundDir = null;
+  for (const dir of sourceDirectories) {
+    try {
+      const files = await readdir(dir);
+      if (files.includes(name)) {
+        foundDir = dir;
+        break;
+      }
+    } catch {
+      // ignore errors reading directory
+    }
+  }
+
+  if (!foundDir) {
+    throw new Error(`Could not find source directory for schema: ${name}`);
+  }
+
+  const sourceBytes = await readFile(resolve(foundDir, name));
   const runtimeBytes = await readFile(resolve(runtimeDirectory, name));
   if (!sourceBytes.equals(runtimeBytes)) {
     throw new Error(`${name} has drifted from its approved source contract.`);
@@ -93,5 +118,5 @@ function visit(value, currentName) {
 for (const [name, schema] of schemas) visit(schema, name);
 
 console.log(
-  "Seven runtime schemas match approved source bytes; all local references resolve offline.",
+  "Nine runtime schemas match approved source bytes; all local references resolve offline.",
 );

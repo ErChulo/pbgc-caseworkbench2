@@ -9,18 +9,12 @@ export interface QuarantineQueueItem {
   readonly displayName: string;
   readonly accountingStatus: "pending-human-disposition";
   readonly provisionalState:
-    | "provisional-quarantine"
-    | "provisional-safety-block"
-    | "rescreen-required";
+    "provisional-quarantine" | "provisional-safety-block" | "rescreen-required";
   readonly findingSummary: string;
   readonly evidenceRequired: string;
   readonly nextAction: string;
   readonly effectiveHumanStatus:
-    | "none"
-    | "released"
-    | "final-quarantine"
-    | "rejected"
-    | "revoked";
+    "none" | "released" | "final-quarantine" | "rejected" | "revoked";
   readonly reviewer: string | null;
   readonly rationale: string | null;
   readonly inheritanceAvailable: boolean;
@@ -105,11 +99,7 @@ export function QuarantineQueue({
   readonly onDecision: (
     item: QuarantineQueueItem,
     action:
-      | "release"
-      | "inherit-release"
-      | "final-quarantine"
-      | "reject"
-      | "revoke",
+      "release" | "inherit-release" | "final-quarantine" | "reject" | "revoke",
     reviewer: string,
     rationale: string,
   ) => Promise<void>;
@@ -124,7 +114,8 @@ export function QuarantineQueue({
 
   const executeDecision = async (
     item: QuarantineQueueItem,
-    action: "release" | "inherit-release" | "final-quarantine" | "reject" | "revoke",
+    action:
+      "release" | "inherit-release" | "final-quarantine" | "reject" | "revoke",
   ): Promise<void> => {
     setBusyHash(item.artifactSha256);
     try {
@@ -164,7 +155,9 @@ export function QuarantineQueue({
           <input
             id="quarantine-reviewer"
             value={sharedReviewer}
-            onChange={(event) => { onReviewerChange(event.currentTarget.value); }}
+            onChange={(event) => {
+              onReviewerChange(event.currentTarget.value);
+            }}
             autoComplete="off"
           />
         </label>
@@ -175,7 +168,9 @@ export function QuarantineQueue({
             value={sharedRationale}
             rows={3}
             placeholder={RATIONALE_PLACEHOLDER}
-            onChange={(event) => { onRationaleChange(event.currentTarget.value); }}
+            onChange={(event) => {
+              onRationaleChange(event.currentTarget.value);
+            }}
             autoComplete="off"
           />
         </label>
@@ -266,14 +261,18 @@ export function QuarantineQueue({
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"
-          onClick={() => { setConfirmAction(null); }}
+          onClick={() => {
+            setConfirmAction(null);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Escape") setConfirmAction(null);
           }}
         >
           <div
             className="confirm-dialog"
-            onClick={(event) => { event.stopPropagation(); }}
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
           >
             <h3 id="confirm-title">Confirm decision</h3>
             <p>{CONFIRM_MESSAGES[confirmAction.action]}</p>
@@ -295,7 +294,9 @@ export function QuarantineQueue({
               <button
                 type="button"
                 className="button button-secondary"
-                onClick={() => { setConfirmAction(null); }}
+                onClick={() => {
+                  setConfirmAction(null);
+                }}
               >
                 Cancel
               </button>

@@ -11,10 +11,18 @@ export function Tooltip({
   return (
     <span
       className="tooltip-wrapper"
-      onMouseEnter={() => { setVisible(true); }}
-      onMouseLeave={() => { setVisible(false); }}
-      onFocus={() => { setVisible(true); }}
-      onBlur={() => { setVisible(false); }}
+      onMouseEnter={() => {
+        setVisible(true);
+      }}
+      onMouseLeave={() => {
+        setVisible(false);
+      }}
+      onFocus={() => {
+        setVisible(true);
+      }}
+      onBlur={() => {
+        setVisible(false);
+      }}
     >
       {children}
       {visible && (
