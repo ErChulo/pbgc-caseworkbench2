@@ -4,17 +4,17 @@
 
 ## Phase 1: Setup and Contracts
 
-- [ ] T001 Verify `web/src/domain/workbook-builder/` and unit-test structure
+- [x] T001 Verify `web/src/domain/workbook-builder/` and unit-test structure
 - [ ] T002 Define workbook schema (structural contract for XLSX)
 - [ ] T003 Verify schema registration in design/runtime validation tools
-- [ ] T004 Add exceljs dependency with determinism evaluation
+- [x] T004 Add exceljs dependency with determinism evaluation
 - [ ] T005 Add workbook schema acceptance and validation tests
 
 ## Phase 2: Core Models and Types
 
-- [ ] T006 Define `V1Workbook`, `WorkbookSheet`, `WorkbookCell` types
-- [ ] T007 Define `SupportSheetContent`, `PopulationDataSource`, `ValidationResult` types
-- [ ] T008 Implement deterministic workbook content hash computation
+- [x] T006 Define `V1Workbook`, `WorkbookSheet`, `WorkbookCell` types
+- [x] T007 Define `SupportSheetContent`, `PopulationDataSource`, `ValidationResult` types
+- [x] T008 Implement deterministic workbook content hash computation
 - [ ] T009 Test model serialization and hashing
 
 ## Phase 3: Support Sheet Generation
@@ -41,17 +41,17 @@
 
 ## Phase 6: Validation Engine
 
-- [ ] T023 Implement BuildSpec validation for workbook generation
-- [ ] T024 Implement population profile validation
-- [ ] T025 Implement data source availability checking
+- [x] T023 Implement BuildSpec validation for workbook generation
+- [x] T024 Implement population profile validation
+- [x] T025 Implement data source availability checking
 - [ ] T026 Implement reference resolution (named ranges, external links)
 - [ ] T027 Implement cycle detection in formula dependencies
-- [ ] T028 Aggregate and deterministically sort all validation errors
+- [x] T028 Aggregate and deterministically sort all validation errors
 - [ ] T029 Test fail-closed validation with multiple error types
 
 ## Phase 7: Workbook Builder Engine
 
-- [ ] T030 Orchestrate BuildSpec authentication, population validation, and generation
+- [x] T030 Orchestrate BuildSpec authentication, population validation, and generation
 - [ ] T031 Implement XLSX serialization with deterministic cell ordering
 - [ ] T032 Implement workbook content hash and metadata injection
 - [ ] T033 Add synthetic governed Feature005-to-Feature007 integration test
@@ -64,6 +64,8 @@
 - [ ] T037 Run focused and full automated test suites
 - [ ] T038 Verify deterministic payload and byte-equivalence
 - [ ] T039 Update Feature 007 documentation and AGENTS.md SPECKIT marker
+
+**Status**: Foundation phase (T001-T008, T023-T030) complete. Core models and validation infrastructure in place. XLSX serialization and support sheet generation pending.
 
 Feature 007 estimated maturity: To be determined post-implementation.
 
