@@ -1,243 +1,68 @@
-# Data Model: V1 Build Specification
+# Data Model: Governed V1 Build Specification
 
-**Feature**: 005 V1 Build Specification
-**Date**: 2026-07-28
-**Authority**: [spec.md](./spec.md) and Constitution 2.0.0
+**Feature**: 005
+**Contract**: BuildSpec `2.0.0`
+**Authority**: Constitution 2.0.0, governed Feature004 architecture, committed Feature006 compiler contract
 
-## Modeling conventions
+## Deterministic and Operational Boundaries
 
-- All UUID fields are immutable UUID strings generated from a cryptographic RNG.
-- SHA-256 values are lowercase 64-character hexadecimal strings.
-- Timestamps are ISO 8601 UTC strings.
-- Status histories are append-only events.
-- Every contract carries `schemaVersion`.
-- PBGC Case Workbench Canonicalization Profile v1 governs deterministic serialization.
+The BuildSpec payload contains stable architecture-derived lineage time, deterministic identities, compiler inputs, validation state, and `buildSpecContentSha256`. The hash excludes its own hash field and `validation.validatedAt`. Export/import actor, tool, and event timestamps are injected operational envelopes and never affect BuildSpec identity.
 
-## Entity relationship overview
+## FormulaGovernanceInput
 
-```text
-BuildSpec 1 ── * FormulaDefinition
-          1 ── * NamedRangeDefinition
-          1 ── * CellMapping
-          1 ── 1 ExecutionOrder
-          1 ── 1 ValidationResult
+| Field | Rule |
+|---|---|
+| `approvedPlanRules` | Explicit supplied `PlanRuleRecord[]`; records must be human approved and unresolved-item free when used |
+| `formulas` | One exact governance entry per observed applicable formula cell/run |
 
-FormulaDefinition * ── 1 CellMapping
-NamedRangeDefinition * ── 1 CellMapping
-```
+Each formula governance entry contains `cellKey`, `scenarioId`, and a gapless hash-bound `FormulaApprovalRecord` decision chain. Every decision binds the exact formula text, target, scenario, I/O/B, complete source rule IDs/hashes, derivation, affected tests, regeneration impact, oracle IDs, human actor, rationale, and timestamp. Approve, revoke, and supersede transitions are replayed; generation requires an effective non-revoked approval. Exactly one source rule is governing and its ID/hash must appear in the architecture run justification.
 
-## 1. BuildSpec
+## BuildSpecV2
 
-The deterministic build specification containing all instructions for workbook generation.
+| Field | Rule |
+|---|---|
+| `schemaVersion` | Exactly `2.0.0` |
+| `buildSpecId` | Deterministic SHA-256-derived UUID |
+| `architectureId`, `architectureContentSha256`, `caseId`, `ruleSetVersion`, `architectureLineage` | Exact re-authenticated architecture record identity, content binding, and complete lineage projection |
+| `generatedAt` | Stable architecture lineage timestamp |
+| `formulas` | Sorted `FormulaDefinitionV2[]` |
+| `namedRanges` | Exact architecture names, targets, and scopes |
+| `cellMappings` | Exact applicable cell/run mappings with deterministic UUIDs |
+| `executionOrder` | Deterministic Kahn result |
+| `validation` | Aggregated, deterministically sorted result |
+| `buildSpecContentSha256` | Canonical deterministic payload hash |
 
-| Field | Type | Rules |
+## FormulaDefinitionV2
+
+Formulas exist only when the architecture observed a nonempty formula and the cell is `O` or `B` for the run. Target tab/cell/field/scenario, formula text, I/O/B, and justification are copied exactly. `formulaKind` is `scalar`. Dependencies contain only formula IDs reached by exact entries in `architecture.formulaDependencies` for the same run.
+
+`FormulaProvenance` preserves each complete authenticated `PlanRuleRecord`, including all citations and applicability evidence, the effective formula approval decision, affected tests, regeneration impact, and independent oracle IDs. It does not reduce material rule provenance to a single citation or supersession pointer.
+
+## NamedRangeDefinition
+
+`rangeName`, `cellAddress`, `tabName`, `scope`, and nullable `genericField` are copied exactly from one architecture named range. `scenarioId` is null because Feature004 names are architecture-level identities. Workbook names are unique case-insensitively; sheet names are unique case-insensitively within their exact sheet. No generated names or suffixes are allowed.
+
+## CellMapping
+
+One mapping exists for every applicable architecture cell/run classification. `mappingId` is a deterministic UUID over architecture hash, run, and cell key. All I/O/B values are preserved.
+
+| I/O/B | `dataSource` | `formulaId` |
 |---|---|---|
-| `schemaVersion` | string | Required; `"1.0.0"` |
-| `buildSpecId` | UUID | Immutable identity |
-| `architectureId` | UUID | Links to V1Architecture |
-| `caseId` | UUID | Case context |
-| `ruleSetVersion` | string | Pins normalization rules |
-| `generatedAt` | timestamp | Operational metadata |
-| `formulas` | FormulaDefinition array | Sorted by formulaId |
-| `namedRanges` | NamedRangeDefinition array | Sorted by rangeName |
-| `cellMappings` | CellMapping array | Sorted by field, then tab |
-| `executionOrder` | ExecutionOrder | Topologically sorted |
-| `validation` | ValidationResult | Generated validation result |
-| `buildSpecContentSha256` | SHA-256 | Hash of canonical payload |
+| `I` | Required exact population source | null |
+| `O` | null | Required observed formula |
+| `B` | Required exact population source | Required observed formula |
+| `N`, `P`, `""` | null | null |
 
-**Invariants**:
-- `formulas.length > 0` when architecture has output fields
-- `namedRanges.length == cellMappings.length`
-- `executionOrder.formulaIds.length == formulas.length`
-- `validation.isValid == true` for exported BuildSpecs
+`CALC_INDICATOR` and `CALCULATION` remain ordinary governed generic-field identities with Feature004-enforced classifications; neither is inferred from I/O/B.
 
-## 2. FormulaDefinition
+## ExecutionOrder
 
-A formula to be compiled for a specific field in a specific scenario.
+`order` is Kahn topological order with codepoint tie-breaking. `maxDepth` is the largest zero-based dependency depth; `levelCount` is zero for no formulas and otherwise `maxDepth + 1`. `cycleNodes` contains only members of cyclic strongly connected components, not downstream blocked formulas. Validation rejects unknown, missing, or duplicate execution IDs and any supplied execution metadata that differs from recomputation.
 
-| Field | Type | Rules |
-|---|---|---|
-| `formulaId` | string | Format: `FORMULA-{tab}-{field}-{scenario}` |
-| `scenarioId` | string | Links to architecture scenario |
-| `tabName` | string | Source tab name |
-| `genericField` | string | Normalized field name |
-| `formulaText` | string | Original formula text from architecture |
-| `cellAddress` | string | Target cell address |
-| `dependencies` | string array | formulaIds of dependencies |
-| `iobClassification` | IoBValue | I, O, B, N, P, or "" |
-| `justification` | string | Classification rationale |
+## Validation
 
-**Invariants**:
-- `formulaId` is unique within the BuildSpec
-- `dependencies` contains only valid formulaIds
-- No circular dependencies in the dependency graph
-- `formulaText` is non-empty for O and B fields
+Errors cover architecture authentication, missing formulas/data sources/governance, duplicate formula/range/mapping identities, provenance, exact mapping mismatches, unsatisfied/external dependencies, cycles, canonical in-grid A1 addresses, and schema failure. Generation returns all available sorted errors and no BuildSpec on failure.
 
-## 3. NamedRangeDefinition
+## Export and Import
 
-A named range mapping a generic field name to a cell address.
-
-| Field | Type | Rules |
-|---|---|---|
-| `rangeName` | string | Generic field name or scenario-qualified |
-| `cellAddress` | string | Absolute cell address |
-| `tabName` | string | Source tab name |
-| `scope` | enum | `workbook` or `sheet` |
-| `genericField` | string | Original generic field name |
-| `scenarioId` | string or null | null for global ranges |
-| `provenance` | object | Source of the mapping |
-
-**Invariants**:
-- `rangeName` is unique within scope
-- `cellAddress` is valid for the target workbook
-- Scenario-qualified names use format `{scenario}_{field}`
-
-## 4. CellMapping
-
-A mapping from a field to its source and processing information.
-
-| Field | Type | Rules |
-|---|---|---|
-| `mappingId` | UUID | Immutable identity |
-| `field` | string | Generic field name |
-| `tabName` | string | Source tab name |
-| `cellAddress` | string | Cell address in workbook |
-| `iobClassification` | IoBValue | I, O, B, N, P, or "" |
-| `dataSource` | DataSourceReference or null | Required for I and B fields |
-| `formulaId` | string or null | Required for O and B fields |
-| `scenarioId` | string | Scenario context |
-
-**Invariants**:
-- `dataSource` is non-null when `iobClassification` is I or B
-- `formulaId` is non-null when `iobClassification` is O or B
-- `dataSource` and `formulaId` are mutually exclusive for I and O fields
-
-### DataSourceReference
-
-| Field | Type | Rules |
-|---|---|---|
-| `sourceType` | enum | `population`, `case-control`, `evidence` |
-| `sourceTab` | string | Source tab name |
-| `sourceField` | string | Field name in source |
-| `evidenceKey` | SHA-256 or null | For evidence sources |
-
-## 5. ExecutionOrder
-
-A topologically sorted list of formula identifiers.
-
-| Field | Type | Rules |
-|---|---|---|
-| `order` | string array | Sorted formulaIds |
-| `levelCount` | number | Number of dependency levels |
-| `maxDepth` | number | Maximum dependency depth |
-| `hasCycles` | boolean | Always false for valid BuildSpecs |
-| `cycleNodes` | string array | Empty for valid BuildSpecs |
-
-**Invariants**:
-- `order.length == formulas.length`
-- For each formula, all dependencies appear earlier in `order`
-- `hasCycles == false` for valid BuildSpecs
-- `cycleNodes` is empty when `hasCycles == false`
-
-## 6. ValidationResult
-
-The result of validating a BuildSpec.
-
-| Field | Type | Rules |
-|---|---|---|
-| `isValid` | boolean | true if no errors |
-| `errors` | ValidationError array | Sorted by code, then field |
-| `warnings` | ValidationWarning array | Sorted by code, then field |
-| `validatedAt` | timestamp | When validation ran |
-
-### ValidationError
-
-| Field | Type | Rules |
-|---|---|---|
-| `code` | string | Error code |
-| `message` | string | Human-readable message |
-| `field` | string or null | Related field name |
-| `formulaId` | string or null | Related formula |
-| `context` | object | Additional error details |
-
-**Error codes**:
-- `MISSING_FORMULA`: Output field lacks formula definition
-- `DUPLICATE_RANGE`: Named range name conflict
-- `UNSATISFIED_DEPENDENCY`: Formula depends on undefined field
-- `CIRCULAR_DEPENDENCY`: Cycle in dependency graph
-- `INVALID_CELL_ADDRESS`: Malformed cell address
-- `MISSING_DATA_SOURCE`: Input field lacks data source
-
-### ValidationWarning
-
-| Field | Type | Rules |
-|---|---|---|
-| `code` | string | Warning code |
-| `message` | string | Human-readable message |
-| `field` | string or null | Related field name |
-| `context` | object | Additional warning details |
-
-**Warning codes**:
-- `UNUSED_RANGE`: Named range not referenced by any formula
-- `DEEP_DEPENDENCY`: Formula has >10 dependency levels
-- `LARGE_FORMULA`: Formula text >1000 characters
-
-## 7. BuildSpec Export Format
-
-The JSON export format for BuildSpec persistence.
-
-| Field | Type | Rules |
-|---|---|---|
-| `buildSpec` | BuildSpec | The complete build specification |
-| `exportMetadata` | ExportMetadata | Operational metadata |
-| `contentSha256` | SHA-256 | Hash of canonical buildSpec payload |
-
-### ExportMetadata
-
-| Field | Type | Rules |
-|---|---|---|
-| `exportedAt` | timestamp | When exported |
-| `exportedBy` | string | Actor identity |
-| `schemaVersion` | string | Export schema version |
-| `toolVersion` | string | Generator version |
-
-## 8. BuildSpec Import Format
-
-The JSON import format for BuildSpec loading.
-
-| Field | Type | Rules |
-|---|---|---|
-| `buildSpec` | BuildSpec | The complete build specification |
-| `importMetadata` | ImportMetadata | Operational metadata |
-| `contentSha256` | SHA-256 | Hash of canonical buildSpec payload |
-
-### ImportMetadata
-
-| Field | Type | Rules |
-|---|---|---|
-| `importedAt` | timestamp | When imported |
-| `importedBy` | string | Actor identity |
-| `sourceHash` | SHA-256 | Hash of source bytes |
-| `verified` | boolean | Hash verification result |
-
-## 9. Status Values
-
-### IoBClassification
-
-- `I` - Input: Read from population data
-- `O` - Output: Calculated result
-- `B` - Both: Input and output
-- `N` - Neither: Intermediate calculation
-- `P` - calculated from another
-- `""` - Unclassified
-
-### DataSourceType
-
-- `population` - From population file
-- `case-control` - From case control parameters
-- `evidence` - From evidence document
-
-### NamedRangeScope
-
-- `workbook` - Visible across all sheets
-- `sheet` - Visible only in source sheet
+`BuildSpecExport` contains the BuildSpec, matching content hash, and separate `ExportMetadata`. Export and import each validate the full schema, independently rerun `validateBuildSpec`, compare embedded validation with recomputation, and verify applicable embedded/envelope hashes. Import returns separate `ImportMetadata` with `verified: true`; any failure returns no trusted BuildSpec.

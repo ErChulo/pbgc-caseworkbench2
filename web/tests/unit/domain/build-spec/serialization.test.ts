@@ -1,164 +1,207 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   computeContentHash,
+  deterministicBuildSpecIdentityPayload,
   exportBuildSpec,
   importBuildSpec,
 } from "../../../../src/domain/build-spec/serialization";
-import type { BuildSpec } from "../../../../src/domain/build-spec/models";
-import type {
-  Sha256,
-  Uuid,
-  UtcTimestamp,
-} from "../../../../src/domain/shared/types";
+import { deterministicUuid } from "../../../../src/domain/build-spec/identity";
+import type { UtcTimestamp } from "../../../../src/domain/shared/types";
+import { buildSpecV2 } from "../../../fixtures/formula-compiler";
 
-function createMockBuildSpec(overrides?: Partial<BuildSpec>): BuildSpec {
-  return {
-    schemaVersion: "1.0.0",
-    buildSpecId: "00000000-0000-1000-8000-000000000001" as Uuid,
-    architectureId: "00000000-0000-1000-8000-000000000002" as Uuid,
-    caseId: "00000000-0000-1000-8000-000000000003" as Uuid,
-    ruleSetVersion: "1.0.0",
-    generatedAt: "2026-07-28T12:00:00Z" as UtcTimestamp,
-    formulas: [],
-    namedRanges: [],
-    cellMappings: [],
-    executionOrder: {
-      order: [],
-      levelCount: 0,
-      maxDepth: 0,
-      hasCycles: false,
-      cycleNodes: [],
-    },
-    validation: {
-      isValid: true,
-      errors: [],
-      warnings: [],
-      validatedAt: "2026-07-28T12:00:00Z" as UtcTimestamp,
-    },
-    buildSpecContentSha256: "a".repeat(64) as Sha256,
-    ...overrides,
-  };
-}
+const exportedAt = "2026-07-29T12:00:00Z" as UtcTimestamp;
+const importedAt = "2026-07-29T12:01:00Z" as UtcTimestamp;
 
-describe("serialization", () => {
-  it("computes deterministic content hash", async () => {
-    const buildSpec = createMockBuildSpec();
-
-    const hash1 = await computeContentHash(buildSpec);
-    const hash2 = await computeContentHash(buildSpec);
-
-    expect(hash1).toBe(hash2);
-    expect(hash1).toHaveLength(64);
-  });
-
-  it("produces different hashes for different build specs", async () => {
-    const spec1 = createMockBuildSpec({
-      buildSpecId: "00000000-0000-1000-8000-000000000001" as Uuid,
-    });
-    const spec2 = createMockBuildSpec({
-      buildSpecId: "00000000-0000-1000-8000-000000000002" as Uuid,
-    });
-
-    const hash1 = await computeContentHash(spec1);
-    const hash2 = await computeContentHash(spec2);
-
-    expect(hash1).not.toBe(hash2);
-  });
-
-  it("exports build spec with metadata", async () => {
-    const buildSpec = createMockBuildSpec();
-
-    const exported = await exportBuildSpec({ buildSpec });
-
-    expect(exported.buildSpec).toBe(buildSpec);
-    expect(exported.exportMetadata.schemaVersion).toBe("1.0.0");
-    expect(exported.exportMetadata.toolVersion).toBe("1.0.0");
-    expect(exported.contentSha256).toHaveLength(64);
-  });
-
-  it("imports build spec with hash verification", async () => {
-    const initial = createMockBuildSpec();
-    const buildSpec = createMockBuildSpec({
-      buildSpecContentSha256: await computeContentHash(initial),
-    });
-
-    const exported = await exportBuildSpec({ buildSpec });
-    const imported = await importBuildSpec(exported);
-
-    expect(imported.ok).toBe(true);
-    if (!imported.ok) throw new Error("Expected a verified import.");
-    expect(imported.value.buildSpec).toBe(exported.buildSpec);
-    expect(imported.value.contentSha256).toBe(exported.contentSha256);
-    expect(imported.value.importMetadata.verified).toBe(true);
-  });
-
-  it("rejects a mismatched embedded build spec hash", async () => {
-    const initial = createMockBuildSpec();
-    const buildSpec = createMockBuildSpec({
-      buildSpecContentSha256: await computeContentHash(initial),
-    });
-    const exported = await exportBuildSpec({ buildSpec });
-    const imported = await importBuildSpec({
-      ...exported,
-      buildSpec: {
-        ...buildSpec,
-        buildSpecContentSha256: "f".repeat(64) as Sha256,
+describe("BuildSpec serialization", () => {
+  it("hashes deterministic content independently of operational metadata", async () => {
+    const buildSpec = await buildSpecV2();
+    expect(await computeContentHash(buildSpec)).toBe(
+      await computeContentHash(buildSpec),
+    );
+    const exported = await exportBuildSpec({
+      buildSpec,
+      operationalMetadata: {
+        exportedAt,
+        exportedBy: "human:test",
+        toolVersion: "2.0.0",
       },
     });
-
-    expect(imported).toMatchObject({
-      ok: false,
-      error: {
-        code: "BUILD_SPEC_HASH_MISMATCH",
-        expected: "f".repeat(64),
-        actual: exported.contentSha256,
-      },
-    });
-    expect(imported).not.toHaveProperty("value.buildSpec");
+    expect(exported.ok && exported.value.contentSha256).toBe(
+      buildSpec.buildSpecContentSha256,
+    );
   });
 
-  it("detects tampered build spec", async () => {
-    const buildSpec = createMockBuildSpec();
-
-    const exported = await exportBuildSpec({ buildSpec });
-
-    const tampered = createMockBuildSpec({
-      buildSpecId: "00000000-0000-1000-8000-000000000099" as Uuid,
+  it("round-trips only schema-valid hash-authenticated v2 payloads", async () => {
+    const buildSpec = await buildSpecV2();
+    const exported = await exportBuildSpec({
+      buildSpec,
+      operationalMetadata: {
+        exportedAt,
+        exportedBy: "human:test",
+        toolVersion: "2.0.0",
+      },
     });
-
-    const imported = await importBuildSpec({
-      ...exported,
-      buildSpec: tampered,
+    if (!exported.ok) throw new Error("Expected export success.");
+    const imported = await importBuildSpec(exported.value, {
+      importedAt,
+      importedBy: "human:test",
     });
+    expect(imported.ok && imported.value.buildSpec).toEqual(buildSpec);
+  });
 
+  it("fails closed on tampering", async () => {
+    const buildSpec = await buildSpecV2();
+    const exported = await exportBuildSpec({
+      buildSpec,
+      operationalMetadata: {
+        exportedAt,
+        exportedBy: "human:test",
+        toolVersion: "2.0.0",
+      },
+    });
+    if (!exported.ok) throw new Error("Expected export success.");
+    const imported = await importBuildSpec(
+      {
+        ...exported.value,
+        buildSpec: { ...buildSpec, ruleSetVersion: "tampered" },
+      },
+      { importedAt, importedBy: "human:test" },
+    );
     expect(imported).toMatchObject({
       ok: false,
       error: { code: "BUILD_SPEC_HASH_MISMATCH" },
     });
-    expect(imported).not.toHaveProperty("value.buildSpec");
   });
 
-  it("fails closed for schema-invalid input", async () => {
-    const buildSpec = createMockBuildSpec();
-    const exported = await exportBuildSpec({ buildSpec });
-    const imported = await importBuildSpec({
-      ...exported,
-      buildSpec: { ...buildSpec, unboundContent: "not hash-bound" },
-    });
-
+  it("rejects semantically tampered payloads even when both hashes are recomputed", async () => {
+    const buildSpec = await buildSpecV2();
+    const tampered = {
+      ...buildSpec,
+      executionOrder: { ...buildSpec.executionOrder, maxDepth: 999 },
+    };
+    const rehashed = {
+      ...tampered,
+      buildSpecContentSha256: await computeContentHash(tampered),
+    };
+    const imported = await importBuildSpec(
+      {
+        buildSpec: rehashed,
+        contentSha256: rehashed.buildSpecContentSha256,
+      },
+      { importedAt, importedBy: "human:test" },
+    );
     expect(imported).toMatchObject({
       ok: false,
       error: { code: "BUILD_SPEC_SCHEMA_INVALID" },
     });
-    expect(imported).not.toHaveProperty("value.buildSpec");
   });
 
-  it("produces canonical JSON", async () => {
-    const buildSpec = createMockBuildSpec();
+  it("rejects forged embedded validation even when rehashed", async () => {
+    const buildSpec = await buildSpecV2();
+    const tampered = {
+      ...buildSpec,
+      validation: {
+        ...buildSpec.validation,
+        warnings: [
+          {
+            code: "LARGE_FORMULA" as const,
+            message: "forged",
+            field: null,
+            context: {},
+          },
+        ],
+      },
+    };
+    const rehashed = {
+      ...tampered,
+      buildSpecContentSha256: await computeContentHash(tampered),
+    };
+    expect(
+      await importBuildSpec(
+        { buildSpec: rehashed, contentSha256: rehashed.buildSpecContentSha256 },
+        { importedAt, importedBy: "human:test" },
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "BUILD_SPEC_SCHEMA_INVALID" },
+    });
+    expect(
+      await exportBuildSpec({
+        buildSpec: rehashed,
+        operationalMetadata: {
+          exportedAt,
+          exportedBy: "human:test",
+          toolVersion: "2.0.0",
+        },
+      }),
+    ).toMatchObject({
+      ok: false,
+      error: { code: "BUILD_SPEC_SCHEMA_INVALID" },
+    });
+  });
 
-    const hash1 = await computeContentHash(buildSpec);
-    const hash2 = await computeContentHash(buildSpec);
+  it("canonicalizes semantically set-like governance collections", async () => {
+    const buildSpec = await buildSpecV2();
+    const reordered = {
+      ...buildSpec,
+      formulas: [...buildSpec.formulas].reverse().map((formula) => ({
+        ...formula,
+        provenance: {
+          ...formula.provenance,
+          sourcePlanRules: [...formula.provenance.sourcePlanRules].reverse(),
+          affectedTestIds: [...formula.provenance.affectedTestIds].reverse(),
+          validationOracleIds: [
+            ...formula.provenance.validationOracleIds,
+          ].reverse(),
+        },
+      })),
+      cellMappings: [...buildSpec.cellMappings].reverse(),
+      namedRanges: [...buildSpec.namedRanges].reverse(),
+    };
+    expect(await computeContentHash(reordered)).toBe(
+      buildSpec.buildSpecContentSha256,
+    );
+    const identityInput = ({
+      buildSpecId: ignoredBuildSpecId,
+      validation: ignoredValidation,
+      buildSpecContentSha256: ignoredHash,
+      ...value
+    }: typeof buildSpec) => {
+      void ignoredBuildSpecId;
+      void ignoredValidation;
+      void ignoredHash;
+      return deterministicBuildSpecIdentityPayload(value);
+    };
+    expect(
+      await deterministicUuid("BuildSpecV2", identityInput(reordered)),
+    ).toBe(await deterministicUuid("BuildSpecV2", identityInput(buildSpec)));
+  });
 
-    expect(hash1).toBe(hash2);
+  it("binds deterministic identity and content hash to architecture identity and content", async () => {
+    const buildSpec = await buildSpecV2();
+    const changed = {
+      ...buildSpec,
+      architectureContentSha256: "f".repeat(
+        64,
+      ) as typeof buildSpec.architectureContentSha256,
+    };
+    expect(await computeContentHash(changed)).not.toBe(
+      buildSpec.buildSpecContentSha256,
+    );
+  });
+
+  it("rejects v1 and schema-invalid payloads before trust", async () => {
+    const buildSpec = await buildSpecV2();
+    const imported = await importBuildSpec(
+      {
+        buildSpec: { ...buildSpec, schemaVersion: "1.0.0" },
+        contentSha256: buildSpec.buildSpecContentSha256,
+      },
+      { importedAt, importedBy: "human:test" },
+    );
+    expect(imported).toMatchObject({
+      ok: false,
+      error: { code: "BUILD_SPEC_SCHEMA_INVALID" },
+    });
   });
 });

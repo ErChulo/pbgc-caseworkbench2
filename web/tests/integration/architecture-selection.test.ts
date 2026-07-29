@@ -376,7 +376,7 @@ describe("Feature 004 architecture selection integration", () => {
   });
 });
 
-async function approvedFixture(
+export async function approvedFixture(
   scenarioRules: readonly ScenarioSelectionRule[] = defaultScenarioRules(),
 ) {
   const catalog = await evidenceCatalog();

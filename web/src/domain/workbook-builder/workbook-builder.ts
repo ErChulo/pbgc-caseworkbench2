@@ -7,6 +7,7 @@ import type {
   SummarySheetData,
   TablesSheetData,
   UDTableSheetData,
+  WorkbookGenerationError,
 } from "./models";
 import {
   validateBuildSpec,
@@ -17,12 +18,15 @@ import {
 
 export async function buildWorkbook(
   input: WorkbookGenerationInput,
-): Promise<{ ok: true; workbook: V1Workbook } | { ok: false; errors: any[] }> {
+): Promise<
+  | { ok: true; workbook: V1Workbook }
+  | { ok: false; errors: readonly WorkbookGenerationError[] }
+> {
   const validationBuildSpec = validateBuildSpec(input.buildSpec);
   const validationPopulation = validatePopulationProfile(
     input.populationProfile,
   );
-  const validationDataSources = validateDataSources(input.buildSpec, "unknown");
+  const validationDataSources = validateDataSources(input.buildSpec);
 
   const validation = aggregateValidationResults(
     validationBuildSpec,
@@ -36,12 +40,22 @@ export async function buildWorkbook(
 
   const zeroHashParsed = parseSha256("0".repeat(64));
   if (!zeroHashParsed.ok) {
-    return { ok: false, errors: [{ code: "HASH_FAILED", message: "Failed to parse zero hash", affectedCells: [], severity: "error" }] };
+    return {
+      ok: false,
+      errors: [
+        {
+          code: "HASH_FAILED",
+          message: "Failed to parse zero hash",
+          affectedCells: [],
+          severity: "error",
+        },
+      ],
+    };
   }
   const zeroHash = zeroHashParsed.value;
 
   const summarySheet = generateSummarySheet(input, zeroHash);
-  const tablesSheet = generateTablesSheet(input);
+  const tablesSheet = generateTablesSheet();
   const udTableSheet = generateUDTableSheet(input);
 
   const supportContent = {
@@ -50,9 +64,8 @@ export async function buildWorkbook(
     udTableSheet,
   };
 
-  const populationProfileContentSha256 = input.populationProfile.effectiveWorkbookProfileContentSha256
-    ? input.populationProfile.effectiveWorkbookProfileContentSha256
-    : zeroHash;
+  const populationProfileContentSha256 =
+    input.populationProfile.effectiveWorkbookProfileContentSha256 ?? zeroHash;
 
   const workbookId = await deterministicUuid("V1Workbook", {
     buildSpecId: input.buildSpec.buildSpecId,
@@ -83,7 +96,12 @@ export async function buildWorkbook(
   const hash = await computeWorkbookContentHash(workbook);
   const parsedHash = parseSha256(hash);
   if (!parsedHash.ok) {
-    return { ok: false, errors: [{ code: "HASH_FAILED", message: hash }] };
+    return {
+      ok: false,
+      errors: [
+        { code: "HASH_FAILED", message: hash, affectedCells: [], severity: "error" },
+      ],
+    };
   }
 
   return {
@@ -92,7 +110,10 @@ export async function buildWorkbook(
   };
 }
 
-function generateSummarySheet(input: WorkbookGenerationInput, zeroHash: Sha256): SummarySheetData {
+function generateSummarySheet(
+  input: WorkbookGenerationInput,
+  zeroHash: Sha256,
+): SummarySheetData {
   return {
     caseId: input.buildSpec.caseId,
     architectureId: input.buildSpec.architectureId,
@@ -109,7 +130,7 @@ function generateSummarySheet(input: WorkbookGenerationInput, zeroHash: Sha256):
   };
 }
 
-function generateTablesSheet(input: WorkbookGenerationInput): TablesSheetData {
+function generateTablesSheet(): TablesSheetData {
   return {
     rules: [],
   };
@@ -138,7 +159,8 @@ function generateUDTableSheet(
 }
 
 async function computeWorkbookContentHash(workbook: V1Workbook): Promise<string> {
-  const { workbookContentSha256: _, ...content } = workbook;
+  const { workbookContentSha256: omitted, ...content } = workbook;
+  void omitted;
   return hashTyped(
     { workbook: content },
     { typeName: "V1WorkbookContent" },

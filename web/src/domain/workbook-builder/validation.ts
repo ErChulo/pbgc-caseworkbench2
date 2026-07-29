@@ -20,7 +20,7 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     });
   }
 
-  if (!buildSpec.formulas || buildSpec.formulas.length === 0) {
+  if (buildSpec.formulas.length === 0) {
     warnings.push({
       code: "NO_FORMULAS",
       message: "BuildSpec contains no formulas",
@@ -29,7 +29,7 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     });
   }
 
-  if (!buildSpec.namedRanges || buildSpec.namedRanges.length === 0) {
+  if (buildSpec.namedRanges.length === 0) {
     warnings.push({
       code: "NO_NAMED_RANGES",
       message: "BuildSpec contains no named ranges",
@@ -38,7 +38,7 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     });
   }
 
-  if (!buildSpec.cellMappings || buildSpec.cellMappings.length === 0) {
+  if (buildSpec.cellMappings.length === 0) {
     warnings.push({
       code: "NO_CELL_MAPPINGS",
       message: "BuildSpec contains no cell mappings",
@@ -47,15 +47,15 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     });
   }
 
-  if (!buildSpec.validation || buildSpec.validation.errors.length > 0) {
+  if (buildSpec.validation.errors.length > 0) {
     errors.push({
       code: "BUILD_SPEC_INVALID",
       message: "BuildSpec failed internal validation",
       affectedCells: [],
       severity: "error",
-      detail: buildSpec.validation?.errors
-        .map((e) => `${e.code}: ${e.message}`)
-        .join("; "),
+      detail: buildSpec.validation.errors
+            .map((e) => `${e.code}: ${e.message}`)
+            .join("; "),
     });
   }
 
@@ -94,16 +94,9 @@ export function validatePopulationProfile(
   return { errors, warnings };
 }
 
-export function validateDataSources(
-  buildSpec: BuildSpecV2,
-  populationSensitivity: string,
-): ValidationState {
+export function validateDataSources(buildSpec: BuildSpecV2): ValidationState {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
-
-  if (!buildSpec.cellMappings) {
-    return { errors, warnings };
-  }
 
   const inputMappings = buildSpec.cellMappings.filter(
     (m) => m.iobClassification === "I" || m.iobClassification === "B",

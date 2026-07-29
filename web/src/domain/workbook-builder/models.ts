@@ -1,5 +1,5 @@
 import type { Uuid, Sha256, UtcTimestamp } from "../shared/types";
-import type { BuildSpecV2, FormulaDefinitionV2, NamedRangeDefinition, CellMapping } from "../build-spec/models";
+import type { BuildSpecV2, NamedRangeDefinition, CellMapping } from "../build-spec/models";
 import type { PopulationDecisionProjection } from "../population/population-profile";
 
 export interface WorkbookGenerationInput {
