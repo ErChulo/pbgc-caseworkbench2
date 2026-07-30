@@ -7,13 +7,9 @@ import type {
 } from "./models";
 
 export interface ValidationEvidenceMetadata {
-  readonly validatorVersion: string;
   readonly validatedAt: string;
-  readonly validator: string;
-  readonly workbookContentSha256: Sha256;
-  readonly buildSpecContentSha256: Sha256;
-  readonly architectureContentSha256: Sha256;
-  readonly populationProfileContentSha256: Sha256;
+  readonly validationType: ValidationResult["validationType"];
+  readonly validationId: Sha256;
 }
 
 export interface ReconciliationEvidenceMetadata {
@@ -31,19 +27,13 @@ export async function generateValidationEvidence(
 ): Promise<{ readonly evidence: string; readonly hash: Sha256 }> {
   const evidence = {
     validationId: result.validationId,
+    validationType: result.validationType,
     status: result.status,
     validatedAt: result.validatedAt,
-    validator: result.validator,
     errorCount: result.errors.length,
     warningCount: result.warnings.length,
     errors: sortFindingsByCode(result.errors),
     warnings: sortFindingsByCode(result.warnings),
-    metadata: {
-      workbookContentSha256: result.workbookContentSha256,
-      buildSpecContentSha256: result.buildSpecContentSha256,
-      architectureContentSha256: result.architectureContentSha256,
-      populationProfileContentSha256: result.populationProfileContentSha256,
-    },
   };
 
   const hash = (await hashTyped(evidence, {
@@ -105,9 +95,9 @@ export function recordHumanReview(
 export function generateValidationSummary(result: ValidationResult): string {
   const lines: string[] = [
     `Validation ID: ${result.validationId}`,
+    `Type: ${result.validationType}`,
     `Status: ${result.status}`,
     `Validated at: ${result.validatedAt}`,
-    `Validator: ${result.validator}`,
     "",
     `Errors: ${String(result.errors.length)}`,
     `Warnings: ${String(result.warnings.length)}`,

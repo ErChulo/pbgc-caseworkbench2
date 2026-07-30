@@ -60,12 +60,15 @@ export async function validateWorkbook(
 
   const sortedErrors = [...errors].sort(compareFinding);
   const sortedWarnings = [...warnings].sort(compareFinding);
+
+  const affectedComponentIds: string[] = [];
+  for (const err of sortedErrors) {
+    affectedComponentIds.push(...err.affectedCells);
+    affectedComponentIds.push(...err.affectedNames);
+  }
+
   const deterministicPayload = {
-    workbookContentSha256: workbook.workbookContentSha256,
-    buildSpecContentSha256: workbook.buildSpecContentSha256,
-    architectureContentSha256: workbook.architectureContentSha256,
-    populationProfileContentSha256: workbook.populationProfileContentSha256,
-    validator: `pbgc-workbook-validator/${input.validatorVersion}`,
+    validationType: "workbook" as const,
     status:
       sortedErrors.length > 0
         ? "invalid"
@@ -74,8 +77,10 @@ export async function validateWorkbook(
           : "valid",
     errors: sortedErrors,
     warnings: sortedWarnings,
-    reconciliationStatus: "pending" as const,
+    affectedComponentIds: [...new Set(affectedComponentIds)].sort(),
+    schemaVersion: "1.0.0" as const,
   } as const;
+
   const validationContentSha256 = (await hashTyped(deterministicPayload, {
     typeName: "WorkbookValidationResult",
   })) as Sha256;

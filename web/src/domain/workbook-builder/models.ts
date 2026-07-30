@@ -1,6 +1,10 @@
 import type { Uuid, Sha256, UtcTimestamp } from "../shared/types";
 import type { BuildSpecV2, NamedRangeDefinition, CellMapping } from "../build-spec/models";
 import type { PopulationDecisionProjection } from "../population/population-profile";
+import type {
+  ValidationError,
+  ValidationWarning,
+} from "../shared/validation-result";
 
 export interface WorkbookGenerationInput {
   readonly buildSpec: BuildSpecV2;
@@ -117,23 +121,6 @@ export interface WorkbookValidationResult {
   readonly errors: readonly ValidationError[];
   readonly warnings: readonly ValidationWarning[];
   readonly workbookContentSha256: Sha256 | null;
-}
-
-export interface ValidationError {
-  readonly code: string;
-  readonly message: string;
-  readonly affectedCells: readonly string[];
-  readonly severity: "error";
-  readonly detail?: string;
-  readonly remediation?: string;
-}
-
-export interface ValidationWarning {
-  readonly code: string;
-  readonly message: string;
-  readonly affectedCells: readonly string[] | null;
-  readonly severity: "warning";
-  readonly detail?: string;
 }
 
 export type WorkbookGenerationError = ValidationError;

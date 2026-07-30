@@ -1,6 +1,9 @@
 import type { BuildSpecV2 } from "../build-spec/models";
 import type { PopulationDecisionProjection } from "../population/population-profile";
-import type { ValidationError, ValidationWarning } from "./models";
+import type {
+  ValidationError,
+  ValidationWarning,
+} from "../shared/validation-result";
 
 export interface ValidationState {
   readonly errors: ValidationError[];
@@ -16,7 +19,10 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
       code: "MISSING_BUILD_SPEC_ID",
       message: "BuildSpec must have a valid ID",
       affectedCells: [],
+      affectedNames: [],
       severity: "error",
+      detail: "BuildSpec identifier is required for deterministic lineage.",
+      remediation: "Regenerate the BuildSpec with a valid deterministic ID.",
     });
   }
 
@@ -24,8 +30,9 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     warnings.push({
       code: "NO_FORMULAS",
       message: "BuildSpec contains no formulas",
-      affectedCells: null,
+      affectedCells: [],
       severity: "warning",
+      detail: "A BuildSpec without formulas may be incomplete for workbook generation.",
     });
   }
 
@@ -33,8 +40,9 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     warnings.push({
       code: "NO_NAMED_RANGES",
       message: "BuildSpec contains no named ranges",
-      affectedCells: null,
+      affectedCells: [],
       severity: "warning",
+      detail: "Named ranges are expected for workbook interoperability and traceability.",
     });
   }
 
@@ -42,8 +50,9 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
     warnings.push({
       code: "NO_CELL_MAPPINGS",
       message: "BuildSpec contains no cell mappings",
-      affectedCells: null,
+      affectedCells: [],
       severity: "warning",
+      detail: "Cell mappings are expected to connect formulas and population inputs.",
     });
   }
 
@@ -52,10 +61,10 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
       code: "BUILD_SPEC_INVALID",
       message: "BuildSpec failed internal validation",
       affectedCells: [],
+      affectedNames: [],
       severity: "error",
-      detail: buildSpec.validation.errors
-            .map((e) => `${e.code}: ${e.message}`)
-            .join("; "),
+      detail: buildSpec.validation.errors.map((e) => `${e.code}: ${e.message}`).join("; "),
+      remediation: "Resolve BuildSpec validation issues before workbook generation.",
     });
   }
 
@@ -78,7 +87,10 @@ export function validatePopulationProfile(
       code: "POPULATION_UNAPPROVED",
       message: "Population profile must have an approved decision",
       affectedCells: [],
+      affectedNames: [],
       severity: "error",
+      detail: "Workbook generation requires a governed population decision status.",
+      remediation: "Approve, reject, revoke, or supersede the population profile explicitly.",
     });
   }
 
@@ -87,7 +99,10 @@ export function validatePopulationProfile(
       code: "MISSING_POPULATION_DECISION",
       message: "Population profile must have an effective decision",
       affectedCells: [],
+      affectedNames: [],
       severity: "error",
+      detail: "Effective population decision ID is required for workbook lineage.",
+      remediation: "Record an effective population decision before generating the workbook.",
     });
   }
 
@@ -108,7 +123,10 @@ export function validateDataSources(buildSpec: BuildSpecV2): ValidationState {
         code: "MISSING_DATA_SOURCE",
         message: `Cell ${mapping.cellAddress} requires a population data source`,
         affectedCells: [mapping.cellAddress],
+        affectedNames: [],
         severity: "error",
+        detail: "Input or biflow cells require an explicit governed data source.",
+        remediation: "Add a population data source to the BuildSpec cell mapping.",
       });
     }
   }

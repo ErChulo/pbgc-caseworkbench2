@@ -1,38 +1,12 @@
 import type { Sha256, UtcTimestamp } from "../shared/types";
 import type { V1Workbook } from "../workbook-builder/models";
+import type {
+  ValidationResult,
+  ValidationError,
+  ValidationWarning,
+} from "../shared/validation-result";
 
-export interface ValidationResult {
-  readonly validationId: string;
-  readonly workbookContentSha256: Sha256;
-  readonly buildSpecContentSha256: Sha256;
-  readonly architectureContentSha256: Sha256;
-  readonly populationProfileContentSha256: Sha256;
-  readonly validatedAt: UtcTimestamp;
-  readonly validator: string;
-  readonly status: "valid" | "invalid" | "warnings";
-  readonly errors: readonly ValidationError[];
-  readonly warnings: readonly ValidationWarning[];
-  readonly reconciliationStatus: "pending" | "reconciled" | "failed";
-  readonly validationContentSha256: Sha256;
-}
-
-export interface ValidationError {
-  readonly code: string;
-  readonly severity: "error";
-  readonly affectedCells: readonly string[];
-  readonly affectedNames: readonly string[];
-  readonly message: string;
-  readonly detail: string;
-  readonly remediation: string;
-}
-
-export interface ValidationWarning {
-  readonly code: string;
-  readonly severity: "warning";
-  readonly affectedCells: readonly string[];
-  readonly message: string;
-  readonly detail: string;
-}
+export type { ValidationResult, ValidationError, ValidationWarning };
 
 export interface ReconciliationOracle {
   readonly oracleId: string;
@@ -84,11 +58,14 @@ export interface ReconciliationMismatch {
 export interface ReconciliationResult {
   readonly reconciliationId: string;
   readonly workbookContentSha256: Sha256;
-  readonly validationId: string;
+  readonly validationId: Sha256;
   readonly oracleId: string;
   readonly oracleExecutedAt: UtcTimestamp;
   readonly reconciliationStatus:
-    "complete" | "mismatches" | "oracle-unavailable" | "oracle-error";
+    | "complete"
+    | "mismatches"
+    | "oracle-unavailable"
+    | "oracle-error";
   readonly mismatches: readonly ReconciliationMismatch[];
   readonly tolerance: ToleranceProfile;
   readonly matchCount: number;

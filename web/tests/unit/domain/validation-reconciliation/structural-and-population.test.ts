@@ -65,17 +65,17 @@ describe("structural validation", () => {
     expect(validated1.validationId).toBe(validated2.validationId);
   });
 
-  it("includes all validation components in result", async () => {
+  it("includes all canonical validation components in result", async () => {
     const workbook = await fixtureWorkbook();
     const validated = await validateWorkbook({
       workbook,
       validatorVersion: "1.0.0",
       validatedAt: workbook.generatedAt,
     });
-    expect(validated.workbookContentSha256).toBeDefined();
-    expect(validated.buildSpecContentSha256).toBeDefined();
-    expect(validated.architectureContentSha256).toBeDefined();
-    expect(validated.populationProfileContentSha256).toBeDefined();
+    expect(validated.validationType).toBe("workbook");
+    expect(validated.affectedComponentIds).toBeDefined();
+    expect(validated.schemaVersion).toBe("1.0.0");
+    expect(validated.validationContentSha256).toBeDefined();
   });
 });
 

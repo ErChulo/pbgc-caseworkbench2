@@ -47,7 +47,10 @@ export async function buildWorkbook(
           code: "HASH_FAILED",
           message: "Failed to parse zero hash",
           affectedCells: [],
+          affectedNames: [],
           severity: "error",
+          detail: "Failed to parse deterministic zero hash placeholder.",
+          remediation: "Verify shared hash parsing utilities and retry workbook generation.",
         },
       ],
     };
@@ -99,7 +102,15 @@ export async function buildWorkbook(
     return {
       ok: false,
       errors: [
-        { code: "HASH_FAILED", message: hash, affectedCells: [], severity: "error" },
+        {
+          code: "HASH_FAILED",
+          message: hash,
+          affectedCells: [],
+          affectedNames: [],
+          severity: "error",
+          detail: "Workbook content hash parsing failed.",
+          remediation: "Verify workbook serialization output and shared hash parsing.",
+        },
       ],
     };
   }
