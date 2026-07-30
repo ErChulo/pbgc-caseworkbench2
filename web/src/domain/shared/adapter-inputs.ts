@@ -16,7 +16,7 @@ export interface WorkbookBuilderInput {
     readonly mappingId: string;
     readonly cellAddress: string;
     readonly iobClassification: string;
-    readonly dataSource: unknown | null;
+    readonly dataSource: unknown;
     readonly formulaId: string | null;
   }[];
 }
