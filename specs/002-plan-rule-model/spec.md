@@ -1,79 +1,181 @@
-# Feature Specification: Plan Rule Model
+# Feature Specification: Plan-Rule Model
 
-**Feature Branch**: `002-plan-rule-model`
-**Created**: 2026-07-18
-**Last governed update**: 2026-07-29
-**Status**: Implemented; documentation in progress
+**Feature Branch**: `002-plan-rule-model`  
+**Created**: 2026-07-30  
+**Status**: Specification in progress  
+**Version**: 1.0.0
 
 ## Purpose
 
-Transform evidence ingestion candidates into an effective-dated, traceable plan-rule model. Rules preserve source citations, effective dates, supersession history, applicability conditions, and human governance. The model serves as the authoritative foundation for architecture selection and formula governance.
+Ingest, author, govern, and apply plan-specific actuarial rules with full provenance tracking. Rules are versioned, superseded, and effective-dated. Every rule retains its source document, approval authority, and audit trail per Constitution §4 and §8.
 
 ## User Stories
 
-### US1 - Author governed plan rules (P1)
+### US1 - Ingest plan rules from authoritative sources (P1)
 
-Given evidence candidates and human approval, generate a deterministic `PlanRuleRecord` with complete provenance, effective-date history, supersession relationships, and applicability conditions.
-
-Acceptance:
-
-1. Every rule has primary and supporting citations traceable to evidence artifacts.
-2. Effective date, end date, and adoption/execution dates are validated ISO dates.
-3. Supersession chains preserve predecessor relationships, effective dates, and link types.
-4. Applicability conditions document participant groups, benefit purposes, service definitions, actuarial-equivalence purposes, freezes, and restrictions.
-5. Authority overrides are resolved and recorded when evidence requires them.
-6. Human approval status, reviewer, and rationale are recorded.
-
-### US2 - Validate rule governance (P1)
-
-Generation rejects incomplete rules, unresolved items, missing applicability, invalid citations, and stale or unauthorized evidence.
+Plan administrators ingest rules from executed plan documents, legal determinations, or policy decisions. Rules are recorded with precise source citations (document, locator, effective date).
 
 Acceptance:
+1. Rules can be ingested from JSON/structured format
+2. Each rule captures: statement, effective date, end date (optional), applicability condition, primary citation
+3. Source citations include: source type, document locator, citation date
+4. Rules are immutable once recorded
 
-1. Rules must have exactly one primary citation backed by a proposed candidate.
-2. All linked unresolved items must be resolved or explicitly approved.
-3. Authority overrides are authenticated against case-specific policies.
-4. Evidence catalog integrity is validated.
-5. Rule content hash is deterministically computed and verified on import.
+### US2 - Author and approve new rules (P1)
 
-### US3 - Track supersession and applicability (P1)
-
-Rules maintain complete effective-dated history and applicability conditions without collapsing historical provisions.
+Authorized plan administrators can draft new rules, submit for approval, and record approval decisions with rationale and supporting evidence.
 
 Acceptance:
+1. Rules can be authored via API with all required fields
+2. Rules exist in "draft" state until approved
+3. Approver records: approval authority, timestamp, rationale, evidence links
+4. Single designated approver per case (configurable by case)
+5. Approval creates immutable record with approver identity
 
-1. Supersession chains record initial, amendment, re-authoring, repeal, and reinstate transitions.
-2. Each rule may have an optional effective end date.
-3. Applicability conditions distinguish participant groups, benefit purposes, service definitions, actuarial-equivalence purposes, freezes, and restrictions.
-4. Identical rule names in different time periods or participant groups remain distinct.
+### US3 - Version and supersede rules (P1)
+
+When a rule changes, a new version is created. Old versions are marked superseded. Effective-date transitions are traceable.
+
+Acceptance:
+1. Each rule has semantic version (major.minor.patch)
+2. Supersession links connect old → new version
+3. Rules can be queried by effective date
+4. Historical rule versions are preserved for audit
+
+### US4 - Query rules by applicability (P1)
+
+Given a participant classification, return all rules that apply. Support date-based queries (rules effective on date X).
+
+Acceptance:
+1. `rulesEffectiveOn(date)` returns rules in effect on that date
+2. `rulesApplicableTo(classification)` returns rules matching classification
+3. Queries return deterministic, sorted results
+4. Queries are computationally lightweight
+
+### US5 - Record audit trail and governance decisions (P2)
+
+All rule changes, approvals, and effective-date transitions are recorded with actor, timestamp, and rationale.
+
+Acceptance:
+1. Audit log captures: action (created, approved, superseded), actor, timestamp, rationale
+2. Audit log is immutable and complete
+3. Audit log supports queries: auditLog(ruleId) returns all events for rule
+
+### US6 - Validate rule applicability against population (P2)
+
+Before workbook generation, verify that all applicable rules are included and no rules are orphaned.
+
+Acceptance:
+1. Population classification matches rule applicability conditions
+2. No participant has zero applicable rules (unless explicitly exempted)
+3. Validation produces clear error messages for mismatches
 
 ## Functional Requirements
 
-- **FR-001** Deterministically author `PlanRuleRecord` from evidence candidates with complete provenance.
-- **FR-002** Preserve primary and supporting citations with artifact hash, locator, source role, and provision identifier.
-- **FR-003** Validate and record effective date, end date, and adoption/execution date as ISO dates.
-- **FR-004** Build supersession chains preserving predecessor ID/hash, effective date, and link type.
-- **FR-005** Enforce exactly one released primary citation.
-- **FR-006** Record human reviewer, approval status, and approval rationale.
-- **FR-007** Authenticate authority overrides and record override ID when required.
-- **FR-008** Validate rule against unresolved items; reject if linked items are unresolved.
-- **FR-009** Compute deterministic SHA-256 rule content hash.
-- **FR-010** Document applicability conditions with dimension, value, and evidence citations.
-- **FR-011** Reject rules with missing applicability dimensions or empty affected scope.
-- **FR-012** Record rule set version and schema version.
+- **FR-001** Ingest rules from structured sources with complete provenance
+- **FR-002** Support rule authoring with draft/approval workflow
+- **FR-003** Enforce single designated approver per case
+- **FR-004** Track rule supersession and effective-date transitions
+- **FR-005** Preserve immutable audit trail for all rule actions
+- **FR-006** Support deterministic queries by effective date and applicability
+- **FR-007** Validate rule completeness for population classifications
+- **FR-008** Prevent orphaned rules and unclassified participants
+- **FR-009** Record approval authority, timestamp, and rationale
+- **FR-010** Support rule versioning (semantic) with version history
 
 ## Success Criteria
 
-- `PlanRuleRecord` implements all required fields and validates deterministically.
-- Rules are accepted by Feature 004 (V1 Architecture Selector) for scenario/run justification.
-- Supersession relationships are preserved without history collapse.
-- Unit, integration, and governed-fixture tests pass.
-- All rules are human-approved with complete governance records.
+- Rules are authored, approved, and versioned with full governance
+- Rule changes are traceable to approver and evidence
+- Population applicability is validated deterministically
+- Audit trail is complete and immutable
+- Rules integrate with Feature 003 (Population Profile) and Feature 005 (BuildSpec)
 
 ## Out of Scope
 
-- UI for rule authoring (Feature 009 covers case intake)
-- Candidate extraction (Feature 001)
-- Architecture selection (Feature 004)
-- Workbook generation
-- External policy services
+- Interactive rule editor UI
+- Bulk rule import from Excel
+- Rule conflict resolution
+- Historical rule simulation (applying old rules to current population)
+- Multi-approver workflows
+
+## Data Model
+
+### PlanRule
+
+```typescript
+interface PlanRule {
+  readonly ruleId: Uuid
+  readonly statement: string
+  readonly effectiveDate: string (YYYY-MM-DD)
+  readonly endDate?: string (YYYY-MM-DD, optional)
+  readonly applicability: string
+  readonly primaryCitation: Citation
+}
+```
+
+### Citation
+
+```typescript
+interface Citation {
+  readonly sourceType: "plan-document" | "legal-opinion" | "board-decision" | "policy"
+  readonly locator: string
+  readonly date: string
+  readonly url?: string
+}
+```
+
+### RuleVersion
+
+```typescript
+interface RuleVersion {
+  readonly ruleId: Uuid
+  readonly version: string (semantic)
+  readonly createdAt: UtcTimestamp
+  readonly createdBy: UserId
+  readonly statement: string
+  readonly supersedes?: RuleVersionId
+  readonly supersededBy?: RuleVersionId
+  readonly approvalDecision?: ApprovalDecision
+}
+```
+
+### ApprovalDecision
+
+```typescript
+interface ApprovalDecision {
+  readonly ruleVersionId: RuleVersionId
+  readonly approvedBy: UserId
+  readonly approvedAt: UtcTimestamp
+  readonly status: "approved" | "rejected" | "pending-review"
+  readonly rationale: string
+  readonly evidence: readonly string[] (URLs, document hashes)
+}
+```
+
+### AuditLog
+
+```typescript
+interface AuditEvent {
+  readonly eventId: Uuid
+  readonly ruleId: Uuid
+  readonly action: "created" | "approved" | "rejected" | "superseded" | "effective-dated"
+  readonly actor: UserId
+  readonly timestamp: UtcTimestamp
+  readonly rationale: string
+  readonly metadata: Record<string, unknown>
+}
+```
+
+## Constitutional Compliance
+
+- **§3** Deterministic computation: rule application is deterministic, no LLM used
+- **§4** Evidence traceability: every rule traces to source, approval, and audit
+- **§8** Human review: all rules require explicit approval with recorded rationale
+- **§12** Reproducibility: rules are versioned, deterministically hashed, and queried by date
+
+No constitutional exception required.
+
+## Verification Commands
+
+`npm run typecheck`, `npm run lint`, `npm run format:check`, `npm test` (focused Feature 002 unit tests)

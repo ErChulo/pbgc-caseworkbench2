@@ -196,3 +196,85 @@ export type AuthoringError =
   | { readonly code: "APPLICABILITY_INVALID"; readonly message: string }
   | { readonly code: "SUPERSESSION_CHAIN_INVALID"; readonly message: string }
   | { readonly code: "HASH_COMPUTATION_FAILED"; readonly message: string };
+
+/* ============================================================================
+ * Governance & Authoring Types (Feature 002 Phase B3)
+ * ============================================================================ */
+
+export type RuleSourceType = "plan-document" | "legal-opinion" | "board-decision" | "policy";
+export type ApprovalStatus = "approved" | "rejected" | "pending-review";
+export type AuditAction = "created" | "approved" | "rejected" | "superseded" | "effective-dated";
+
+export interface Citation {
+  readonly sourceType: RuleSourceType;
+  readonly locator: string;
+  readonly date: string;
+  readonly url?: string;
+}
+
+export interface PlanRule {
+  readonly ruleId: Uuid;
+  readonly statement: string;
+  readonly effectiveDate: string;
+  readonly endDate?: string;
+  readonly applicability: string;
+  readonly primaryCitation: Citation;
+  readonly createdAt: UtcTimestamp;
+  readonly createdBy: string;
+  readonly ruleContentSha256: Sha256;
+}
+
+export interface RuleVersion {
+  readonly ruleVersionId: Sha256;
+  readonly ruleId: Uuid;
+  readonly version: string;
+  readonly createdAt: UtcTimestamp;
+  readonly createdBy: string;
+  readonly statement: string;
+  readonly supersedes?: Sha256;
+  readonly supersededBy?: Sha256;
+  readonly versionContentSha256: Sha256;
+}
+
+export interface ApprovalDecision {
+  readonly approvalId: Sha256;
+  readonly ruleVersionId: Sha256;
+  readonly approvedBy: string;
+  readonly approvedAt: UtcTimestamp;
+  readonly status: ApprovalStatus;
+  readonly rationale: string;
+  readonly evidence: readonly string[];
+  readonly approvalContentSha256: Sha256;
+}
+
+export interface AuditEvent {
+  readonly eventId: Uuid;
+  readonly ruleId: Uuid;
+  readonly action: AuditAction;
+  readonly actor: string;
+  readonly timestamp: UtcTimestamp;
+  readonly rationale: string;
+  readonly metadata: Readonly<Record<string, unknown>>;
+  readonly eventContentSha256: Sha256;
+}
+
+export interface RuleQueryResult {
+  readonly rule: PlanRule;
+  readonly currentVersion: RuleVersion;
+  readonly approval?: ApprovalDecision;
+  readonly versionHistory: readonly RuleVersion[];
+}
+
+export interface RuleApplicabilityMatch {
+  readonly ruleId: Uuid;
+  readonly applicability: string;
+  readonly effectiveDate: string;
+  readonly endDate?: string;
+  readonly matchScore: number;
+}
+
+export interface WorkbookRuleContext {
+  readonly effectiveDate: string;
+  readonly applicableRuleIds: readonly Uuid[];
+  readonly classificationRationale: string;
+}
