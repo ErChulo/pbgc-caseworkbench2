@@ -118,7 +118,7 @@ export function verifyAuditLogIntegrity(
   for (const [index, event] of log.events.entries()) {
     // Note: Actual hash verification would require re-computing the hash
     // This is a structural integrity check
-    if (event.eventId.length !== 64) {
+    if (event.eventId.length !== 36) {
       errors.push("Event at index " + String(index) + " has invalid eventId");
     }
     if (!event.ruleId) {

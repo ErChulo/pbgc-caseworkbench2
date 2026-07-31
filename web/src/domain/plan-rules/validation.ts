@@ -196,7 +196,7 @@ export function validateApprovalCompleteness(
 }
 
 export function combineValidationResults(
-  ...results: { valid: boolean; errors: ValidationError[]; warnings: ValidationWarning[] }[]
+  ...results: { valid: boolean; errors: readonly ValidationError[]; warnings: readonly ValidationWarning[] }[]
 ): { valid: boolean; errors: ValidationError[]; warnings: ValidationWarning[] } {
   const allErrors: ValidationError[] = [];
   const allWarnings: ValidationWarning[] = [];

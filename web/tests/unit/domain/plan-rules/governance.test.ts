@@ -616,7 +616,7 @@ describe("audit-log", () => {
   });
 
   it("verifyAuditLogIntegrity returns valid for consistent log", () => {
-    const event = makeAuditEvent({ eventId: uid("0000000000000000000000000000000000000000000000000000000000000030") });
+    const event = makeAuditEvent({ eventId: uid("00000000-0000-4000-8000-000000000030") });
     const log = createAuditLog([event]);
     const result = verifyAuditLogIntegrity(log);
     expect(result.valid).toBe(true);
