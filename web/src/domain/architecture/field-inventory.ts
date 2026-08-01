@@ -2,6 +2,7 @@ import type { CreateUnresolvedItemInput } from "../plan-rules/unresolved-items";
 import { unresolvedItemEmitters } from "../plan-rules/unresolved-items";
 import type { Interpretation } from "../plan-rules/models";
 import { parseUuid } from "../shared/types";
+import { primitiveDisplay } from "../shared/value-classification";
 import type {
   CellDescriptor,
   NamedRange,
@@ -55,7 +56,7 @@ export function buildFieldInventory(input: {
     )) {
       const header = /^[A-Z]+1$/u.test(cell.address);
       const formula = cell.formulaText !== null;
-      const storedDescription = displayPrimitive(cell.storedValue);
+      const storedDescription = primitiveDisplay(cell.storedValue);
       const description = formula
         ? formulaDescription(sheet.cells, cell.address)
         : storedDescription;
@@ -97,7 +98,7 @@ function formulaDescription(
   const column = /^[A-Z]+/u.exec(address)?.[0];
   if (column === undefined) return "";
   const header = cells.find((cell) => cell.address === `${column}1`);
-  return header === undefined ? "" : displayPrimitive(header.storedValue);
+  return header === undefined ? "" : primitiveDisplay(header.storedValue);
 }
 
 export function extractNamedRanges(
@@ -162,14 +163,6 @@ function bindingFor(
         (binding.candidate.candidateKey === tab.populationCandidateKey &&
           binding.candidate.artifactSha256 === tab.populationArtifactSha256)),
   );
-}
-
-function displayPrimitive(value: unknown): string {
-  return typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-    ? String(value)
-    : "";
 }
 
 function normalize(value: string): string {

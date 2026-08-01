@@ -1,26 +1,71 @@
+/**
+ * Population Detector
+ *
+ * Structural population detection from tabular and workbook profiles.
+ * Uses dependency injection for testability — factory functions can be
+ * mocked in tests to verify orchestration logic without cryptographic overhead.
+ */
+
 import type { Sha256 } from "../shared/types";
+import { primitiveDisplay } from "../shared/value-classification";
+import { isHeaderCell, rowNumber } from "../shared/cell-address";
 import type { TabularPopulationProfile } from "./tabular-adapter";
 import type { WorkbookPopulationProfile } from "./workbook-adapter";
-import {
-  createPopulationCandidate,
-  createPopulationEvidenceObservation,
-  type PopulationCandidateProfile,
-  type PopulationEvidenceObservation,
-} from "./population-profile";
+import type {
+  PopulationCandidateProfile,
+  PopulationEvidenceObservation,
+} from "./population-types";
 
 export interface PopulationDetection {
   readonly candidate: PopulationCandidateProfile;
   readonly observations: readonly PopulationEvidenceObservation[];
 }
 
+/**
+ * Dependencies for population detection.
+ * Allows injection of factory functions for testing.
+ */
+export interface PopulationDetectionDependencies {
+  readonly createEvidenceObservation: (input: {
+    readonly citationId: string;
+    readonly artifactSha256: Sha256;
+    readonly sourceLocator: string;
+    readonly evidenceKind: string;
+    readonly observedTextOrValue?: unknown;
+  }) => Promise<PopulationEvidenceObservation>;
+  readonly createCandidate: (
+    input: Omit<PopulationCandidateProfile, "candidateKey">,
+  ) => Promise<PopulationCandidateProfile>;
+}
+
+/**
+ * Default dependencies using the real factory functions.
+ */
+export async function getDefaultDependencies(): Promise<PopulationDetectionDependencies> {
+  const { createPopulationEvidenceObservation, createPopulationCandidate } =
+    await import("./population-factories");
+  return {
+    createEvidenceObservation: createPopulationEvidenceObservation,
+    createCandidate: createPopulationCandidate,
+  };
+}
+
+/**
+ * Detects a population candidate from a tabular profile.
+ * Extracts headers as observed fields and computes confidence scores.
+ */
 export async function detectTabularPopulation(
   artifactSha256: Sha256,
   profile: TabularPopulationProfile,
   sensitivity: PopulationCandidateProfile["sensitivity"] = "unknown",
+  deps?: PopulationDetectionDependencies,
 ): Promise<PopulationDetection> {
+  const { createEvidenceObservation, createCandidate } =
+    deps ?? (await getDefaultDependencies());
+
   const observations = await Promise.all(
     profile.headers.map((header, index) =>
-      createPopulationEvidenceObservation({
+      createEvidenceObservation({
         citationId: `population-header-${String(index + 1)}`,
         artifactSha256,
         sourceLocator: `row:1/column:${String(index + 1)}`,
@@ -30,7 +75,7 @@ export async function detectTabularPopulation(
     ),
   );
   const likely = profile.status === "profiled" && profile.headers.length >= 2;
-  const candidate = await createPopulationCandidate({
+  const candidate = await createCandidate({
     artifactSha256,
     candidateStatus:
       likely && profile.structurallyValid ? "proposed" : "unresolved",
@@ -54,14 +99,22 @@ export async function detectTabularPopulation(
   });
 }
 
+/**
+ * Detects a population candidate from a workbook profile.
+ * Extracts header cells from row 1 as observed fields.
+ */
 export async function detectWorkbookPopulation(
   artifactSha256: Sha256,
   profile: WorkbookPopulationProfile,
   sensitivity: PopulationCandidateProfile["sensitivity"] = "unknown",
+  deps?: PopulationDetectionDependencies,
 ): Promise<PopulationDetection> {
+  const { createEvidenceObservation, createCandidate } =
+    deps ?? (await getDefaultDependencies());
+
   const observations = await Promise.all(
     profile.sheets.map((sheet, index) =>
-      createPopulationEvidenceObservation({
+      createEvidenceObservation({
         citationId: `population-sheet-${String(index + 1)}`,
         artifactSha256,
         sourceLocator: `sheet:${sheet.name}`,
@@ -76,10 +129,10 @@ export async function detectWorkbookPopulation(
   );
   const fields = profile.sheets.flatMap((sheet) =>
     sheet.cells
-      .filter((cell) => /^[A-Z]+1$/u.test(cell.address))
-      .map((cell) => displayPrimitive(cell.storedValue)),
+      .filter((cell) => isHeaderCell(cell.address))
+      .map((cell) => primitiveDisplay(cell.storedValue)),
   );
-  const candidate = await createPopulationCandidate({
+  const candidate = await createCandidate({
     artifactSha256,
     candidateStatus:
       profile.status === "profiled" && fields.length >= 2
@@ -94,7 +147,7 @@ export async function detectWorkbookPopulation(
       Math.max(
         0,
         new Set(
-          sheet.cells.map((cell) => /\d+$/u.exec(cell.address)?.[0] ?? ""),
+          sheet.cells.map((cell) => rowNumber(cell.address)),
         ).size - 1,
       ),
     ),
@@ -105,15 +158,4 @@ export async function detectWorkbookPopulation(
     candidate,
     observations: Object.freeze(observations),
   });
-}
-
-function displayPrimitive(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  )
-    return String(value);
-  return "";
 }

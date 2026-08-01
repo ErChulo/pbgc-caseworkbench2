@@ -12,6 +12,8 @@ import type {
   WorkbookPopulationProfile,
 } from "../population/workbook-adapter";
 import { parseUuid, type Sha256 } from "../shared/types";
+import { isHeaderCell } from "../shared/cell-address";
+import { primitiveDisplay } from "../shared/value-classification";
 import type { SourceTab } from "./models";
 
 export interface TabSelectionRule {
@@ -74,14 +76,9 @@ function observedSheetFields(
   if (sheet === undefined) return [];
   const governed = new Set(binding.candidate.observedFields.map(normalize));
   return sheet.cells
-    .filter((cell) => /^[A-Z]+1$/u.test(cell.address))
+    .filter((cell) => isHeaderCell(cell.address))
     .flatMap((cell) => {
-      const value =
-        typeof cell.storedValue === "string" ||
-        typeof cell.storedValue === "number" ||
-        typeof cell.storedValue === "boolean"
-          ? String(cell.storedValue)
-          : "";
+      const value = primitiveDisplay(cell.storedValue);
       return governed.has(normalize(value)) ? [value] : [];
     });
 }
