@@ -206,4 +206,38 @@ describe("workbook builder foundation", () => {
       expect(result.errors.some((e) => e.code === "MISSING_DATA_SOURCE")).toBe(true);
     }
   });
+
+  it("populates tables sheet with plan rules from formula provenance", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const tables = result.workbook.support.tablesSheet;
+    expect(tables.rules.length).toBeGreaterThan(0);
+    const firstRule = tables.rules[0];
+    expect(firstRule?.ruleId).toBeTruthy();
+    expect(firstRule?.statement).toBeTruthy();
+    expect(firstRule?.effectiveDate).toBeTruthy();
+  });
+
+  it("deduplicates plan rules across formulas", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const tables = result.workbook.support.tablesSheet;
+    const ruleIds = tables.rules.map((r) => r.ruleId);
+    const uniqueRuleIds = [...new Set(ruleIds)];
+    expect(ruleIds).toEqual(uniqueRuleIds);
+  });
 });

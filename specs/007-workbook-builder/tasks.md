@@ -19,10 +19,10 @@
 
 ## Phase 3: Support Sheet Generation
 
-- [ ] T010 Implement Summary sheet (metadata: case, architecture, population, hashes)
-- [ ] T011 Implement Tables sheet (plan rules with effective dates, citations, applicability)
-- [ ] T012 Implement UD Table sheet (user-defined ranges, mappings, validation state)
-- [ ] T013 Test support sheet determinism and completeness
+- [x] T010 Implement Summary sheet (metadata: case, architecture, population, hashes)
+- [x] T011 Implement Tables sheet (plan rules with effective dates, citations, applicability)
+- [x] T012 Implement UD Table sheet (user-defined ranges, mappings, validation state)
+- [x] T013 Test support sheet determinism and completeness
 
 ## Phase 4: Formula Sheet Generation
 

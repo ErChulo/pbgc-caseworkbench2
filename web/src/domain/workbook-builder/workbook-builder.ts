@@ -7,6 +7,7 @@ import type {
   SummarySheetData,
   TablesSheetData,
   UDTableSheetData,
+  PlanRuleRow,
   WorkbookGenerationError,
 } from "./models";
 import {
@@ -58,7 +59,7 @@ export async function buildWorkbook(
   const zeroHash = zeroHashParsed.value;
 
   const summarySheet = generateSummarySheet(input, zeroHash);
-  const tablesSheet = generateTablesSheet();
+  const tablesSheet = generateTablesSheet(input);
   const udTableSheet = generateUDTableSheet(input);
 
   const supportContent = {
@@ -141,10 +142,31 @@ function generateSummarySheet(
   };
 }
 
-function generateTablesSheet(): TablesSheetData {
-  return {
-    rules: [],
-  };
+function generateTablesSheet(input: WorkbookGenerationInput): TablesSheetData {
+  const seenRuleIds = new Set<string>();
+  const rules: PlanRuleRow[] = [];
+
+  for (const formula of input.buildSpec.formulas) {
+    for (const sourceRule of formula.provenance.sourcePlanRules) {
+      if (seenRuleIds.has(sourceRule.ruleId)) continue;
+      seenRuleIds.add(sourceRule.ruleId);
+
+      const applicability = sourceRule.applicabilityConditions
+        .map((c) => `${c.dimension}=${c.value}`)
+        .join("; ");
+
+      rules.push({
+        ruleId: sourceRule.ruleId,
+        statement: sourceRule.governingRestatement,
+        effectiveDate: sourceRule.effectiveDate,
+        endDate: sourceRule.endDate,
+        applicability,
+        primaryCitation: sourceRule.primaryCitation.citationLocator,
+      });
+    }
+  }
+
+  return { rules };
 }
 
 function generateUDTableSheet(
