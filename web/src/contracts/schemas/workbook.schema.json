@@ -1,0 +1,482 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workbook.schema.json",
+  "title": "V1 Workbook",
+  "description": "Governed deterministic workbook output produced by the Workbook Builder",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "workbookId",
+    "buildSpecId",
+    "buildSpecContentSha256",
+    "architectureId",
+    "architectureContentSha256",
+    "caseId",
+    "populationProfileDecisionId",
+    "populationProfileContentSha256",
+    "generatedAt",
+    "sheets",
+    "namedRanges",
+    "cellMappings",
+    "formulaCells",
+    "support",
+    "workbookContentSha256"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "workbookId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "buildSpecId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "buildSpecContentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "architectureId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "architectureContentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "caseId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "populationProfileDecisionId": {
+      "type": ["string", "null"]
+    },
+    "populationProfileContentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sheets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/WorkbookSheet"
+      }
+    },
+    "namedRanges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/NamedRangeDefinition"
+      }
+    },
+    "cellMappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/CellMapping"
+      }
+    },
+    "formulaCells": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/FormulaCell"
+      }
+    },
+    "support": {
+      "$ref": "#/$defs/SupportSheetContent"
+    },
+    "workbookContentSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "WorkbookSheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "hidden", "cells"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WorkbookCell"
+          }
+        }
+      }
+    },
+    "WorkbookCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "kind", "formulaText", "value", "dataSource", "mappingId"],
+      "properties": {
+        "address": {
+          "type": "string",
+          "pattern": "^[A-Z]+[0-9]+$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["formula", "input", "output", "label", "blank"]
+        },
+        "formulaText": {
+          "type": ["string", "null"]
+        },
+        "value": {},
+        "dataSource": {
+          "oneOf": [
+            { "$ref": "#/$defs/PopulationDataSource" },
+            { "type": "null" }
+          ]
+        },
+        "mappingId": {
+          "oneOf": [
+            { "type": "string", "format": "uuid" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "PopulationDataSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceTab", "columnIdentifier", "rowRange", "recordCount", "recordHash"],
+      "properties": {
+        "sourceTab": {
+          "type": "string"
+        },
+        "columnIdentifier": {
+          "type": "string"
+        },
+        "rowRange": {
+          "$ref": "#/$defs/RowRange"
+        },
+        "recordCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recordHash": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "RowRange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "count"],
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "NamedRangeDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rangeName", "cellAddress", "tabName", "scope", "genericField", "scenarioId", "provenance"],
+      "properties": {
+        "rangeName": {
+          "type": "string"
+        },
+        "cellAddress": {
+          "type": "string"
+        },
+        "tabName": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["workbook", "sheet"]
+        },
+        "genericField": {
+          "type": ["string", "null"]
+        },
+        "scenarioId": {
+          "type": ["string", "null"]
+        },
+        "provenance": {
+          "$ref": "#/$defs/NamedRangeProvenance"
+        }
+      }
+    },
+    "NamedRangeProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["architecture", "formula-compiler", "workbook-builder"]
+        },
+        "architectureNamedRange": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "CellMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mappingId", "field", "tabName", "cellAddress", "iobClassification", "dataSource", "formulaId", "scenarioId"],
+      "properties": {
+        "mappingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "field": {
+          "type": "string"
+        },
+        "tabName": {
+          "type": "string"
+        },
+        "cellAddress": {
+          "type": "string"
+        },
+        "iobClassification": {
+          "type": "string",
+          "enum": ["I", "O", "B", "N", "P"]
+        },
+        "dataSource": {
+          "oneOf": [
+            { "$ref": "#/$defs/DataSourceReference" },
+            { "type": "null" }
+          ]
+        },
+        "formulaId": {
+          "type": ["string", "null"]
+        },
+        "scenarioId": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "DataSourceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceType", "sourceTab", "sourceField", "evidenceKey"],
+      "properties": {
+        "sourceType": {
+          "type": "string",
+          "enum": ["population", "architecture", "formula"]
+        },
+        "sourceTab": {
+          "type": "string"
+        },
+        "sourceField": {
+          "type": "string"
+        },
+        "evidenceKey": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "FormulaCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cellAddress", "tabName", "formulaText", "formulaId", "dependencies", "executionOrder", "executionLevel"],
+      "properties": {
+        "cellAddress": {
+          "type": "string"
+        },
+        "tabName": {
+          "type": "string"
+        },
+        "formulaText": {
+          "type": "string"
+        },
+        "formulaId": {
+          "type": "string"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FormulaCell"
+          }
+        },
+        "executionOrder": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executionLevel": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "SupportSheetContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summarySheet", "tablesSheet", "udTableSheet"],
+      "properties": {
+        "summarySheet": {
+          "$ref": "#/$defs/SummarySheetData"
+        },
+        "tablesSheet": {
+          "$ref": "#/$defs/TablesSheetData"
+        },
+        "udTableSheet": {
+          "$ref": "#/$defs/UDTableSheetData"
+        }
+      }
+    },
+    "SummarySheetData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "architectureId", "architectureContentSha256", "buildSpecId", "buildSpecContentSha256", "populationProfileDecisionId", "populationProfileContentSha256", "generatedAt", "generatorVersion", "workbookContentSha256"],
+      "properties": {
+        "caseId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "architectureId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "architectureContentSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "buildSpecId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "buildSpecContentSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "populationProfileDecisionId": {
+          "type": ["string", "null"]
+        },
+        "populationProfileContentSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "generatorVersion": {
+          "type": "string"
+        },
+        "workbookContentSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "TablesSheetData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlanRuleRow"
+          }
+        }
+      }
+    },
+    "PlanRuleRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleId", "statement", "effectiveDate", "endDate", "applicability", "primaryCitation"],
+      "properties": {
+        "ruleId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "statement": {
+          "type": "string"
+        },
+        "effectiveDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": ["string", "null"]
+        },
+        "applicability": {
+          "type": "string"
+        },
+        "primaryCitation": {
+          "type": "string"
+        }
+      }
+    },
+    "UDTableSheetData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namedRanges", "cellMappings"],
+      "properties": {
+        "namedRanges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NamedRangeRow"
+          }
+        },
+        "cellMappings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CellMappingRow"
+          }
+        }
+      }
+    },
+    "NamedRangeRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "scope", "target", "genericField"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "genericField": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "CellMappingRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mappingId", "cellAddress", "iobValue", "dataSource", "formulaId"],
+      "properties": {
+        "mappingId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "cellAddress": {
+          "type": "string"
+        },
+        "iobValue": {
+          "type": "string"
+        },
+        "dataSource": {
+          "type": ["string", "null"]
+        },
+        "formulaId": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

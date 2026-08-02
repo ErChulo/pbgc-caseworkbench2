@@ -23,9 +23,9 @@
 - [x] T001 Create architecture directory structure: `web/src/domain/architecture/`, `web/tests/unit/domain/architecture/`, `web/tests/integration/`
 - [x] T002 Register `v1-architecture.schema.json` in `web/tools/validate-design-schemas.mjs` and `web/tools/validate-contracts.mjs`
 - [x] T003 [P] Create `web/src/domain/architecture/models.ts` — export `V1Architecture`, `SourceTab`, `RunDescriptor`, `DateRange`, `RunJustification`, `CellDescriptor`, `IoBClassification`, `IoBValue`, `FormulaDependency`, `NamedRange`, `ScenarioSelectionPolicy`, `TabSelectionPolicy`, `IoBClassificationRule`, `TriggerCondition`, `ArchitectureBuildError` types (all fields per data-model.md)
-- [ ] T004 [P] Populate `rules/scenario-selection.yaml` — define approved scenarios (DOR, NRD, ERD, EURD, DORNSF, QPSA, QPSALIAB, RBD, XRD) with trigger conditions derived from reference V1 summaries
-- [ ] T005 [P] Populate `rules/tab-selection.yaml` — define tab selection rules based on population characteristics
-- [ ] T006 [P] Populate `rules/iob-classification.yaml` — define I/O/B classification rules for generic fields per run
+- [x] T004 [P] Populate `rules/scenario-selection.yaml` — define approved scenarios (DOR, NRD, ERD, EURD, DORNSF, QPSA, QPSALIAB, RBD, XRD) with trigger conditions derived from reference V1 summaries
+- [x] T005 [P] Populate `rules/tab-selection.yaml` — define tab selection rules based on population characteristics
+- [x] T006 [P] Populate `rules/iob-classification.yaml` — define I/O/B classification rules for generic fields per run
 - [x] T007 Create `web/src/domain/architecture/rule-loader.ts` — implement `loadRuleSets()` function that reads YAML rule files and returns typed policy objects
 - [x] T008 [P] Create `web/tests/contract/v1-architecture-contracts.test.ts` — Ajv validation tests for `v1-architecture.schema.json`: positive (valid document), negative (missing required field), semantic (empty cells map)
 - [x] T009 Verify schema validation passes: `npm run validate:schemas && npm run validate:contracts`
@@ -41,7 +41,7 @@
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
 - [x] T010 Create `web/src/domain/architecture/field-name-glossary.ts` — implement `mapGenericField(workbookDescription, tabContext)` function that normalizes workbook-specific field names to generic field names using `rules/field-name-glossary.yaml`
-- [ ] T011 [P] Populate `rules/field-name-glossary.yaml` — map common workbook field descriptions to generic names (DOB, BSEX, COMP, FV, BENEFIT, etc.) based on reference V1 summaries
+- [x] T011 [P] Populate `rules/field-name-glossary.yaml` — map common workbook field descriptions to generic names (DOB, BSEX, COMP, FV, BENEFIT, etc.) based on reference V1 summaries
 - [x] T012 [P] Create `web/tests/unit/domain/architecture/rule-loader.test.ts` — unit tests for YAML rule loading, validation, and policy construction
 - [x] T013 Create `web/src/adapters/filesystem/architecture-workspace.ts` — implement `saveArchitecture()`, `loadArchitecture()` methods using atomic JSON persistence under `cases/<caseId>/architecture/`
 

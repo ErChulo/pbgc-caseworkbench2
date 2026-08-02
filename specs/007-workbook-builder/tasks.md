@@ -5,10 +5,10 @@
 ## Phase 1: Setup and Contracts
 
 - [x] T001 Verify `web/src/domain/workbook-builder/` and unit-test structure
-- [ ] T002 Define workbook schema (structural contract for XLSX)
-- [ ] T003 Verify schema registration in design/runtime validation tools
+- [x] T002 Define workbook schema (structural contract for XLSX)
+- [x] T003 Verify schema registration in design/runtime validation tools
 - [x] T004 Add exceljs dependency with determinism evaluation
-- [ ] T005 Add workbook schema acceptance and validation tests
+- [x] T005 Add workbook schema acceptance and validation tests
 
 ## Phase 2: Core Models and Types
 

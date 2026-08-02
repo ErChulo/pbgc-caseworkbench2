@@ -7,6 +7,7 @@ const contractDirectories = [
   resolve("specs/004-v1-architecture-selector/contracts"),
   resolve("specs/005-v1-build-spec/contracts"),
   resolve("specs/006-formula-compiler/contracts"),
+  resolve("specs/007-workbook-builder/contracts"),
 ];
 
 const schemas = new Map();
