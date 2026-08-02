@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import { hashTyped } from "../manifests/canonical-json";
 import type { Sha256 } from "../shared/types";
 import type { V1Workbook } from "./models";
@@ -150,4 +151,46 @@ function buildUDTableSheet(workbook: V1Workbook): XLSXSheet {
 function extractSheetName(cellAddress: string): string | null {
   const match = /^'?([^'!]+)'?!/.exec(cellAddress);
   return match?.[1] ?? null;
+}
+
+export async function writeXLSXBuffer(spec: XLSXWorkbookSpec): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "PBGC CaseWorkBench";
+  workbook.created = new Date(0);
+
+  for (const sheet of spec.sheets) {
+    const ws = workbook.addWorksheet(sheet.name, {
+      state: sheet.hidden ? "hidden" : "visible",
+    });
+    for (let rowIndex = 0; rowIndex < sheet.rows.length; rowIndex++) {
+      const row = sheet.rows[rowIndex];
+      if (row === undefined) continue;
+      const excelRow = ws.getRow(rowIndex + 1);
+      for (let colIndex = 0; colIndex < row.length; colIndex++) {
+        const value = row[colIndex];
+        excelRow.getCell(colIndex + 1).value = value ?? undefined;
+      }
+      excelRow.commit();
+    }
+  }
+
+  for (const nr of spec.namedRanges) {
+    workbook.definedNames.add(nr.name, nr.reference);
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+export async function writeXLSXBytes(spec: XLSXWorkbookSpec): Promise<Uint8Array> {
+  const buffer = await writeXLSXBuffer(spec);
+  return new Uint8Array(buffer);
+}
+
+export async function computeXLSXHash(spec: XLSXWorkbookSpec): Promise<Sha256> {
+  const bytes = await writeXLSXBytes(spec);
+  return (await hashTyped(
+    { xlsx: Array.from(bytes) },
+    { typeName: "XLSXPayload" },
+  )) as Sha256;
 }
