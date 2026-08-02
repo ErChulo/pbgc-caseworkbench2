@@ -14,6 +14,8 @@ import {
   validateBuildSpec,
   validatePopulationProfile,
   validateDataSources,
+  validateFormulaReferences,
+  validateNoCycles,
   aggregateValidationResults,
 } from "./validation";
 
@@ -28,11 +30,15 @@ export async function buildWorkbook(
     input.populationProfile,
   );
   const validationDataSources = validateDataSources(input.buildSpec);
+  const validationReferences = validateFormulaReferences(input.buildSpec);
+  const validationCycles = validateNoCycles(input.buildSpec);
 
   const validation = aggregateValidationResults(
     validationBuildSpec,
     validationPopulation,
     validationDataSources,
+    validationReferences,
+    validationCycles,
   );
 
   if (validation.errors.length > 0) {

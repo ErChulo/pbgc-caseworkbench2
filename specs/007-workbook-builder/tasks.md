@@ -44,10 +44,10 @@
 - [x] T023 Implement BuildSpec validation for workbook generation
 - [x] T024 Implement population profile validation
 - [x] T025 Implement data source availability checking
-- [ ] T026 Implement reference resolution (named ranges, external links)
-- [ ] T027 Implement cycle detection in formula dependencies
+- [x] T026 Implement reference resolution (named ranges, external links)
+- [x] T027 Implement cycle detection in formula dependencies
 - [x] T028 Aggregate and deterministically sort all validation errors
-- [ ] T029 Test fail-closed validation with multiple error types
+- [x] T029 Test fail-closed validation with multiple error types
 
 ## Phase 7: Workbook Builder Engine
 
