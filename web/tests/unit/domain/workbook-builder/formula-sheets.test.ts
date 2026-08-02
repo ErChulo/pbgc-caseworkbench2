@@ -170,4 +170,33 @@ describe("sheet cell merging", () => {
     const result = mergeSheetCells(map1, map2);
     expect(result.size).toBe(2);
   });
+
+  it("merges overlapping cells by address, combining formula and data", () => {
+    const formulaCells = new Map([
+      ["Retirees", [{ address: "C1", kind: "formula" as const, formulaText: "=A1+B1", value: null, dataSource: null, mappingId: null }]],
+    ]);
+    const dataCells = new Map([
+      ["Retirees", [{ address: "C1", kind: "output" as const, formulaText: null, value: 42, dataSource: null, mappingId: null }]],
+    ]);
+    const result = mergeSheetCells(formulaCells, dataCells);
+    const cells = result.get("Retirees");
+    expect(cells).toHaveLength(1);
+    expect(cells?.[0]?.formulaText).toBe("=A1+B1");
+    expect(cells?.[0]?.value).toBe(42);
+  });
+
+  it("preserves formula text when merging B cells from both sources", () => {
+    const formulaCells = new Map([
+      ["Retirees", [{ address: "D1", kind: "formula" as const, formulaText: "=C1*2", value: null, dataSource: null, mappingId: null }]],
+    ]);
+    const dataCells = new Map([
+      ["Retirees", [{ address: "D1", kind: "output" as const, formulaText: null, value: 100, dataSource: { sourceTab: "RETIREES", columnIdentifier: "BENEFIT", rowRange: { start: 0, count: 1 }, recordCount: 1, recordHash: "a".repeat(64) as import("../../../../src/domain/shared/types").Sha256 }, mappingId: "m1" as import("../../../../src/domain/shared/types").Uuid }]],
+    ]);
+    const result = mergeSheetCells(formulaCells, dataCells);
+    const cells = result.get("Retirees");
+    expect(cells).toHaveLength(1);
+    expect(cells?.[0]?.formulaText).toBe("=C1*2");
+    expect(cells?.[0]?.value).toBe(100);
+    expect(cells?.[0]?.dataSource?.columnIdentifier).toBe("BENEFIT");
+  });
 });

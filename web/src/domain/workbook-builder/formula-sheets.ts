@@ -144,15 +144,35 @@ export function populateDataCells(
 export function mergeSheetCells(
   ...sources: readonly ReadonlyMap<string, readonly WorkbookCell[]>[]
 ): ReadonlyMap<string, readonly WorkbookCell[]> {
-  const merged = new Map<string, WorkbookCell[]>();
+  const merged = new Map<string, Map<string, WorkbookCell>>();
   for (const source of sources) {
     for (const [tabName, cells] of source) {
-      const existing = merged.get(tabName) ?? [];
-      for (const cell of cells) {
-        existing.push(cell);
+      let tab = merged.get(tabName);
+      if (tab === undefined) {
+        tab = new Map();
+        merged.set(tabName, tab);
       }
-      merged.set(tabName, existing);
+      for (const cell of cells) {
+        const existing = tab.get(cell.address);
+        if (existing === undefined) {
+          tab.set(cell.address, cell);
+        } else {
+          tab.set(cell.address, {
+            address: existing.address,
+            kind: existing.kind === "blank" ? cell.kind : existing.kind,
+            formulaText: existing.formulaText ?? cell.formulaText,
+            value: existing.value !== null ? existing.value : cell.value,
+            dataSource: existing.dataSource ?? cell.dataSource,
+            mappingId: existing.mappingId ?? cell.mappingId,
+          });
+        }
+      }
     }
   }
-  return merged;
+
+  const result = new Map<string, readonly WorkbookCell[]>();
+  for (const [tabName, cellMap] of merged) {
+    result.set(tabName, [...cellMap.values()]);
+  }
+  return result;
 }
