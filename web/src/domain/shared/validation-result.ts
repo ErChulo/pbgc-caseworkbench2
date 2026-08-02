@@ -23,11 +23,7 @@ export interface ValidationWarning {
 export type ValidationFinding = ValidationError | ValidationWarning;
 
 export type ValidationType =
-  | "workbook"
-  | "buildSpec"
-  | "population"
-  | "rule"
-  | "architecture";
+  "workbook" | "buildSpec" | "population" | "rule" | "architecture";
 export type ValidationStatus = "valid" | "invalid" | "warnings";
 
 export interface ValidationResult {

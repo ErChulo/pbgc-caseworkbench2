@@ -4,7 +4,7 @@
 **Style:** Plain language with technical terms explained
 **Last updated:** 2026-08-02
 
-This manual explains how to use PBGC CaseworkBench 2.0 from start to finish. It is written for people doing case intake, evidence review, and supervisory review.
+This manual explains how to use PBGC CaseworkBench 2.0 from start to finish. It is written for people doing case intake, evidence review, final casework package assembly, and supervisory review.
 
 Use this manual with the Quick-Start Guide and the Technical Appendix in this same folder.
 
@@ -26,6 +26,8 @@ The app is designed to help you:
 - Review system suggestions before they become governed decisions.
 - Track unresolved issues.
 - Export an evidence manifest with lineage and audit details.
+- Link generated V1, workbook, validation, reconciliation, and Section 436 artifacts by hash.
+- Export a final casework output package that records completed stages and blockers.
 
 The app is local-first. This means case data stays on your computer or selected local workspace. The app does not require a server for case processing.
 
@@ -60,6 +62,9 @@ Follow these rules every time you use the app.
 | Decision | A human action such as approve, reject, release, revoke, or supersede. |
 | Manifest | The exported machine-readable record of evidence, review state, and lineage. |
 | Lineage | A trace from output records back to source files, locations, and decisions. |
+| Final casework output package | The exported package that references required casework artifacts and records blockers. |
+| Artifact linker | The Case Output Package control that hashes an existing workspace file before linking it. |
+| Section 436 evaluation | A deterministic evaluation artifact and Markdown report surface for Section 436 facts and rules. |
 
 See `technical-appendix.md` for a deeper explanation of these terms.
 
@@ -327,9 +332,9 @@ Date candidate review:
 
 ### 5.8 Evidence Review Workspace
 
-Purpose: Shows a synthetic evidence-review and plan-rule preview workspace.
+Purpose: Shows a synthetic evidence-review workspace and governed plan-rule authoring controls.
 
-Important: This section is currently a synthetic session preview. It validates in memory and does not persist final production plan rules.
+Important: This section still uses typed synthetic demo candidates. Plan-rule records persist to the active local case workspace when a workspace and case are selected. If no active case is selected, rule authoring remains preview-only. Unresolved-item decisions in this demo workspace are session preview records and are not final production plan-rule approvals.
 
 Tabs:
 
@@ -442,6 +447,75 @@ How to export:
 5. Store the exported file according to office procedure.
 
 Do not manually edit the manifest. If something is wrong, correct the underlying review state and export again.
+
+### 5.12 Case Output Package
+
+Purpose: Assembles the final casework output boundary for the active case.
+
+The panel shows:
+
+- Package status: `complete` or `blocked`.
+- Referenced artifact count.
+- Blocking stage count.
+- Required stages and their maturity levels.
+- Linked generated artifacts and SHA-256 values.
+
+The package covers these stages:
+
+| Stage | What It Needs |
+| --- | --- |
+| Evidence | An exported evidence manifest or recorded blocker. |
+| Plan rules | Governed plan-rule records with review status. |
+| Population profile | A linked approved population-profile artifact. |
+| V1 architecture | A linked architecture artifact. |
+| BuildSpec | A linked BuildSpec artifact. |
+| Compiled formulas | A linked compiled-formula artifact. |
+| Workbook | A linked generated V1 workbook artifact. |
+| Validation and reconciliation | Linked validation and reconciliation artifacts, or blockers. |
+| Section 436 | A linked Section 436 evaluation artifact when required. |
+
+How to link a generated artifact:
+
+1. Confirm the generated artifact already exists in the selected workspace.
+2. Choose the artifact type.
+3. Enter the artifact ID.
+4. Enter the workspace-relative path, such as `cases/<case-uuid>/outputs/build-spec.json`.
+5. Enter the media type, such as `application/json` or an approved workbook media type.
+6. Choose the maturity level supported by the evidence.
+7. Enter a description.
+8. Click Hash and link workspace artifact.
+
+The app reads the file bytes and computes the SHA-256 before linking. Do not type or invent artifact hashes. The link record is stored at `cases/<case-uuid>/outputs/artifact-references.json`.
+
+How to export the final package:
+
+1. Review the stage list.
+2. Confirm required stages are ready or have explicit blockers.
+3. Confirm no external-execution maturity level is claimed unless evidence exists.
+4. Click Export final output package.
+5. Store `cases/<case-uuid>/exports/final-casework-output-package.json` under office procedure.
+
+Important: A blocked package is still useful. It documents exactly which required outputs are missing. Do not hand-edit the package to make a blocked case appear complete.
+
+### 5.13 Section 436 Evaluation Artifact
+
+Purpose: Represents the deterministic Section 436 evaluation output that can be linked into the final casework package.
+
+The current implementation supports:
+
+- A schema-governed `section-436-evaluation` artifact.
+- Required facts: `aftap-percentage`, `plan-year-start`, `plan-year-end`, and `certification-date`.
+- Human-approved facts and rules with citations.
+- A deterministic conclusion and content hash.
+- A Markdown report renderer for the evaluation artifact.
+
+The current implementation does not provide:
+
+- A production fact-entry screen.
+- A DOCX or PDF memo generator.
+- External legal, actuarial, Excel, ValTool, Runtime, ATPBGC, or BCV execution.
+
+If Section 436 is required and no evaluation artifact is linked, the final output package remains blocked for that stage.
 
 ---
 
@@ -561,6 +635,48 @@ Use this at the end of a review session or when preserving a checkpoint.
 8. Export local manifest.
 9. Store the exported file under office procedure.
 
+### 6.9 Link Generated Casework Artifacts
+
+Use this after generated artifacts already exist in the selected workspace.
+
+1. Open Case Output Package.
+2. For each generated artifact, choose the artifact type.
+3. Enter an artifact ID that identifies the artifact for this case.
+4. Enter the workspace-relative path.
+5. Confirm media type and maturity level.
+6. Enter a description that explains what the artifact represents.
+7. Hash and link the workspace artifact.
+8. Confirm the linked artifact list shows the computed SHA-256.
+
+Do not link files from outside the selected workspace. Do not claim `human-approved`, `independently-validated`, or `externally-executed` maturity unless the artifact itself has that evidence.
+
+### 6.10 Export The Final Casework Output Package
+
+Use this at the end of a casework package assembly step or when preserving a checkpoint.
+
+1. Open Case Output Package.
+2. Review package status.
+3. Review blocking stages.
+4. Review every linked artifact hash.
+5. Confirm Section 436 status is correct for the case.
+6. Export final output package.
+7. Store the exported JSON under office procedure.
+
+If the package is blocked, treat the blockers as the action list for the next generation or review pass.
+
+### 6.11 Link A Section 436 Evaluation
+
+Use this only when a Section 436 evaluation artifact has already been produced from reviewed facts and rules.
+
+1. Confirm the evaluation artifact is stored in the selected workspace.
+2. In Case Output Package, choose `section-436-evaluation`.
+3. Enter the evaluation artifact ID.
+4. Enter the workspace-relative path.
+5. Use the correct media type for the stored artifact, usually `application/json`.
+6. Choose the maturity level supported by the review evidence.
+7. Enter a description such as `Section 436 evaluation for plan year 2026`.
+8. Hash and link the workspace artifact.
+
 ---
 
 ## 7. Examples
@@ -645,6 +761,43 @@ Expected result:
 - Review decision records the issue.
 - Downstream use remains blocked if required facts are unresolved.
 
+### 7.5 Example: Final Output Package Is Blocked
+
+Scenario: A reviewer has an evidence manifest and BuildSpec but no generated workbook or validation result.
+
+Steps:
+
+1. Export the evidence manifest.
+2. Open Case Output Package.
+3. Link the existing BuildSpec artifact.
+4. Review the stage list.
+5. Export the final output package.
+
+Expected result:
+
+- The package exports as blocked.
+- The BuildSpec hash is referenced.
+- Workbook, validation, and reconciliation blockers remain visible.
+- No missing artifact hash is invented.
+
+### 7.6 Example: Section 436 Evaluation Is Linked
+
+Scenario: A deterministic Section 436 evaluation JSON file already exists in the workspace.
+
+Steps:
+
+1. Open Case Output Package for the active case.
+2. Choose `section-436-evaluation` as the artifact type.
+3. Enter the workspace-relative evaluation path.
+4. Hash and link the workspace artifact.
+5. Export the final output package.
+
+Expected result:
+
+- The Section 436 stage references the computed evaluation hash.
+- The package does not claim DOCX/PDF memo generation.
+- Any missing required casework stages remain blocked.
+
 ---
 
 ## 8. Troubleshooting
@@ -695,6 +848,27 @@ Check:
 4. Are any files failed or interrupted?
 5. Are you looking at the correct case and workspace?
 
+### 8.6 Final Output Package Is Blocked
+
+Check:
+
+1. Are all required generated artifacts present in the selected workspace?
+2. Did you link each artifact from a workspace-relative path?
+3. Does the artifact have enough evidence for the selected maturity level?
+4. Is Section 436 required for the case and missing?
+5. Are unresolved items still blocking downstream use?
+
+Do not hand-edit the exported package. Fix the missing input, regenerate if needed, relink the artifact, and export again.
+
+### 8.7 Artifact Link Fails
+
+Check:
+
+1. The path is relative to the selected workspace, not an absolute system path.
+2. The file exists and the browser still has workspace permission.
+3. The file is not open in a way that blocks browser reading.
+4. The artifact ID, media type, and description are filled in.
+
 ---
 
 ## 9. Supervisor Checklist
@@ -709,6 +883,10 @@ Use this checklist before relying on exported manifest evidence.
 - Confirm population candidates needed for downstream use are reviewed.
 - Confirm unresolved items are known and documented.
 - Confirm manifest hash is recorded.
+- Confirm final output package status is complete or blockers are accepted and assigned.
+- Confirm each linked generated artifact hash was computed by the app from workspace bytes.
+- Confirm Section 436 status is correct for the case.
+- Confirm maturity claims do not exceed available evidence.
 - Confirm no real PII was put into Git, docs, screenshots, or examples.
 
 ---
@@ -722,5 +900,7 @@ This manual does not claim:
 - That external tools such as Excel, ValTool, Runtime, ATPBGC, or BCV were executed.
 - That the browser can certify files are malware-free.
 - That missing participant data can be inferred or replaced with zero.
+- That a linked artifact is correct merely because it was linked by hash.
+- That Section 436 DOCX/PDF memo generation is available.
 
 Those actions require separate execution, evidence, or human review.

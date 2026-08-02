@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "final-casework-output-package.schema.json",
+  "title": "Final Casework Output Package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "artifactType",
+    "deterministicPayload",
+    "contentSha256",
+    "operationalMetadata"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "artifactType": { "const": "final-casework-output-package" },
+    "deterministicPayload": { "$ref": "#/$defs/DeterministicPayload" },
+    "contentSha256": { "$ref": "#/$defs/Sha256" },
+    "operationalMetadata": { "$ref": "#/$defs/OperationalMetadata" }
+  },
+  "$defs": {
+    "Sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "StageKey": {
+      "enum": [
+        "evidence",
+        "plan-rules",
+        "population-profile",
+        "v1-architecture",
+        "build-spec",
+        "compiled-formulas",
+        "workbook",
+        "validation-reconciliation",
+        "section-436"
+      ]
+    },
+    "MaturityLevel": {
+      "enum": [
+        "specified",
+        "implemented",
+        "tested",
+        "independently-validated",
+        "externally-executed",
+        "human-approved"
+      ]
+    },
+    "DeterministicPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "caseId",
+        "packagePurpose",
+        "packageStatus",
+        "section436Required",
+        "stages",
+        "artifacts",
+        "unresolvedItems",
+        "maturityClaims",
+        "lineage"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "caseId": { "type": "string", "format": "uuid" },
+        "packagePurpose": { "const": "production-v1-casework-output" },
+        "packageStatus": { "enum": ["complete", "blocked"] },
+        "section436Required": { "type": "boolean" },
+        "stages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OutputStage" },
+          "minItems": 9
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ArtifactReference" }
+        },
+        "unresolvedItems": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/UnresolvedItemSummary" }
+        },
+        "maturityClaims": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MaturityClaim" }
+        },
+        "lineage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LineageEdge" }
+        }
+      }
+    },
+    "OutputStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stageKey",
+        "label",
+        "required",
+        "status",
+        "maturityLevel",
+        "artifactSha256Values",
+        "blockers"
+      ],
+      "properties": {
+        "stageKey": { "$ref": "#/$defs/StageKey" },
+        "label": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "status": { "enum": ["ready", "blocked", "not-required"] },
+        "maturityLevel": { "$ref": "#/$defs/MaturityLevel" },
+        "artifactSha256Values": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Sha256" },
+          "uniqueItems": true
+        },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "ArtifactReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactType",
+        "artifactId",
+        "contentSha256",
+        "mediaType",
+        "storagePath",
+        "description"
+      ],
+      "properties": {
+        "artifactType": {
+          "enum": [
+            "evidence-manifest",
+            "plan-rule-record",
+            "population-profile",
+            "v1-architecture",
+            "build-spec",
+            "compiled-formula-artifact",
+            "v1-workbook",
+            "validation-result",
+            "reconciliation-result",
+            "section-436-evaluation"
+          ]
+        },
+        "artifactId": { "type": "string", "minLength": 1 },
+        "contentSha256": { "$ref": "#/$defs/Sha256" },
+        "mediaType": { "type": "string", "minLength": 1 },
+        "storagePath": { "type": ["string", "null"] },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "UnresolvedItemSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["itemId", "scope", "downstreamConsequence", "status"],
+      "properties": {
+        "itemId": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "minLength": 1 },
+        "downstreamConsequence": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 }
+      }
+    },
+    "MaturityClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "level", "evidence", "externalExecutionClaimed"],
+      "properties": {
+        "subject": { "type": "string", "minLength": 1 },
+        "level": { "$ref": "#/$defs/MaturityLevel" },
+        "evidence": { "type": "string", "minLength": 1 },
+        "externalExecutionClaimed": { "type": "boolean" }
+      }
+    },
+    "LineageEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromArtifactSha256", "toArtifactSha256", "relationship"],
+      "properties": {
+        "fromArtifactSha256": { "$ref": "#/$defs/Sha256" },
+        "toArtifactSha256": { "$ref": "#/$defs/Sha256" },
+        "relationship": { "type": "string", "minLength": 1 }
+      }
+    },
+    "OperationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["createdAt", "createdBy", "generatorVersion"],
+      "properties": {
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": ["string", "null"] },
+        "generatorVersion": { "const": "case-output-package-v1.0.0" }
+      }
+    }
+  }
+}

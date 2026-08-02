@@ -67,7 +67,8 @@ export async function buildWorkbook(
           affectedNames: [],
           severity: "error",
           detail: "Failed to parse deterministic zero hash placeholder.",
-          remediation: "Verify shared hash parsing utilities and retry workbook generation.",
+          remediation:
+            "Verify shared hash parsing utilities and retry workbook generation.",
         },
       ],
     };
@@ -146,7 +147,8 @@ export async function buildWorkbook(
           affectedNames: [],
           severity: "error",
           detail: "Workbook content hash parsing failed.",
-          remediation: "Verify workbook serialization output and shared hash parsing.",
+          remediation:
+            "Verify workbook serialization output and shared hash parsing.",
         },
       ],
     };
@@ -227,11 +229,10 @@ function generateUDTableSheet(
   };
 }
 
-async function computeWorkbookContentHash(workbook: V1Workbook): Promise<string> {
+async function computeWorkbookContentHash(
+  workbook: V1Workbook,
+): Promise<string> {
   const { workbookContentSha256: omitted, ...content } = workbook;
   void omitted;
-  return hashTyped(
-    { workbook: content },
-    { typeName: "V1WorkbookContent" },
-  );
+  return hashTyped({ workbook: content }, { typeName: "V1WorkbookContent" });
 }

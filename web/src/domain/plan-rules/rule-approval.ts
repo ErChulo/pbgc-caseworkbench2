@@ -30,12 +30,16 @@ export function validateApprovalAuthority(
   return { valid: true };
 }
 
-export function validateApprovalInput(
-  input: ApprovalContext,
-): { valid: boolean; errors: string[] } {
+export function validateApprovalInput(input: ApprovalContext): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
-  const authorityCheck = validateApprovalAuthority(input.approverId, input.caseApproverId);
+  const authorityCheck = validateApprovalAuthority(
+    input.approverId,
+    input.caseApproverId,
+  );
   if (!authorityCheck.valid && authorityCheck.error) {
     errors.push(authorityCheck.error);
   }
@@ -48,7 +52,10 @@ export function validateApprovalInput(
     errors.push("At least one piece of evidence is required for approval");
   }
 
-  if (input.status === "rejected" && (!input.rationale || input.rationale.trim() === "")) {
+  if (
+    input.status === "rejected" &&
+    (!input.rationale || input.rationale.trim() === "")
+  ) {
     errors.push("Rejection rationale is required");
   }
 
@@ -58,7 +65,9 @@ export function validateApprovalInput(
   };
 }
 
-export async function recordApprovalDecision(input: ApprovalContext): Promise<ApprovalDecision> {
+export async function recordApprovalDecision(
+  input: ApprovalContext,
+): Promise<ApprovalDecision> {
   const deterministicPayload = {
     ruleVersionId: input.ruleVersion.ruleVersionId,
     approvedBy: input.approverId,

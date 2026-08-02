@@ -1,4 +1,7 @@
-import type { FormulaDefinitionV2, NamedRangeDefinition } from "../build-spec/models";
+import type {
+  FormulaDefinitionV2,
+  NamedRangeDefinition,
+} from "../build-spec/models";
 import type { CompilerPolicy } from "../formula-compiler/models";
 
 export interface CompilerInput {

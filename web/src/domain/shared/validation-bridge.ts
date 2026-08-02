@@ -11,7 +11,8 @@ export function toSharedValidationError(
     affectedNames: error.field !== null ? [error.field] : [],
     message: error.message,
     detail: JSON.stringify(error.context),
-    remediation: "Resolve the BuildSpec validation issue before workbook generation.",
+    remediation:
+      "Resolve the BuildSpec validation issue before workbook generation.",
   };
 }
 

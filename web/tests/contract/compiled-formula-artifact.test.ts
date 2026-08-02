@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { validateContract } from "../../src/contracts/schema-validator";
 import { compileBuildSpec } from "../../src/domain/formula-compiler/compiler";
@@ -13,17 +14,19 @@ import {
   fixedUuid,
 } from "../fixtures/formula-compiler";
 
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+
 describe("compiled formula artifact contract", () => {
   it("keeps approved and runtime schema bytes identical", async () => {
     const source = await readFile(
       resolve(
-        import.meta.dirname,
+        currentDirectory,
         "../../../specs/006-formula-compiler/contracts/compiled-formula-artifact.schema.json",
       ),
     );
     const runtime = await readFile(
       resolve(
-        import.meta.dirname,
+        currentDirectory,
         "../../src/contracts/schemas/compiled-formula-artifact.schema.json",
       ),
     );

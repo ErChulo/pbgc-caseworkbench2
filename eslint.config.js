@@ -1,4 +1,6 @@
 import eslint from "@eslint/js";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import globals from "globals";
@@ -10,6 +12,8 @@ const forbiddenProductionGlobals = {
   WebSocket: "Production runtime networking is prohibited.",
   EventSource: "Production runtime networking is prohibited.",
 };
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
 export default tseslint.config(
   {
@@ -40,7 +44,7 @@ export default tseslint.config(
       globals: globals.browser,
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: currentDirectory,
       },
     },
     plugins: {
@@ -89,7 +93,7 @@ export default tseslint.config(
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: currentDirectory,
       },
     },
     rules: {
@@ -105,7 +109,7 @@ export default tseslint.config(
       globals: globals.node,
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: currentDirectory,
       },
     },
     rules: {

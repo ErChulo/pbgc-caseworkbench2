@@ -22,9 +22,10 @@ export function queryRules(
 
   if (options.effectiveDate) {
     const effDate = options.effectiveDate;
-    result = result.filter((rule) =>
-      rule.effectiveDate <= effDate &&
-      (!rule.endDate || rule.endDate > effDate),
+    result = result.filter(
+      (rule) =>
+        rule.effectiveDate <= effDate &&
+        (!rule.endDate || rule.endDate > effDate),
     );
   }
 
@@ -38,9 +39,10 @@ export function queryRules(
 
   if (options.status === "effective" && options.effectiveDate) {
     const effDate = options.effectiveDate;
-    result = result.filter((rule) =>
-      rule.effectiveDate <= effDate &&
-      (!rule.endDate || rule.endDate > effDate),
+    result = result.filter(
+      (rule) =>
+        rule.effectiveDate <= effDate &&
+        (!rule.endDate || rule.endDate > effDate),
     );
   } else if (options.status === "superseded") {
     result = result.filter((rule) => rule.endDate !== undefined);
@@ -71,7 +73,10 @@ export function getRulesEffectiveOn(
   date: string,
 ): PlanRule[] {
   return rules
-    .filter((rule) => rule.effectiveDate <= date && (!rule.endDate || rule.endDate > date))
+    .filter(
+      (rule) =>
+        rule.effectiveDate <= date && (!rule.endDate || rule.endDate > date),
+    )
     .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
 }
 
@@ -83,7 +88,9 @@ export function getRulesApplicableTo(
   return rules
     .filter((rule) => {
       const ruleAppLower = rule.applicability.toLowerCase();
-      return ruleAppLower.includes(classLower) || classLower.includes(ruleAppLower);
+      return (
+        ruleAppLower.includes(classLower) || classLower.includes(ruleAppLower)
+      );
     })
     .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate));
 }
@@ -99,7 +106,11 @@ export function getApplicableRulesForWorkbook(
   return {
     effectiveDate,
     applicableRuleIds: applicableRules.map((r) => r.ruleId),
-    classificationRationale: "Rules effective on " + effectiveDate + " applicable to " + classification,
+    classificationRationale:
+      "Rules effective on " +
+      effectiveDate +
+      " applicable to " +
+      classification,
   };
 }
 
@@ -111,7 +122,9 @@ export function matchRulesToClassification(
   const matches = rules
     .filter((rule) => {
       const ruleAppLower = rule.applicability.toLowerCase();
-      return ruleAppLower.includes(classLower) || classLower.includes(ruleAppLower);
+      return (
+        ruleAppLower.includes(classLower) || classLower.includes(ruleAppLower)
+      );
     })
     .map((rule): RuleApplicabilityMatch => ({
       ruleId: rule.ruleId,
@@ -125,7 +138,10 @@ export function matchRulesToClassification(
   return matches;
 }
 
-function calculateMatchScore(classification: string, applicability: string): number {
+function calculateMatchScore(
+  classification: string,
+  applicability: string,
+): number {
   const classLower = classification.toLowerCase();
   const appLower = applicability.toLowerCase();
 

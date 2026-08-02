@@ -231,6 +231,92 @@ h2 {
   border-color: var(--color-warning-border);
 }
 
+.case-output-stage-list {
+  display: grid;
+  gap: var(--space-1);
+  padding: 0;
+  list-style: none;
+}
+
+.case-output-linker,
+.case-output-linked-artifacts {
+  display: grid;
+  gap: var(--space-1);
+  margin-block: var(--space-3);
+  padding: var(--space-2);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.case-output-linker h3,
+.case-output-linked-artifacts h3 {
+  margin-block: 0;
+}
+
+.case-output-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.case-output-link-grid label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+}
+
+.case-output-link-grid input,
+.case-output-link-grid select {
+  width: 100%;
+  padding: 0.65rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-input);
+  border-radius: var(--radius-sm);
+}
+
+.case-output-description-field {
+  grid-column: 1 / -1;
+}
+
+.case-output-linked-artifacts ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.case-output-stage {
+  display: grid;
+  gap: 0.35rem;
+  padding: var(--space-2);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.case-output-stage div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.case-output-stage span,
+.case-output-stage p {
+  color: var(--color-muted-text);
+}
+
+.case-output-stage p {
+  margin-block-end: 0;
+}
+
+.case-output-stage-blocked {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+}
+
 .quarantine-panel label {
   display: grid;
   gap: 0.4rem;

@@ -1,13 +1,16 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
 import { validateContract } from "../../src/contracts/schema-validator";
 
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+
 const schema = JSON.parse(
   readFileSync(
     resolve(
-      import.meta.dirname,
+      currentDirectory,
       "../../../specs/004-v1-architecture-selector/contracts/v1-architecture.schema.json",
     ),
     "utf8",
@@ -16,7 +19,7 @@ const schema = JSON.parse(
 const governed = JSON.parse(
   readFileSync(
     resolve(
-      import.meta.dirname,
+      currentDirectory,
       "../../src/contracts/schemas/governed-records.schema.json",
     ),
     "utf8",

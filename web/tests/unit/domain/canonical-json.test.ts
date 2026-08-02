@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +18,8 @@ import {
   makeRegisteredArrayVector,
   type RegisteredArrayVector,
 } from "../../fixtures/contracts/registered-array-vectors";
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
 interface CanonicalApi {
   canonicalize(value: unknown): string;
@@ -42,7 +44,7 @@ interface CanonicalApi {
 async function loadCanonicalApi(): Promise<CanonicalApi> {
   const implementationUrl = pathToFileURL(
     resolve(
-      import.meta.dirname,
+      currentDirectory,
       "../../../src/domain/manifests/canonical-json.ts",
     ),
   ).href;
@@ -53,7 +55,7 @@ async function registeredArrayRules(): Promise<
   readonly RegisteredArrayVector[]
 > {
   const directory = resolve(
-    import.meta.dirname,
+    currentDirectory,
     "../../../../specs/009-case-intake-normalization/contracts",
   );
   const rules: RegisteredArrayVector[] = [];

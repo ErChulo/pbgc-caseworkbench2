@@ -10,7 +10,14 @@ import type {
   ExecutionOrder,
 } from "../../../../src/domain/build-spec/models";
 
-function formula(overrides: Partial<FormulaDefinitionV2> & { formulaId: string; formulaText: string; cellAddress: string; tabName: string }): FormulaDefinitionV2 {
+function formula(
+  overrides: Partial<FormulaDefinitionV2> & {
+    formulaId: string;
+    formulaText: string;
+    cellAddress: string;
+    tabName: string;
+  },
+): FormulaDefinitionV2 {
   return {
     scenarioId: "NRD",
     genericField: "CALC",
@@ -32,9 +39,26 @@ function formula(overrides: Partial<FormulaDefinitionV2> & { formulaId: string; 
 
 describe("formula sheet generation", () => {
   it("generates formula cells in execution order", () => {
-    const f1 = formula({ formulaId: "F1", cellAddress: "A1", tabName: "Retirees", formulaText: "=B1+1" });
-    const f2 = formula({ formulaId: "F2", cellAddress: "B1", tabName: "Retirees", formulaText: "=10", dependencies: [] });
-    const f3 = formula({ formulaId: "F3", cellAddress: "C1", tabName: "Retirees", formulaText: "=A1*2", dependencies: ["F1"] });
+    const f1 = formula({
+      formulaId: "F1",
+      cellAddress: "A1",
+      tabName: "Retirees",
+      formulaText: "=B1+1",
+    });
+    const f2 = formula({
+      formulaId: "F2",
+      cellAddress: "B1",
+      tabName: "Retirees",
+      formulaText: "=10",
+      dependencies: [],
+    });
+    const f3 = formula({
+      formulaId: "F3",
+      cellAddress: "C1",
+      tabName: "Retirees",
+      formulaText: "=A1*2",
+      dependencies: ["F1"],
+    });
 
     const executionOrder: ExecutionOrder = {
       order: ["F2", "F1", "F3"],
@@ -44,7 +68,10 @@ describe("formula sheet generation", () => {
       cycleNodes: [],
     };
 
-    const result = generateFormulaCells({ formulas: [f1, f2, f3], executionOrder });
+    const result = generateFormulaCells({
+      formulas: [f1, f2, f3],
+      executionOrder,
+    });
     expect(result.formulaCells).toHaveLength(3);
     expect(result.formulaCells[0]?.formulaId).toBe("F2");
     expect(result.formulaCells[0]?.executionOrder).toBe(0);
@@ -56,8 +83,18 @@ describe("formula sheet generation", () => {
   });
 
   it("groups formula cells by tab", () => {
-    const f1 = formula({ formulaId: "F1", cellAddress: "A1", tabName: "Retirees", formulaText: "=1" });
-    const f2 = formula({ formulaId: "F2", cellAddress: "A1", tabName: "Tables", formulaText: "=2" });
+    const f1 = formula({
+      formulaId: "F1",
+      cellAddress: "A1",
+      tabName: "Retirees",
+      formulaText: "=1",
+    });
+    const f2 = formula({
+      formulaId: "F2",
+      cellAddress: "A1",
+      tabName: "Tables",
+      formulaText: "=2",
+    });
 
     const executionOrder: ExecutionOrder = {
       order: ["F1", "F2"],
@@ -74,9 +111,26 @@ describe("formula sheet generation", () => {
   });
 
   it("computes execution levels from dependency depth", () => {
-    const f1 = formula({ formulaId: "F1", cellAddress: "A1", tabName: "T", formulaText: "=1" });
-    const f2 = formula({ formulaId: "F2", cellAddress: "B1", tabName: "T", formulaText: "=A1", dependencies: ["F1"] });
-    const f3 = formula({ formulaId: "F3", cellAddress: "C1", tabName: "T", formulaText: "=B1", dependencies: ["F2"] });
+    const f1 = formula({
+      formulaId: "F1",
+      cellAddress: "A1",
+      tabName: "T",
+      formulaText: "=1",
+    });
+    const f2 = formula({
+      formulaId: "F2",
+      cellAddress: "B1",
+      tabName: "T",
+      formulaText: "=A1",
+      dependencies: ["F1"],
+    });
+    const f3 = formula({
+      formulaId: "F3",
+      cellAddress: "C1",
+      tabName: "T",
+      formulaText: "=B1",
+      dependencies: ["F2"],
+    });
 
     const executionOrder: ExecutionOrder = {
       order: ["F1", "F2", "F3"],
@@ -86,7 +140,10 @@ describe("formula sheet generation", () => {
       cycleNodes: [],
     };
 
-    const result = generateFormulaCells({ formulas: [f1, f2, f3], executionOrder });
+    const result = generateFormulaCells({
+      formulas: [f1, f2, f3],
+      executionOrder,
+    });
     expect(result.formulaCells[0]?.executionLevel).toBe(0);
     expect(result.formulaCells[1]?.executionLevel).toBe(1);
     expect(result.formulaCells[2]?.executionLevel).toBe(2);
@@ -102,7 +159,12 @@ describe("data cell population", () => {
         tabName: "Retirees",
         cellAddress: "A1",
         iobClassification: "I",
-        dataSource: { sourceType: "population", sourceTab: "Pop", sourceField: "DOB", evidenceKey: null },
+        dataSource: {
+          sourceType: "population",
+          sourceTab: "Pop",
+          sourceField: "DOB",
+          evidenceKey: null,
+        },
         formulaId: null,
         scenarioId: "NRD",
       },
@@ -151,10 +213,34 @@ describe("data cell population", () => {
 describe("sheet cell merging", () => {
   it("merges cells from multiple sources by tab", () => {
     const map1 = new Map([
-      ["Retirees", [{ address: "A1", kind: "formula" as const, formulaText: "=1", value: null, dataSource: null, mappingId: null }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "A1",
+            kind: "formula" as const,
+            formulaText: "=1",
+            value: null,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const map2 = new Map([
-      ["Retirees", [{ address: "B1", kind: "input" as const, formulaText: null, value: null, dataSource: null, mappingId: null }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "B1",
+            kind: "input" as const,
+            formulaText: null,
+            value: null,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const result = mergeSheetCells(map1, map2);
     expect(result.get("Retirees")).toHaveLength(2);
@@ -162,10 +248,34 @@ describe("sheet cell merging", () => {
 
   it("handles disjoint tabs", () => {
     const map1 = new Map([
-      ["Retirees", [{ address: "A1", kind: "formula" as const, formulaText: "=1", value: null, dataSource: null, mappingId: null }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "A1",
+            kind: "formula" as const,
+            formulaText: "=1",
+            value: null,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const map2 = new Map([
-      ["Tables", [{ address: "A1", kind: "label" as const, formulaText: null, value: null, dataSource: null, mappingId: null }]],
+      [
+        "Tables",
+        [
+          {
+            address: "A1",
+            kind: "label" as const,
+            formulaText: null,
+            value: null,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const result = mergeSheetCells(map1, map2);
     expect(result.size).toBe(2);
@@ -173,10 +283,34 @@ describe("sheet cell merging", () => {
 
   it("merges overlapping cells by address, combining formula and data", () => {
     const formulaCells = new Map([
-      ["Retirees", [{ address: "C1", kind: "formula" as const, formulaText: "=A1+B1", value: null, dataSource: null, mappingId: null }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "C1",
+            kind: "formula" as const,
+            formulaText: "=A1+B1",
+            value: null,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const dataCells = new Map([
-      ["Retirees", [{ address: "C1", kind: "output" as const, formulaText: null, value: 42, dataSource: null, mappingId: null }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "C1",
+            kind: "output" as const,
+            formulaText: null,
+            value: 42,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const result = mergeSheetCells(formulaCells, dataCells);
     const cells = result.get("Retirees");
@@ -187,10 +321,43 @@ describe("sheet cell merging", () => {
 
   it("preserves formula text when merging B cells from both sources", () => {
     const formulaCells = new Map([
-      ["Retirees", [{ address: "D1", kind: "formula" as const, formulaText: "=C1*2", value: null, dataSource: null, mappingId: null }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "D1",
+            kind: "formula" as const,
+            formulaText: "=C1*2",
+            value: null,
+            dataSource: null,
+            mappingId: null,
+          },
+        ],
+      ],
     ]);
     const dataCells = new Map([
-      ["Retirees", [{ address: "D1", kind: "output" as const, formulaText: null, value: 100, dataSource: { sourceTab: "RETIREES", columnIdentifier: "BENEFIT", rowRange: { start: 0, count: 1 }, recordCount: 1, recordHash: "a".repeat(64) as import("../../../../src/domain/shared/types").Sha256 }, mappingId: "m1" as import("../../../../src/domain/shared/types").Uuid }]],
+      [
+        "Retirees",
+        [
+          {
+            address: "D1",
+            kind: "output" as const,
+            formulaText: null,
+            value: 100,
+            dataSource: {
+              sourceTab: "RETIREES",
+              columnIdentifier: "BENEFIT",
+              rowRange: { start: 0, count: 1 },
+              recordCount: 1,
+              recordHash: "a".repeat(
+                64,
+              ) as import("../../../../src/domain/shared/types").Sha256,
+            },
+            mappingId:
+              "m1" as import("../../../../src/domain/shared/types").Uuid,
+          },
+        ],
+      ],
     ]);
     const result = mergeSheetCells(formulaCells, dataCells);
     const cells = result.get("Retirees");

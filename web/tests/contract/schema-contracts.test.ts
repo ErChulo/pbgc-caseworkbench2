@@ -1,5 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import Ajv2020, { type ValidateFunction } from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
@@ -12,8 +13,10 @@ import {
   universalInvalidChainConditions,
 } from "../fixtures/contracts/semantic-cases";
 
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+
 const schemaDirectory = resolve(
-  import.meta.dirname,
+  currentDirectory,
   "../../../specs/009-case-intake-normalization/contracts",
 );
 

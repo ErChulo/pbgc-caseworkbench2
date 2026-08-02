@@ -198,13 +198,11 @@ describe("Feature 001 evidence reviewer UI", () => {
     );
   });
 
-  it("keeps governed decisions and rules in a resettable session preview", async () => {
+  it("keeps governed decisions and preview-only rules in a resettable session", async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(
-      screen.getByText(/does not persist decisions or rules/u),
-    ).toBeVisible();
+    expect(screen.getByText(/production persistence/u)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Unresolved items" }));
     await user.type(
       screen.getByLabelText("Reviewer name"),
@@ -238,7 +236,7 @@ describe("Feature 001 evidence reviewer UI", () => {
     );
     expect(
       await screen.findByText(/Governed validation passed/u),
-    ).toHaveTextContent("not persisted");
+    ).toHaveTextContent("Select a workspace and active case");
 
     await user.click(
       screen.getByRole("button", { name: "Reset session preview" }),

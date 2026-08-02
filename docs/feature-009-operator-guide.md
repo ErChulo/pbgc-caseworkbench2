@@ -51,3 +51,13 @@ The application writes only to the selected local workspace. It does not send ca
 ## Built-in help
 
 The application includes built-in help describing workspace selection, backups, keyboard operation, static-origin fallback, and local PII handling. Use it as the first operator reference before processing a production package.
+
+## Final output package operation
+
+- Use the Case Output Package panel only after the correct case is active.
+- Link generated V1, workbook, validation, reconciliation, and Section 436 artifacts from paths inside the selected workspace.
+- The app computes each linked artifact SHA-256 from file bytes; do not enter manual hashes.
+- Linked references are stored at `cases/<case-uuid>/outputs/artifact-references.json`.
+- The exported final package is stored at `cases/<case-uuid>/exports/final-casework-output-package.json`.
+- A blocked final package is acceptable evidence of missing required outputs; do not mark it complete by hand-editing JSON.
+- Do not claim Excel, ValTool, Runtime, ATPBGC, BCV, or other external execution unless separate execution evidence is linked and reviewed.

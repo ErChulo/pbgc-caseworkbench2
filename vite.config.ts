@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -18,12 +19,14 @@ const renameEntryHtml = {
   },
 };
 
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+
 export default defineConfig({
-  root: resolve(import.meta.dirname, "web"),
+  root: resolve(currentDirectory, "web"),
   base: "./",
   plugins: [react(), viteSingleFile(), renameEntryHtml],
   build: {
-    outDir: resolve(import.meta.dirname, "dist"),
+    outDir: resolve(currentDirectory, "dist"),
     emptyOutDir: true,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
     cssCodeSplit: false,

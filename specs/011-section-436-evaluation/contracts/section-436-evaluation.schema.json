@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "section-436-evaluation.schema.json",
+  "title": "Section 436 Evaluation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "artifactType",
+    "deterministicPayload",
+    "contentSha256",
+    "operationalMetadata"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "artifactType": { "const": "section-436-evaluation" },
+    "deterministicPayload": { "$ref": "#/$defs/DeterministicPayload" },
+    "contentSha256": { "$ref": "#/$defs/Sha256" },
+    "operationalMetadata": { "$ref": "#/$defs/OperationalMetadata" }
+  },
+  "$defs": {
+    "Sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "Citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "sourceLocator", "description"],
+      "properties": {
+        "artifactSha256": { "$ref": "#/$defs/Sha256" },
+        "sourceLocator": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 }
+      }
+    },
+    "Fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "factKey",
+        "value",
+        "valueKind",
+        "citations",
+        "reviewStatus"
+      ],
+      "properties": {
+        "factKey": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 },
+        "valueKind": { "enum": ["date", "decimal-percentage", "text"] },
+        "citations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Citation" },
+          "minItems": 1
+        },
+        "reviewStatus": { "enum": ["human-approved", "provisional"] }
+      }
+    },
+    "Rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ruleId",
+        "description",
+        "operator",
+        "aftapPercentageThreshold",
+        "conclusionCode",
+        "limitationEffect",
+        "priority",
+        "effectiveDate",
+        "citations",
+        "reviewStatus"
+      ],
+      "properties": {
+        "ruleId": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "operator": {
+          "enum": [
+            "less-than",
+            "less-than-or-equal",
+            "greater-than-or-equal",
+            "equal"
+          ]
+        },
+        "aftapPercentageThreshold": { "type": "string", "minLength": 1 },
+        "conclusionCode": {
+          "enum": [
+            "restriction-applies",
+            "no-restriction-identified",
+            "additional-review-required"
+          ]
+        },
+        "limitationEffect": { "type": "string", "minLength": 1 },
+        "priority": { "type": "integer", "minimum": 1 },
+        "effectiveDate": { "type": "string", "format": "date" },
+        "citations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Citation" },
+          "minItems": 1
+        },
+        "reviewStatus": { "enum": ["human-approved", "provisional"] }
+      }
+    },
+    "DeterministicPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "caseId",
+        "evaluationStatus",
+        "planYearStart",
+        "planYearEnd",
+        "facts",
+        "rules",
+        "missingRequiredFacts",
+        "matchedRuleIds",
+        "conclusionCode",
+        "limitationEffect",
+        "citations",
+        "blockedReasons"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "caseId": { "type": "string", "format": "uuid" },
+        "evaluationStatus": {
+          "enum": ["completed", "blocked", "inconclusive"]
+        },
+        "planYearStart": { "type": ["string", "null"], "format": "date" },
+        "planYearEnd": { "type": ["string", "null"], "format": "date" },
+        "facts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Fact" }
+        },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Rule" }
+        },
+        "missingRequiredFacts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "matchedRuleIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "conclusionCode": {
+          "enum": [
+            "restriction-applies",
+            "no-restriction-identified",
+            "additional-review-required",
+            "blocked"
+          ]
+        },
+        "limitationEffect": { "type": ["string", "null"] },
+        "citations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Citation" }
+        },
+        "blockedReasons": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "OperationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluatedAt", "evaluatedBy", "engineVersion"],
+      "properties": {
+        "evaluatedAt": { "type": "string", "format": "date-time" },
+        "evaluatedBy": { "type": ["string", "null"] },
+        "engineVersion": { "const": "section-436-evaluator-v1.0.0" }
+      }
+    }
+  }
+}

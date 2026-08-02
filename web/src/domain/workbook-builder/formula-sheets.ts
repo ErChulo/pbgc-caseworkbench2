@@ -1,4 +1,8 @@
-import type { FormulaDefinitionV2, CellMapping, ExecutionOrder } from "../build-spec/models";
+import type {
+  FormulaDefinitionV2,
+  CellMapping,
+  ExecutionOrder,
+} from "../build-spec/models";
 import type { FormulaCell, WorkbookCell } from "./models";
 import type { PopulationDataResolver } from "./population-data-resolver";
 import { resolveCellValue } from "./population-data-resolver";
@@ -13,7 +17,9 @@ export interface FormulaSheetResult {
   readonly cellsByTab: ReadonlyMap<string, readonly WorkbookCell[]>;
 }
 
-export function generateFormulaCells(input: FormulaSheetInput): FormulaSheetResult {
+export function generateFormulaCells(
+  input: FormulaSheetInput,
+): FormulaSheetResult {
   const formulaMap = new Map<string, FormulaDefinitionV2>();
   for (const formula of input.formulas) {
     formulaMap.set(formula.formulaId, formula);

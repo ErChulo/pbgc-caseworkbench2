@@ -2,7 +2,7 @@
 
 **Feature**: 007 Workbook Builder
 **Date**: 2026-07-29
-**Status**: Planning; implementation not yet started
+**Status**: Implemented and tested; ready for human approval
 
 ## Summary
 
@@ -15,7 +15,7 @@ Feature 007 generates deterministic V1 workbooks from governed BuildSpecs (Featu
 - No external workbook execution (ValTool, Runtime, etc.)
 - No formula execution during generation
 - Input: `BuildSpecV2`, `PopulationDecisionProjection`, `WorkbookPopulationProfile`
-- Output: Deterministic XLSX workbook or aggregated validation errors
+- Output: Deterministic workbook representation/XLSX artifact or aggregated validation errors
 
 ## Architecture
 
@@ -72,15 +72,15 @@ web/tests/fixtures/
 
 ## Constitution Check
 
-| Requirement | Result |
-|---|---|
-| Deterministic actuarial computation | Pass: deterministic generation, no formula execution, no LLM output |
-| Evidence and effective-date traceability | Pass: support sheets preserve BuildSpec lineage, plan rules, governance |
-| Missing data | Pass: missing population sources block generation; no invented values |
-| V1 concept separation | Pass: workbook is pure artifact; CALC, CALCULATION, I/O/B remain distinct |
-| Human review | Pass: governance and approval decisions embedded in support sheets |
-| Reproducibility | Pass: deterministic content hash, byte-identical outputs from same inputs |
-| Validation evidence | Not yet implemented; to be tested post-implementation |
+| Requirement                              | Result                                                                     |
+| ---------------------------------------- | -------------------------------------------------------------------------- |
+| Deterministic actuarial computation      | Pass: deterministic generation, no formula execution, no LLM output        |
+| Evidence and effective-date traceability | Pass: support sheets preserve BuildSpec lineage, plan rules, governance    |
+| Missing data                             | Pass: missing population sources block generation; no invented values      |
+| V1 concept separation                    | Pass: workbook is pure artifact; CALC, CALCULATION, I/O/B remain distinct  |
+| Human review                             | Pass: governance and approval decisions embedded in support sheets         |
+| Reproducibility                          | Pass: deterministic content hash, byte-identical outputs from same inputs  |
+| Validation evidence                      | Tested through focused workbook-builder tests and Feature 008 bridge tests |
 
 No constitutional exception required.
 

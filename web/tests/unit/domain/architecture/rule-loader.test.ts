@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   effectivePolicyApproval,
@@ -16,7 +17,8 @@ import {
 import type { Sha256, Uuid } from "../../../../src/domain/shared/types";
 import { evidenceCatalog } from "../plan-rules/governed-fixtures";
 
-const rulesDir = resolve(import.meta.dirname, "../../../../../rules");
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const rulesDir = resolve(currentDirectory, "../../../../../rules");
 const temporaryDirectories: string[] = [];
 
 afterEach(async () => {
@@ -150,8 +152,12 @@ describe("rule-loader", () => {
     );
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
-    expect(policyContentHash(first.value)).toBe(policyContentHash(second.value));
-    expect(policyContentHash(first.value)).toBe(first.value.policyContentSha256);
+    expect(policyContentHash(first.value)).toBe(
+      policyContentHash(second.value),
+    );
+    expect(policyContentHash(first.value)).toBe(
+      first.value.policyContentSha256,
+    );
   });
 
   it("resolves rule paths relative to a base directory", () => {

@@ -120,6 +120,10 @@ import {
   UnresolvedItemQueue,
   type UnresolvedAction,
 } from "../components/evidence/UnresolvedItemQueue";
+import {
+  CaseOutputPackagePanel,
+  type CaseOutputArtifactLinkDraft,
+} from "../components/case-output/CaseOutputPackagePanel";
 import { evidenceReviewDemo } from "../components/evidence/demo-evidence";
 import type {
   AuthorityOverride,
@@ -131,6 +135,15 @@ import {
   type GovernanceDependencies,
 } from "../domain/plan-rules/rule-authoring";
 import { resolveItem } from "../domain/plan-rules/unresolved-items";
+import {
+  buildFinalCaseworkOutputPayload,
+  createFinalCaseworkOutputPackage,
+} from "../domain/case-output/package-builder";
+import type {
+  CaseworkOutputArtifactInput,
+  CaseworkOutputUnresolvedItemSummary,
+  FinalCaseworkOutputInput,
+} from "../domain/case-output/models";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -178,6 +191,22 @@ const DEMO_PROVISION_CANDIDATES = evidenceReviewDemo.candidates.map(
 const EMPTY_DEMO_RULES = [] as const;
 const EMPTY_AUTHORITY_OVERRIDES: readonly AuthorityOverride[] = [];
 const SYNTHETIC_RULE_SCOPE = "benefit/accrual-freeze/participant-group";
+const CASE_OUTPUT_ARTIFACT_TYPES = [
+  "population-profile",
+  "v1-architecture",
+  "build-spec",
+  "compiled-formula-artifact",
+  "v1-workbook",
+  "validation-result",
+  "reconciliation-result",
+  "section-436-evaluation",
+] as const;
+const CASE_OUTPUT_MATURITY_LEVELS = [
+  "implemented",
+  "tested",
+  "independently-validated",
+  "human-approved",
+] as const;
 
 function createSessionGovernanceDependencies(): GovernanceDependencies {
   let sequence = 500;
@@ -257,6 +286,15 @@ export function App({
   const [ruleAuthoringOutcome, setRuleAuthoringOutcome] =
     useState<SessionPreviewOutcome | null>(null);
   const [ruleAuthoringBusy, setRuleAuthoringBusy] = useState(false);
+  const [caseOutputExportMessage, setCaseOutputExportMessage] = useState<
+    string | null
+  >(null);
+  const [caseOutputLinkMessage, setCaseOutputLinkMessage] = useState<
+    string | null
+  >(null);
+  const [caseOutputArtifacts, setCaseOutputArtifacts] = useState<
+    readonly CaseworkOutputArtifactInput[]
+  >([]);
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
   const activeGovernanceDependencies =
@@ -267,8 +305,12 @@ export function App({
       priorSnapshot.current = null;
       inventoryCheckpoints.current.clear();
       lastCheckpoint.current = null;
+      setCaseOutputArtifacts([]);
+      setCaseOutputLinkMessage(null);
+      setCaseOutputExportMessage(null);
     }
     setActiveCase(caseRecord);
+    void loadCaseOutputArtifactReferences(caseRecord);
   };
 
   const selectWorkspace = async (): Promise<void> => {
@@ -571,11 +613,15 @@ export function App({
       setRuleAuthoringBusy(false);
       return;
     }
+    const persisted = await persistPlanRuleRecord(result.value);
     setPreviewRules((current) => [...current, result.value]);
     setRuleAuthoringOutcome({
       kind: "success",
-      message: `Governed validation passed for a synthetic session preview effective ${result.value.effectiveDate}. This preview was not persisted and will be lost on reset or refresh.`,
+      message: persisted
+        ? `Governed validation passed and the plan-rule record was persisted locally for this case effective ${result.value.effectiveDate}.`
+        : `Governed validation passed for a synthetic session preview effective ${result.value.effectiveDate}. Select a workspace and active case to persist rule records.`,
     });
+    setCaseOutputExportMessage(null);
     setRuleAuthoringBusy(false);
   };
 
@@ -623,6 +669,22 @@ export function App({
         onAction={recordUnresolvedAction}
       />
     );
+
+  const finalOutputInput = activeCase
+    ? createFinalOutputInput({
+        caseRecord: activeCase,
+        manifestSummary,
+        previewRules,
+        populationItems,
+        caseOutputArtifacts,
+        unresolvedItems: evidenceUnresolvedItems,
+        createdAt: dependencies.clock.now(),
+        createdBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
+      })
+    : null;
+  const finalOutputPayload = finalOutputInput
+    ? buildFinalCaseworkOutputPayload(finalOutputInput)
+    : null;
 
   return (
     <div className="app-frame">
@@ -697,14 +759,17 @@ export function App({
                 Evidence and plan-rule review
               </h2>
             </div>
-            <p>Typed synthetic demo data only</p>
+            <p>Typed synthetic demo candidates</p>
           </div>
           <div className="notice session-preview-controls">
             <p>
-              <strong>Synthetic session preview only.</strong> Governed
-              operations validate in memory, but this reviewer workspace does
-              not persist decisions or rules. Reset or browser refresh restores
-              the initial synthetic state.
+              <strong>
+                Synthetic session preview with production persistence.
+              </strong>
+              Governed operations use typed demo candidates. Plan-rule records
+              persist to the active local case workspace when one is selected;
+              otherwise they remain preview-only. Reset or browser refresh
+              restores the initial synthetic preview state.
             </p>
             <button
               type="button"
@@ -763,6 +828,14 @@ export function App({
         <ManifestExport
           summary={manifestSummary}
           onExport={exportCurrentManifest}
+        />
+        <CaseOutputPackagePanel
+          payload={finalOutputPayload}
+          linkedArtifacts={caseOutputArtifacts}
+          exportMessage={caseOutputExportMessage}
+          linkMessage={caseOutputLinkMessage}
+          onLinkArtifact={linkCaseOutputArtifact}
+          onExport={exportFinalCaseworkOutputPackage}
         />
       </main>
     </div>
@@ -1549,6 +1622,135 @@ export function App({
     if (!saved.ok) throw new Error("Review event could not be preserved.");
   }
 
+  async function persistPlanRuleRecord(rule: PlanRuleRecord): Promise<boolean> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null || activeCase === null) return false;
+    await activeWorkspace.createDirectory(
+      `cases/${activeCase.caseId}/evidence`,
+    );
+    const saved = await activeWorkspace.append(
+      `cases/${activeCase.caseId}/evidence/rule-records.jsonl`,
+      new TextEncoder().encode(`${canonicalize(rule)}\n`),
+    );
+    if (!saved.ok) throw new Error("Plan-rule record could not be preserved.");
+    await appendReviewEvent({
+      eventType: "plan-rule-recorded",
+      ruleId: rule.ruleId,
+      ruleContentSha256: rule.ruleContentSha256,
+      effectiveDate: rule.effectiveDate,
+      recordedAt: dependencies.clock.now(),
+      schemaVersion: "1.0.0",
+    });
+    return true;
+  }
+
+  async function loadCaseOutputArtifactReferences(
+    caseRecord: CaseRecord,
+  ): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null) return;
+    const opened = await activeWorkspace.openChunkReader(
+      `cases/${caseRecord.caseId}/outputs/artifact-references.json`,
+    );
+    if (!opened.ok) {
+      if (opened.error.code !== "NOT_FOUND") {
+        setCaseOutputLinkMessage(
+          "Existing final-output artifact references could not be read.",
+        );
+      }
+      return;
+    }
+    try {
+      const value = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          await readAllBytes(opened.value),
+        ),
+      ) as unknown;
+      setCaseOutputArtifacts(parseCaseOutputArtifactReferences(value));
+    } catch {
+      setCaseOutputLinkMessage(
+        "Existing final-output artifact references are not valid JSON and were ignored.",
+      );
+    }
+  }
+
+  async function persistCaseOutputArtifactReferences(
+    caseId: Uuid,
+    references: readonly CaseworkOutputArtifactInput[],
+  ): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null) throw new Error("Workspace unavailable.");
+    await activeWorkspace.createDirectory(`cases/${caseId}/outputs`);
+    const saved = await activeWorkspace.writeAtomic(
+      `cases/${caseId}/outputs/artifact-references.json`,
+      new TextEncoder().encode(`${canonicalize(references)}\n`),
+    );
+    if (!saved.ok) {
+      throw new Error("Final-output artifact references could not be saved.");
+    }
+  }
+
+  async function linkCaseOutputArtifact(
+    draft: CaseOutputArtifactLinkDraft,
+  ): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null || activeCase === null) {
+      setCaseOutputLinkMessage(
+        "Select an active local case before linking output artifacts.",
+      );
+      return;
+    }
+    const artifactId = draft.artifactId.trim();
+    const storagePath = normalizeWorkspacePath(draft.storagePath);
+    const mediaType = draft.mediaType.trim();
+    const description = draft.description.trim();
+    if (
+      artifactId === "" ||
+      storagePath === null ||
+      mediaType === "" ||
+      description === ""
+    ) {
+      setCaseOutputLinkMessage(
+        "Artifact type, ID, workspace path, media type, and description are required. Paths must be relative workspace paths without '..'.",
+      );
+      return;
+    }
+
+    const opened = await activeWorkspace.openChunkReader(storagePath);
+    if (!opened.ok) {
+      setCaseOutputLinkMessage(
+        `Workspace artifact could not be opened at ${storagePath}.`,
+      );
+      return;
+    }
+    const hashed = await hashChunkReader(opened.value);
+    if (!hashed.ok) {
+      setCaseOutputLinkMessage(hashed.error.safeMessage);
+      return;
+    }
+    const linked: CaseworkOutputArtifactInput = {
+      artifactType: draft.artifactType,
+      artifactId,
+      contentSha256: hashed.value.sha256,
+      mediaType,
+      storagePath,
+      description,
+      maturityLevel: draft.maturityLevel,
+    };
+    const next = [
+      ...caseOutputArtifacts.filter(
+        (artifact) => artifact.artifactType !== linked.artifactType,
+      ),
+      linked,
+    ].sort(compareCaseOutputArtifacts);
+    await persistCaseOutputArtifactReferences(activeCase.caseId, next);
+    setCaseOutputArtifacts(next);
+    setCaseOutputExportMessage(null);
+    setCaseOutputLinkMessage(
+      `Linked ${linked.artifactType} from ${storagePath} with SHA-256 ${linked.contentSha256}.`,
+    );
+  }
+
   async function exportCurrentManifest(): Promise<void> {
     const activeWorkspace = workspace.current;
     if (!activeWorkspace || !activeCase || !manifestSummary)
@@ -1570,6 +1772,232 @@ export function App({
     );
     if (!saved.ok) throw new Error("Local manifest export failed.");
   }
+
+  async function exportFinalCaseworkOutputPackage(): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (!activeWorkspace || !activeCase) {
+      throw new Error("No active local case is available for export.");
+    }
+    const outputInput = createFinalOutputInput({
+      caseRecord: activeCase,
+      manifestSummary,
+      previewRules,
+      populationItems,
+      caseOutputArtifacts,
+      unresolvedItems: evidenceUnresolvedItems,
+      createdAt: dependencies.clock.now(),
+      createdBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
+    });
+    const outputPackage = await createFinalCaseworkOutputPackage(outputInput);
+    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/exports`);
+    const saved = await activeWorkspace.writeAtomic(
+      `cases/${activeCase.caseId}/exports/final-casework-output-package.json`,
+      new TextEncoder().encode(`${canonicalize(outputPackage)}\n`),
+    );
+    if (!saved.ok) throw new Error("Final output package export failed.");
+    setCaseOutputExportMessage(
+      `Final output package exported with status ${outputPackage.deterministicPayload.packageStatus} and hash ${outputPackage.contentSha256}.`,
+    );
+  }
+}
+
+function createFinalOutputInput({
+  caseRecord,
+  manifestSummary,
+  previewRules,
+  populationItems,
+  caseOutputArtifacts,
+  unresolvedItems,
+  createdAt,
+  createdBy,
+}: {
+  readonly caseRecord: CaseRecord;
+  readonly manifestSummary: ManifestExportSummary | null;
+  readonly previewRules: readonly PlanRuleRecord[];
+  readonly populationItems: readonly PopulationReviewItem[];
+  readonly caseOutputArtifacts: readonly CaseworkOutputArtifactInput[];
+  readonly unresolvedItems: readonly UnresolvedItem[];
+  readonly createdAt: ReturnType<typeof dependencies.clock.now>;
+  readonly createdBy: string | null;
+}): FinalCaseworkOutputInput {
+  const linked = linkedCaseOutputArtifacts(caseOutputArtifacts);
+  return {
+    caseId: caseRecord.caseId,
+    evidenceManifestSha256: manifestSha256(manifestSummary),
+    planRules: previewRules.map((rule) => ({
+      ruleId: rule.ruleId,
+      ruleContentSha256: rule.ruleContentSha256,
+      reviewStatus: rule.reviewStatus,
+      storagePath: `cases/${caseRecord.caseId}/evidence/rule-records.jsonl`,
+    })),
+    populationProfileContentSha256:
+      approvedPopulationProfileHash(populationItems) ??
+      linked.get("population-profile")?.contentSha256 ??
+      null,
+    architecture: linked.get("v1-architecture") ?? null,
+    buildSpec: linked.get("build-spec") ?? null,
+    compiledFormulas: linked.get("compiled-formula-artifact") ?? null,
+    workbook: linked.get("v1-workbook") ?? null,
+    validation: linked.get("validation-result") ?? null,
+    reconciliation: linked.get("reconciliation-result") ?? null,
+    section436: linked.get("section-436-evaluation") ?? null,
+    section436Required: true,
+    unresolvedItems: unresolvedItems.map(unresolvedItemSummary),
+    createdAt,
+    createdBy,
+  };
+}
+
+function manifestSha256(
+  manifestSummary: ManifestExportSummary | null,
+): Sha256 | null {
+  if (manifestSummary === null) return null;
+  const parsed = parseSha256(manifestSummary.deterministicManifestHash);
+  return parsed.ok ? parsed.value : null;
+}
+
+function approvedPopulationProfileHash(
+  populationItems: readonly PopulationReviewItem[],
+): Sha256 | null {
+  for (const item of populationItems) {
+    if (
+      item.projection.status === "approved" &&
+      item.projection.effectiveWorkbookProfileContentSha256 !== null
+    ) {
+      return item.projection.effectiveWorkbookProfileContentSha256;
+    }
+  }
+  return null;
+}
+
+function unresolvedItemSummary(
+  item: UnresolvedItem,
+): CaseworkOutputUnresolvedItemSummary {
+  return {
+    itemId: item.itemId,
+    scope: item.affectedScope,
+    downstreamConsequence: item.consequence,
+    status: item.status,
+  };
+}
+
+function linkedCaseOutputArtifacts(
+  artifacts: readonly CaseworkOutputArtifactInput[],
+): ReadonlyMap<
+  CaseworkOutputArtifactInput["artifactType"],
+  CaseworkOutputArtifactInput
+> {
+  return new Map(
+    artifacts.map((artifact) => [artifact.artifactType, artifact] as const),
+  );
+}
+
+function parseCaseOutputArtifactReferences(
+  value: unknown,
+): readonly CaseworkOutputArtifactInput[] {
+  if (!Array.isArray(value)) return [];
+  const references: CaseworkOutputArtifactInput[] = [];
+  for (const item of value) {
+    if (item === null || typeof item !== "object") continue;
+    const record = item as Record<string, unknown>;
+    if (
+      !isCaseOutputArtifactType(record.artifactType) ||
+      typeof record.artifactId !== "string" ||
+      typeof record.mediaType !== "string" ||
+      typeof record.description !== "string" ||
+      !isCaseOutputMaturityLevel(record.maturityLevel)
+    ) {
+      continue;
+    }
+    const parsedHash =
+      typeof record.contentSha256 === "string"
+        ? parseSha256(record.contentSha256)
+        : { ok: false as const };
+    if (!parsedHash.ok) continue;
+    if (record.storagePath !== null && typeof record.storagePath !== "string") {
+      continue;
+    }
+    references.push({
+      artifactType: record.artifactType,
+      artifactId: record.artifactId,
+      contentSha256: parsedHash.value,
+      mediaType: record.mediaType,
+      storagePath: record.storagePath,
+      description: record.description,
+      maturityLevel: record.maturityLevel,
+    });
+  }
+  return references.sort(compareCaseOutputArtifacts);
+}
+
+function isCaseOutputArtifactType(
+  value: unknown,
+): value is CaseworkOutputArtifactInput["artifactType"] {
+  return (
+    typeof value === "string" &&
+    CASE_OUTPUT_ARTIFACT_TYPES.includes(
+      value as (typeof CASE_OUTPUT_ARTIFACT_TYPES)[number],
+    )
+  );
+}
+
+function isCaseOutputMaturityLevel(
+  value: unknown,
+): value is NonNullable<CaseworkOutputArtifactInput["maturityLevel"]> {
+  return (
+    typeof value === "string" &&
+    CASE_OUTPUT_MATURITY_LEVELS.includes(
+      value as (typeof CASE_OUTPUT_MATURITY_LEVELS)[number],
+    )
+  );
+}
+
+function normalizeWorkspacePath(value: string): string | null {
+  const normalized = value.trim().replaceAll("\\", "/");
+  if (normalized === "" || normalized.startsWith("/")) return null;
+  const segments = normalized.split("/");
+  if (
+    segments.some(
+      (segment) => segment === "" || segment === "." || segment === "..",
+    )
+  ) {
+    return null;
+  }
+  return normalized;
+}
+
+async function readAllBytes(
+  source: ChunkReaderPort<BrowserWorkspaceError>,
+): Promise<Uint8Array> {
+  const bytes = new Uint8Array(source.sizeBytes);
+  let offsetBytes = 0;
+  while (offsetBytes < bytes.byteLength) {
+    const chunk = await source.read({
+      offsetBytes,
+      lengthBytes: Math.min(64 * 1024, bytes.byteLength - offsetBytes),
+    });
+    if (
+      !chunk.ok ||
+      chunk.value.offsetBytes !== offsetBytes ||
+      chunk.value.bytes.byteLength === 0
+    ) {
+      throw new Error("Workspace file could not be read completely.");
+    }
+    bytes.set(chunk.value.bytes, offsetBytes);
+    offsetBytes += chunk.value.bytes.byteLength;
+  }
+  return bytes;
+}
+
+function compareCaseOutputArtifacts(
+  left: CaseworkOutputArtifactInput,
+  right: CaseworkOutputArtifactInput,
+): number {
+  return (
+    left.artifactType.localeCompare(right.artifactType) ||
+    left.artifactId.localeCompare(right.artifactId) ||
+    left.contentSha256.localeCompare(right.contentSha256)
+  );
 }
 
 function replaceItem(

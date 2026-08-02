@@ -8,6 +8,8 @@ const contractDirectories = [
   resolve("specs/005-v1-build-spec/contracts"),
   resolve("specs/006-formula-compiler/contracts"),
   resolve("specs/007-workbook-builder/contracts"),
+  resolve("specs/010-final-casework-output-package/contracts"),
+  resolve("specs/011-section-436-evaluation/contracts"),
 ];
 
 const schemas = new Map();

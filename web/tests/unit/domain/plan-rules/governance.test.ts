@@ -71,7 +71,10 @@ import type {
   AuditEvent,
 } from "../../../../src/domain/plan-rules/models";
 
-import type { ValidationError, ValidationWarning } from "../../../../src/domain/shared/validation-result";
+import type {
+  ValidationError,
+  ValidationWarning,
+} from "../../../../src/domain/shared/validation-result";
 
 type Ts = import("../../../../src/domain/shared/types").UtcTimestamp;
 
@@ -109,7 +112,9 @@ function makeVersion(overrides: Partial<RuleVersion> = {}): RuleVersion {
   };
 }
 
-function makeApproval(overrides: Partial<ApprovalDecision> = {}): ApprovalDecision {
+function makeApproval(
+  overrides: Partial<ApprovalDecision> = {},
+): ApprovalDecision {
   return {
     approvalId: uid("00000000-0000-4000-8000-000000000020"),
     ruleVersionId: uid("00000000-0000-4000-8000-000000000010"),
@@ -138,11 +143,25 @@ function makeAuditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
 }
 
 function makeWarning(code: string, message: string): ValidationWarning {
-  return { code, severity: "warning", affectedCells: [], message, detail: "Test detail" };
+  return {
+    code,
+    severity: "warning",
+    affectedCells: [],
+    message,
+    detail: "Test detail",
+  };
 }
 
 function makeError(code: string, message: string): ValidationError {
-  return { code, severity: "error", affectedCells: [], affectedNames: [], message, detail: "Test detail", remediation: "Fix it" };
+  return {
+    code,
+    severity: "error",
+    affectedCells: [],
+    affectedNames: [],
+    message,
+    detail: "Test detail",
+    remediation: "Fix it",
+  };
 }
 
 const population = {
@@ -158,7 +177,11 @@ describe("rule-engine", () => {
       statement: "Test rule",
       effectiveDate: "2024-01-01",
       applicability: "participant-group",
-      primaryCitation: { sourceType: "plan-document" as const, locator: "Art 4", date: "2023-01-01" },
+      primaryCitation: {
+        sourceType: "plan-document" as const,
+        locator: "Art 4",
+        date: "2023-01-01",
+      },
       createdBy: "author-1",
       createdAt: ts("2024-01-01T00:00:00.000Z"),
     };
@@ -168,7 +191,10 @@ describe("rule-engine", () => {
   });
 
   it("isRuleEffectiveOn checks date ranges", () => {
-    const rule = makeRule({ effectiveDate: "2024-01-01", endDate: "2024-12-31" });
+    const rule = makeRule({
+      effectiveDate: "2024-01-01",
+      endDate: "2024-12-31",
+    });
     expect(isRuleEffectiveOn(rule, "2024-06-15")).toBe(true);
     expect(isRuleEffectiveOn(rule, "2025-01-01")).toBe(false);
     expect(isRuleEffectiveOn(rule, "2023-12-31")).toBe(false);
@@ -180,13 +206,27 @@ describe("rule-engine", () => {
   });
 
   it("matchesApplicability matches exact classification", () => {
-    expect(matchesApplicability("participant-group", "participant-group")).toBe(true);
-    expect(matchesApplicability("other-group", "participant-group")).toBe(false);
+    expect(matchesApplicability("participant-group", "participant-group")).toBe(
+      true,
+    );
+    expect(matchesApplicability("other-group", "participant-group")).toBe(
+      false,
+    );
   });
 
   it("matchesApplicability matches partial classification", () => {
-    expect(matchesApplicability("participant-group", "participant-group,amendment-period")).toBe(true);
-    expect(matchesApplicability("amendment-period", "participant-group,amendment-period")).toBe(true);
+    expect(
+      matchesApplicability(
+        "participant-group",
+        "participant-group,amendment-period",
+      ),
+    ).toBe(true);
+    expect(
+      matchesApplicability(
+        "amendment-period",
+        "participant-group,amendment-period",
+      ),
+    ).toBe(true);
   });
 
   it("validateSemanticVersion accepts valid versions", () => {
@@ -257,15 +297,36 @@ describe("rule-versioning", () => {
 
   it("validateSupersessionChain accepts valid chain", () => {
     const chain: SupersessionLink[] = [
-      createSupersessionLink(uid("aaa"), uid("hash-a"), "2024-01-01", "initial", 1),
-      createSupersessionLink(uid("bbb"), uid("hash-b"), "2024-06-01", "supersession", 2),
+      createSupersessionLink(
+        uid("aaa"),
+        uid("hash-a"),
+        "2024-01-01",
+        "initial",
+        1,
+      ),
+      createSupersessionLink(
+        uid("bbb"),
+        uid("hash-b"),
+        "2024-06-01",
+        "supersession",
+        2,
+      ),
     ];
-    expect(validateSupersessionChain(chain)).toEqual({ valid: true, errors: [] });
+    expect(validateSupersessionChain(chain)).toEqual({
+      valid: true,
+      errors: [],
+    });
   });
 
   it("validateSupersessionChain rejects non-initial first link", () => {
     const chain: SupersessionLink[] = [
-      createSupersessionLink(uid("aaa"), uid("hash-a"), "2024-01-01", "supersession", 1),
+      createSupersessionLink(
+        uid("aaa"),
+        uid("hash-a"),
+        "2024-01-01",
+        "supersession",
+        1,
+      ),
     ];
     const result = validateSupersessionChain(chain);
     expect(result.valid).toBe(false);
@@ -274,8 +335,20 @@ describe("rule-versioning", () => {
 
   it("validateSupersessionChain rejects duplicate ordinals", () => {
     const chain: SupersessionLink[] = [
-      createSupersessionLink(uid("aaa"), uid("hash-a"), "2024-01-01", "initial", 1),
-      createSupersessionLink(uid("bbb"), uid("hash-b"), "2024-06-01", "supersession", 1),
+      createSupersessionLink(
+        uid("aaa"),
+        uid("hash-a"),
+        "2024-01-01",
+        "initial",
+        1,
+      ),
+      createSupersessionLink(
+        uid("bbb"),
+        uid("hash-b"),
+        "2024-06-01",
+        "supersession",
+        1,
+      ),
     ];
     const result = validateSupersessionChain(chain);
     expect(result.valid).toBe(false);
@@ -284,13 +357,27 @@ describe("rule-versioning", () => {
 
   it("computeRuleVersionHash is deterministic", async () => {
     const rule = makeRule();
-    const hash1 = await computeRuleVersionHash(rule.ruleId, "1.0.0", rule.statement);
-    const hash2 = await computeRuleVersionHash(rule.ruleId, "1.0.0", rule.statement);
+    const hash1 = await computeRuleVersionHash(
+      rule.ruleId,
+      "1.0.0",
+      rule.statement,
+    );
+    const hash2 = await computeRuleVersionHash(
+      rule.ruleId,
+      "1.0.0",
+      rule.statement,
+    );
     expect(hash1).toBe(hash2);
   });
 
   it("createSupersessionLink creates link with correct fields", () => {
-    const link = createSupersessionLink(uid("aaa"), uid("hash-a"), "2024-01-01", "initial", 1);
+    const link = createSupersessionLink(
+      uid("aaa"),
+      uid("hash-a"),
+      "2024-01-01",
+      "initial",
+      1,
+    );
     expect(link.ordinal).toBe(1);
     expect(link.predecessorRuleId).toBe("aaa");
     expect(link.effectiveDate).toBe("2024-01-01");
@@ -358,22 +445,32 @@ describe("rule-approval", () => {
 
   it("getApprovalStatus returns status for rule version", () => {
     const approvals = [makeApproval()];
-    const status = getApprovalStatus(approvals, uid("00000000-0000-4000-8000-000000000010"));
+    const status = getApprovalStatus(
+      approvals,
+      uid("00000000-0000-4000-8000-000000000010"),
+    );
     expect(status).toBe("approved");
   });
 
   it("getApprovalStatus returns null when no approval exists", () => {
-    const status = getApprovalStatus([], uid("00000000-0000-4000-8000-000000000010"));
+    const status = getApprovalStatus(
+      [],
+      uid("00000000-0000-4000-8000-000000000010"),
+    );
     expect(status).toBeNull();
   });
 
   it("isRuleApproved returns true when approved", () => {
     const approvals = [makeApproval()];
-    expect(isRuleApproved(approvals, uid("00000000-0000-4000-8000-000000000010"))).toBe(true);
+    expect(
+      isRuleApproved(approvals, uid("00000000-0000-4000-8000-000000000010")),
+    ).toBe(true);
   });
 
   it("isRuleApproved returns false when not approved", () => {
-    expect(isRuleApproved([], uid("00000000-0000-4000-8000-000000000010"))).toBe(false);
+    expect(
+      isRuleApproved([], uid("00000000-0000-4000-8000-000000000010")),
+    ).toBe(false);
   });
 
   it("getLatestApproval returns most recent approval", () => {
@@ -382,12 +479,18 @@ describe("rule-approval", () => {
       approvalId: uid("00000000-0000-4000-8000-000000000021"),
       approvedAt: ts("2024-06-01T00:00:00.000Z"),
     });
-    const latest = getLatestApproval([older, newer], uid("00000000-0000-4000-8000-000000000010"));
+    const latest = getLatestApproval(
+      [older, newer],
+      uid("00000000-0000-4000-8000-000000000010"),
+    );
     expect(latest?.approvalId).toBe(newer.approvalId);
   });
 
   it("getLatestApproval returns null when no approvals", () => {
-    const latest = getLatestApproval([], uid("00000000-0000-4000-8000-000000000010"));
+    const latest = getLatestApproval(
+      [],
+      uid("00000000-0000-4000-8000-000000000010"),
+    );
     expect(latest).toBeNull();
   });
 
@@ -397,7 +500,10 @@ describe("rule-approval", () => {
       approvalId: uid("00000000-0000-4000-8000-000000000021"),
       approvedAt: ts("2024-06-01T00:00:00.000Z"),
     });
-    const history = getApprovalHistory([a2, a1], "00000000-0000-4000-8000-000000000010");
+    const history = getApprovalHistory(
+      [a2, a1],
+      "00000000-0000-4000-8000-000000000010",
+    );
     expect(history.length).toBe(2);
     expect(history[0]?.approvedAt).toBe("2024-06-01T00:00:00.000Z");
   });
@@ -461,12 +567,18 @@ describe("rule-query", () => {
   });
 
   it("findRuleById returns correct rule", () => {
-    const found = findRuleById(rules, uid("00000000-0000-4000-8000-000000000002"));
+    const found = findRuleById(
+      rules,
+      uid("00000000-0000-4000-8000-000000000002"),
+    );
     expect(found?.applicability).toBe("amendment-period");
   });
 
   it("findRuleById returns null when not found", () => {
-    const found = findRuleById(rules, uid("00000000-0000-4000-8000-999999999999"));
+    const found = findRuleById(
+      rules,
+      uid("00000000-0000-4000-8000-999999999999"),
+    );
     expect(found).toBeNull();
   });
 
@@ -486,7 +598,11 @@ describe("rule-query", () => {
   });
 
   it("getApplicableRulesForWorkbook returns correct context", () => {
-    const context = getApplicableRulesForWorkbook(rules, "2024-06-15", "participant-group");
+    const context = getApplicableRulesForWorkbook(
+      rules,
+      "2024-06-15",
+      "participant-group",
+    );
     expect(context.effectiveDate).toBe("2024-06-15");
     expect(context.applicableRuleIds.length).toBe(1);
   });
@@ -494,31 +610,52 @@ describe("rule-query", () => {
   it("matchRulesToClassification returns matches with scores", () => {
     const matches = matchRulesToClassification(rules, "participant-group");
     expect(matches.length).toBe(2);
-    expect(matches[0]?.matchScore).toBeGreaterThanOrEqual(matches[1]?.matchScore ?? 0);
+    expect(matches[0]?.matchScore).toBeGreaterThanOrEqual(
+      matches[1]?.matchScore ?? 0,
+    );
   });
 
   it("getRuleVersion returns specific version", () => {
     const versions = [
       makeVersion({ version: "1.0.0" }),
-      makeVersion({ version: "2.0.0", ruleVersionId: uid("00000000-0000-4000-8000-000000000011") }),
+      makeVersion({
+        version: "2.0.0",
+        ruleVersionId: uid("00000000-0000-4000-8000-000000000011"),
+      }),
     ];
-    const found = getRuleVersion(versions, uid("00000000-0000-4000-8000-000000000001"), "2.0.0");
+    const found = getRuleVersion(
+      versions,
+      uid("00000000-0000-4000-8000-000000000001"),
+      "2.0.0",
+    );
     expect(found?.version).toBe("2.0.0");
   });
 
   it("getRuleVersion returns latest version when no version specified", () => {
     const versions = [
       makeVersion({ version: "1.0.0" }),
-      makeVersion({ version: "2.0.0", ruleVersionId: uid("00000000-0000-4000-8000-000000000011") }),
+      makeVersion({
+        version: "2.0.0",
+        ruleVersionId: uid("00000000-0000-4000-8000-000000000011"),
+      }),
     ];
-    const latest = getRuleVersion(versions, uid("00000000-0000-4000-8000-000000000001"));
+    const latest = getRuleVersion(
+      versions,
+      uid("00000000-0000-4000-8000-000000000001"),
+    );
     expect(latest?.version).toBe("2.0.0");
   });
 
   it("getRuleVersionHistory returns versions sorted", () => {
     const v1 = makeVersion({ version: "1.0.0" });
-    const v2 = makeVersion({ version: "2.0.0", ruleVersionId: uid("00000000-0000-4000-8000-000000000011") });
-    const history = getRuleVersionHistory([v1, v2], uid("00000000-0000-4000-8000-000000000001"));
+    const v2 = makeVersion({
+      version: "2.0.0",
+      ruleVersionId: uid("00000000-0000-4000-8000-000000000011"),
+    });
+    const history = getRuleVersionHistory(
+      [v1, v2],
+      uid("00000000-0000-4000-8000-000000000001"),
+    );
     expect(history[0]?.version).toBe("2.0.0");
     expect(history[1]?.version).toBe("1.0.0");
   });
@@ -526,9 +663,15 @@ describe("rule-query", () => {
   it("getAuditEventsForRule returns events for specific rule", () => {
     const events = [
       makeAuditEvent({ ruleId: uid("00000000-0000-4000-8000-000000000001") }),
-      makeAuditEvent({ ruleId: uid("00000000-0000-4000-8000-000000000002"), eventId: uid("00000000-0000-4000-8000-000000000031") }),
+      makeAuditEvent({
+        ruleId: uid("00000000-0000-4000-8000-000000000002"),
+        eventId: uid("00000000-0000-4000-8000-000000000031"),
+      }),
     ];
-    const result = getAuditEventsForRuleFromQuery(events, uid("00000000-0000-4000-8000-000000000001"));
+    const result = getAuditEventsForRuleFromQuery(
+      events,
+      uid("00000000-0000-4000-8000-000000000001"),
+    );
     expect(result.length).toBe(1);
   });
 });
@@ -572,7 +715,10 @@ describe("audit-log", () => {
   it("getAuditEventsByActor filters by actor", () => {
     const events = [
       makeAuditEvent({ actor: "author-1" }),
-      makeAuditEvent({ actor: "approver-1", eventId: uid("00000000-0000-4000-8000-000000000031") }),
+      makeAuditEvent({
+        actor: "approver-1",
+        eventId: uid("00000000-0000-4000-8000-000000000031"),
+      }),
     ];
     const log = createAuditLog(events);
     const result = getAuditEventsByActor(log, "author-1");
@@ -583,7 +729,10 @@ describe("audit-log", () => {
   it("getAuditEventsByAction filters by action", () => {
     const events = [
       makeAuditEvent({ action: "created" }),
-      makeAuditEvent({ action: "approved", eventId: uid("00000000-0000-4000-8000-000000000031") }),
+      makeAuditEvent({
+        action: "approved",
+        eventId: uid("00000000-0000-4000-8000-000000000031"),
+      }),
     ];
     const log = createAuditLog(events);
     const result = getAuditEventsByAction(log, "created");
@@ -594,29 +743,49 @@ describe("audit-log", () => {
   it("getAuditEventsInRange filters by timestamp", () => {
     const events = [
       makeAuditEvent({ timestamp: ts("2024-01-01T00:00:00.000Z") }),
-      makeAuditEvent({ timestamp: ts("2024-06-01T00:00:00.000Z"), eventId: uid("00000000-0000-4000-8000-000000000031") }),
-      makeAuditEvent({ timestamp: ts("2025-01-01T00:00:00.000Z"), eventId: uid("00000000-0000-4000-8000-000000000032") }),
+      makeAuditEvent({
+        timestamp: ts("2024-06-01T00:00:00.000Z"),
+        eventId: uid("00000000-0000-4000-8000-000000000031"),
+      }),
+      makeAuditEvent({
+        timestamp: ts("2025-01-01T00:00:00.000Z"),
+        eventId: uid("00000000-0000-4000-8000-000000000032"),
+      }),
     ];
     const log = createAuditLog(events);
-    const result = getAuditEventsInRange(log, ts("2024-01-01T00:00:00.000Z"), ts("2024-12-31T23:59:59.999Z"));
+    const result = getAuditEventsInRange(
+      log,
+      ts("2024-01-01T00:00:00.000Z"),
+      ts("2024-12-31T23:59:59.999Z"),
+    );
     expect(result.length).toBe(2);
   });
 
   it("getAuditEventById returns correct event", () => {
-    const event = makeAuditEvent({ eventId: uid("00000000-0000-4000-8000-000000000030") });
+    const event = makeAuditEvent({
+      eventId: uid("00000000-0000-4000-8000-000000000030"),
+    });
     const log = createAuditLog([event]);
-    const found = getAuditEventById(log, "00000000-0000-4000-8000-000000000030");
+    const found = getAuditEventById(
+      log,
+      "00000000-0000-4000-8000-000000000030",
+    );
     expect(found?.eventId).toBe("00000000-0000-4000-8000-000000000030");
   });
 
   it("getAuditEventById returns null when not found", () => {
     const log = createAuditLog();
-    const found = getAuditEventById(log, "00000000-0000-4000-8000-999999999999");
+    const found = getAuditEventById(
+      log,
+      "00000000-0000-4000-8000-999999999999",
+    );
     expect(found).toBeNull();
   });
 
   it("verifyAuditLogIntegrity returns valid for consistent log", () => {
-    const event = makeAuditEvent({ eventId: uid("00000000-0000-4000-8000-000000000030") });
+    const event = makeAuditEvent({
+      eventId: uid("00000000-0000-4000-8000-000000000030"),
+    });
     const log = createAuditLog([event]);
     const result = verifyAuditLogIntegrity(log);
     expect(result.valid).toBe(true);
@@ -634,8 +803,16 @@ describe("audit-log", () => {
   it("getAuditSummary returns correct counts", () => {
     const events = [
       makeAuditEvent({ action: "created", actor: "author-1" }),
-      makeAuditEvent({ action: "approved", actor: "approver-1", eventId: uid("00000000-0000-4000-8000-000000000031") }),
-      makeAuditEvent({ action: "created", actor: "author-2", eventId: uid("00000000-0000-4000-8000-000000000032") }),
+      makeAuditEvent({
+        action: "approved",
+        actor: "approver-1",
+        eventId: uid("00000000-0000-4000-8000-000000000031"),
+      }),
+      makeAuditEvent({
+        action: "created",
+        actor: "author-2",
+        eventId: uid("00000000-0000-4000-8000-000000000032"),
+      }),
     ];
     const log = createAuditLog(events);
     const summary = getAuditSummary(log);
@@ -656,13 +833,21 @@ describe("validation", () => {
       caseApproverId: "approver-1",
     });
     expect(result.valid).toBe(true);
-    expect(result.warnings.some((w) => w.code === "NO_EFFECTIVE_RULES")).toBe(true);
+    expect(result.warnings.some((w) => w.code === "NO_EFFECTIVE_RULES")).toBe(
+      true,
+    );
   });
 
   it("validateRuleSet returns warnings for overlapping applicability", () => {
     const rules = [
-      makeRule({ ruleId: uid("00000000-0000-4000-8000-000000000001"), applicability: "participant-group" }),
-      makeRule({ ruleId: uid("00000000-0000-4000-8000-000000000002"), applicability: "participant-group" }),
+      makeRule({
+        ruleId: uid("00000000-0000-4000-8000-000000000001"),
+        applicability: "participant-group",
+      }),
+      makeRule({
+        ruleId: uid("00000000-0000-4000-8000-000000000002"),
+        applicability: "participant-group",
+      }),
     ];
     const result = validateRuleSet({
       rules,
@@ -670,40 +855,59 @@ describe("validation", () => {
       population,
       caseApproverId: "approver-1",
     });
-    expect(result.warnings.some((w) => w.code === "OVERLAPPING_APPLICABILITY")).toBe(true);
+    expect(
+      result.warnings.some((w) => w.code === "OVERLAPPING_APPLICABILITY"),
+    ).toBe(true);
   });
 
   it("validatePopulationApplicability returns errors when no effective rules", () => {
     const result = validatePopulationApplicability(population, []);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.code === "NO_EFFECTIVE_RULES_FOR_POPULATION")).toBe(true);
+    expect(
+      result.errors.some((e) => e.code === "NO_EFFECTIVE_RULES_FOR_POPULATION"),
+    ).toBe(true);
   });
 
   it("validateRuleVersions detects duplicate versions", () => {
     const v1 = makeVersion({ version: "1.0.0" });
-    const v2 = makeVersion({ version: "1.0.0", ruleVersionId: uid("00000000-0000-4000-8000-000000000011") });
+    const v2 = makeVersion({
+      version: "1.0.0",
+      ruleVersionId: uid("00000000-0000-4000-8000-000000000011"),
+    });
     const result = validateRuleVersions([v1, v2], [makeRule()]);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e) => e.code === "DUPLICATE_RULE_VERSION")).toBe(true);
+    expect(result.errors.some((e) => e.code === "DUPLICATE_RULE_VERSION")).toBe(
+      true,
+    );
   });
 
   it("validateRuleVersions warns for rule without version", () => {
     const rule = makeRule();
     const result = validateRuleVersions([], [rule]);
-    expect(result.warnings.some((w) => w.code === "RULE_WITHOUT_VERSION")).toBe(true);
+    expect(result.warnings.some((w) => w.code === "RULE_WITHOUT_VERSION")).toBe(
+      true,
+    );
   });
 
   it("validateApprovalCompleteness warns for unapproved versions", () => {
     const version = makeVersion();
     const result = validateApprovalCompleteness([], [makeRule()], [version]);
-    expect(result.warnings.some((w) => w.code === "UNAPPROVED_RULE_VERSION")).toBe(true);
+    expect(
+      result.warnings.some((w) => w.code === "UNAPPROVED_RULE_VERSION"),
+    ).toBe(true);
   });
 
   it("validateApprovalCompleteness passes when all versions approved", () => {
     const version = makeVersion();
     const approval = makeApproval({ ruleVersionId: version.ruleVersionId });
-    const result = validateApprovalCompleteness([approval], [makeRule()], [version]);
-    expect(result.warnings.some((w) => w.code === "UNAPPROVED_RULE_VERSION")).toBe(false);
+    const result = validateApprovalCompleteness(
+      [approval],
+      [makeRule()],
+      [version],
+    );
+    expect(
+      result.warnings.some((w) => w.code === "UNAPPROVED_RULE_VERSION"),
+    ).toBe(false);
   });
 
   it("combineValidationResults merges results", () => {

@@ -138,7 +138,10 @@ describe("Feature 007 workbook builder integration", () => {
           scope: "workbook" as const,
           genericField: "COMP",
           scenarioId: null,
-          provenance: { source: "architecture" as const, architectureNamedRange: "COMP" },
+          provenance: {
+            source: "architecture" as const,
+            architectureNamedRange: "COMP",
+          },
         },
       ],
     };
@@ -193,9 +196,14 @@ describe("population data integration with arbitrary fields", () => {
       generatorVersion: "1.0.0",
       populationData,
     });
-    if (!result.ok) throw new Error(`workbook build failed: ${JSON.stringify(result.errors)}`);
+    if (!result.ok)
+      throw new Error(
+        `workbook build failed: ${JSON.stringify(result.errors)}`,
+      );
 
-    const retireeSheet = result.workbook.sheets.find((s) => s.name === "RETIREES");
+    const retireeSheet = result.workbook.sheets.find(
+      (s) => s.name === "RETIREES",
+    );
     expect(retireeSheet).toBeDefined();
     if (retireeSheet === undefined) return;
 
@@ -213,7 +221,8 @@ describe("population data integration with arbitrary fields", () => {
   });
 
   it("handles arbitrary user-defined field names", async () => {
-    const csv = "MY_CUSTOM_FIELD,ANOTHER_USER_FIELD,CALC_AVG_COMP\nfoo,bar,42\n";
+    const csv =
+      "MY_CUSTOM_FIELD,ANOTHER_USER_FIELD,CALC_AVG_COMP\nfoo,bar,42\n";
     const registry = parseCsvToRegistry(csv, "CUSTOM_TAB");
     const populationData = registryToPopulationData(registry);
 
@@ -279,9 +288,14 @@ describe("population data integration with arbitrary fields", () => {
       generatorVersion: "1.0.0",
       populationData,
     });
-    if (!result.ok) throw new Error(`workbook build failed: ${JSON.stringify(result.errors)}`);
+    if (!result.ok)
+      throw new Error(
+        `workbook build failed: ${JSON.stringify(result.errors)}`,
+      );
 
-    const retireeSheet = result.workbook.sheets.find((s) => s.name === "RETIREES");
+    const retireeSheet = result.workbook.sheets.find(
+      (s) => s.name === "RETIREES",
+    );
     expect(retireeSheet).toBeDefined();
     if (retireeSheet === undefined) return;
 
@@ -352,9 +366,14 @@ describe("population data integration with arbitrary fields", () => {
       generatorVersion: "1.0.0",
       populationData: merged,
     });
-    if (!result.ok) throw new Error(`workbook build failed: ${JSON.stringify(result.errors)}`);
+    if (!result.ok)
+      throw new Error(
+        `workbook build failed: ${JSON.stringify(result.errors)}`,
+      );
 
-    expect(result.workbook.sheets.some((s) => s.name === "RETIREES")).toBe(true);
+    expect(result.workbook.sheets.some((s) => s.name === "RETIREES")).toBe(
+      true,
+    );
     expect(result.workbook.sheets.some((s) => s.name === "ACTIVE")).toBe(true);
 
     const activeSheet = result.workbook.sheets.find((s) => s.name === "ACTIVE");

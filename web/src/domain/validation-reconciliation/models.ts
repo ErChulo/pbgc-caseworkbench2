@@ -62,10 +62,7 @@ export interface ReconciliationResult {
   readonly oracleId: string;
   readonly oracleExecutedAt: UtcTimestamp;
   readonly reconciliationStatus:
-    | "complete"
-    | "mismatches"
-    | "oracle-unavailable"
-    | "oracle-error";
+    "complete" | "mismatches" | "oracle-unavailable" | "oracle-error";
   readonly mismatches: readonly ReconciliationMismatch[];
   readonly tolerance: ToleranceProfile;
   readonly matchCount: number;

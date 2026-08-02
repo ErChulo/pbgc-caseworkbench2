@@ -9,7 +9,13 @@ import { createPopulationDataResolver } from "../../../../src/domain/workbook-bu
 describe("PopulationDataRegistry", () => {
   it("resolves values by tab and field", () => {
     const data = new Map([
-      ["RETIREES", new Map([["COMP", [50000, 60000]], ["YOS", [10, 15]]])],
+      [
+        "RETIREES",
+        new Map([
+          ["COMP", [50000, 60000]],
+          ["YOS", [10, 15]],
+        ]),
+      ],
     ]);
     const registry = createPopulationDataRegistry(data);
     expect(registry.resolve("RETIREES", "COMP")).toEqual([50000, 60000]);
@@ -23,7 +29,13 @@ describe("PopulationDataRegistry", () => {
 
   it("lists tabs and fields", () => {
     const data = new Map([
-      ["RETIREES", new Map([["COMP", [1]], ["YOS", [2]]])],
+      [
+        "RETIREES",
+        new Map([
+          ["COMP", [1]],
+          ["YOS", [2]],
+        ]),
+      ],
       ["ACTIVE", new Map([["SALARY", [3]]])],
     ]);
     const registry = createPopulationDataRegistry(data);
@@ -33,7 +45,13 @@ describe("PopulationDataRegistry", () => {
 
   it("reports record counts", () => {
     const data = new Map([
-      ["RETIREES", new Map([["COMP", [1, 2, 3]], ["YOS", [4, 5]]])],
+      [
+        "RETIREES",
+        new Map([
+          ["COMP", [1, 2, 3]],
+          ["YOS", [4, 5]],
+        ]),
+      ],
     ]);
     const registry = createPopulationDataRegistry(data);
     expect(registry.recordCount("RETIREES")).toBe(3);
@@ -75,7 +93,13 @@ describe("CSV parsing to registry", () => {
 describe("registry to population data conversion", () => {
   it("converts registry to population data map", () => {
     const data = new Map([
-      ["RETIREES", new Map([["COMP", [50000]], ["YOS", [10]]])],
+      [
+        "RETIREES",
+        new Map([
+          ["COMP", [50000]],
+          ["YOS", [10]],
+        ]),
+      ],
     ]);
     const registry = createPopulationDataRegistry(data);
     const popData = registryToPopulationData(registry);

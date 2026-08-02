@@ -1,10 +1,7 @@
 import type { ValidationError, ValidationWarning } from "./validation-result";
 
 export type ValidationRule<T> =
-  | RequiredRule<T>
-  | NonEmptyRule<T>
-  | UniqueRule<T>
-  | CustomRule<T>;
+  RequiredRule<T> | NonEmptyRule<T> | UniqueRule<T> | CustomRule<T>;
 
 export interface RequiredRule<T> {
   readonly kind: "required";
@@ -37,11 +34,7 @@ export class ValidationBuilder<T> {
   private errorRules: ValidationRule<T>[] = [];
   private warningRules: ValidationRule<T>[] = [];
 
-  required(
-    field: keyof T,
-    code: string,
-    message: string,
-  ): this {
+  required(field: keyof T, code: string, message: string): this {
     this.errorRules.push({
       kind: "required",
       field,
@@ -51,11 +44,7 @@ export class ValidationBuilder<T> {
     return this;
   }
 
-  nonEmpty(
-    field: keyof T,
-    code: string,
-    message: string,
-  ): this {
+  nonEmpty(field: keyof T, code: string, message: string): this {
     this.errorRules.push({
       kind: "nonEmpty",
       field,
@@ -89,11 +78,7 @@ export class ValidationBuilder<T> {
     return this;
   }
 
-  warn(
-    field: keyof T,
-    code: string,
-    message: string,
-  ): this {
+  warn(field: keyof T, code: string, message: string): this {
     this.warningRules.push({
       kind: "required",
       field,
@@ -103,7 +88,10 @@ export class ValidationBuilder<T> {
     return this;
   }
 
-  validate(input: T): { errors: ValidationError[]; warnings: ValidationWarning[] } {
+  validate(input: T): {
+    errors: ValidationError[];
+    warnings: ValidationWarning[];
+  } {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 

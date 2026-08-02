@@ -10,7 +10,8 @@ export interface AuditLog {
 
 export async function createAuditEvent(input: {
   readonly ruleId: Uuid;
-  readonly action: "created" | "approved" | "rejected" | "superseded" | "effective-dated";
+  readonly action:
+    "created" | "approved" | "rejected" | "superseded" | "effective-dated";
   readonly actor: string;
   readonly timestamp: UtcTimestamp;
   readonly rationale: string;
@@ -36,7 +37,8 @@ export async function createAuditEvent(input: {
     actor: input.actor,
   });
   const eventIdResult = parseUuid(eventIdString);
-  if (!eventIdResult.ok) throw new Error("Failed to parse UUID: " + eventIdResult.error.message);
+  if (!eventIdResult.ok)
+    throw new Error("Failed to parse UUID: " + eventIdResult.error.message);
   const eventId = eventIdResult.value;
 
   return {
@@ -51,18 +53,13 @@ export async function createAuditEvent(input: {
   };
 }
 
-export function appendAuditEvent(
-  log: AuditLog,
-  event: AuditEvent,
-): AuditLog {
+export function appendAuditEvent(log: AuditLog, event: AuditEvent): AuditLog {
   return {
     events: [...log.events, event],
   };
 }
 
-export function createAuditLog(
-  events: readonly AuditEvent[] = [],
-): AuditLog {
+export function createAuditLog(events: readonly AuditEvent[] = []): AuditLog {
   return { events: [...events] };
 }
 
@@ -110,9 +107,10 @@ export function getAuditEventById(
   return log.events.find((e) => e.eventId === eventId) ?? null;
 }
 
-export function verifyAuditLogIntegrity(
-  log: AuditLog,
-): { valid: boolean; errors: string[] } {
+export function verifyAuditLogIntegrity(log: AuditLog): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   for (const [index, event] of log.events.entries()) {
@@ -138,13 +136,14 @@ export function verifyAuditLogIntegrity(
   };
 }
 
-export function getAuditSummary(
-  log: AuditLog,
-): {
+export function getAuditSummary(log: AuditLog): {
   readonly totalEvents: number;
   readonly byAction: Readonly<Record<string, number>>;
   readonly byActor: Readonly<Record<string, number>>;
-  readonly dateRange: { readonly earliest: UtcTimestamp | null; readonly latest: UtcTimestamp | null };
+  readonly dateRange: {
+    readonly earliest: UtcTimestamp | null;
+    readonly latest: UtcTimestamp | null;
+  };
 } {
   const byAction: Record<string, number> = {};
   const byActor: Record<string, number> = {};

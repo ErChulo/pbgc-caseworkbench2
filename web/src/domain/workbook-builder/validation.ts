@@ -32,7 +32,8 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
       message: "BuildSpec contains no formulas",
       affectedCells: [],
       severity: "warning",
-      detail: "A BuildSpec without formulas may be incomplete for workbook generation.",
+      detail:
+        "A BuildSpec without formulas may be incomplete for workbook generation.",
     });
   }
 
@@ -42,7 +43,8 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
       message: "BuildSpec contains no named ranges",
       affectedCells: [],
       severity: "warning",
-      detail: "Named ranges are expected for workbook interoperability and traceability.",
+      detail:
+        "Named ranges are expected for workbook interoperability and traceability.",
     });
   }
 
@@ -52,7 +54,8 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
       message: "BuildSpec contains no cell mappings",
       affectedCells: [],
       severity: "warning",
-      detail: "Cell mappings are expected to connect formulas and population inputs.",
+      detail:
+        "Cell mappings are expected to connect formulas and population inputs.",
     });
   }
 
@@ -63,8 +66,11 @@ export function validateBuildSpec(buildSpec: BuildSpecV2): ValidationState {
       affectedCells: [],
       affectedNames: [],
       severity: "error",
-      detail: buildSpec.validation.errors.map((e) => `${e.code}: ${e.message}`).join("; "),
-      remediation: "Resolve BuildSpec validation issues before workbook generation.",
+      detail: buildSpec.validation.errors
+        .map((e) => `${e.code}: ${e.message}`)
+        .join("; "),
+      remediation:
+        "Resolve BuildSpec validation issues before workbook generation.",
     });
   }
 
@@ -89,8 +95,10 @@ export function validatePopulationProfile(
       affectedCells: [],
       affectedNames: [],
       severity: "error",
-      detail: "Workbook generation requires a governed population decision status.",
-      remediation: "Approve, reject, revoke, or supersede the population profile explicitly.",
+      detail:
+        "Workbook generation requires a governed population decision status.",
+      remediation:
+        "Approve, reject, revoke, or supersede the population profile explicitly.",
     });
   }
 
@@ -101,8 +109,10 @@ export function validatePopulationProfile(
       affectedCells: [],
       affectedNames: [],
       severity: "error",
-      detail: "Effective population decision ID is required for workbook lineage.",
-      remediation: "Record an effective population decision before generating the workbook.",
+      detail:
+        "Effective population decision ID is required for workbook lineage.",
+      remediation:
+        "Record an effective population decision before generating the workbook.",
     });
   }
 
@@ -125,8 +135,10 @@ export function validateDataSources(buildSpec: BuildSpecV2): ValidationState {
         affectedCells: [mapping.cellAddress],
         affectedNames: [],
         severity: "error",
-        detail: "Input or biflow cells require an explicit governed data source.",
-        remediation: "Add a population data source to the BuildSpec cell mapping.",
+        detail:
+          "Input or biflow cells require an explicit governed data source.",
+        remediation:
+          "Add a population data source to the BuildSpec cell mapping.",
       });
     }
   }
@@ -134,7 +146,9 @@ export function validateDataSources(buildSpec: BuildSpecV2): ValidationState {
   return { errors, warnings };
 }
 
-export function validateFormulaReferences(buildSpec: BuildSpecV2): ValidationState {
+export function validateFormulaReferences(
+  buildSpec: BuildSpecV2,
+): ValidationState {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -149,8 +163,10 @@ export function validateFormulaReferences(buildSpec: BuildSpecV2): ValidationSta
           affectedCells: [formula.cellAddress],
           affectedNames: [formula.formulaId],
           severity: "error",
-          detail: "Every formula dependency must reference an existing formula in the BuildSpec.",
-          remediation: "Add the missing formula or remove the invalid dependency.",
+          detail:
+            "Every formula dependency must reference an existing formula in the BuildSpec.",
+          remediation:
+            "Add the missing formula or remove the invalid dependency.",
         });
       }
     }
@@ -172,7 +188,8 @@ export function validateNoCycles(buildSpec: BuildSpecV2): ValidationState {
       affectedNames: cycleNodes,
       severity: "error",
       detail: `Circular dependencies: ${cycleNodes.join(", ")}`,
-      remediation: "Break the circular dependency by removing or restructuring formula dependencies.",
+      remediation:
+        "Break the circular dependency by removing or restructuring formula dependencies.",
     });
   }
 

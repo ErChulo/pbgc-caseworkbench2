@@ -1,4 +1,7 @@
-import type { ValidationError, ValidationWarning } from "../shared/validation-result";
+import type {
+  ValidationError,
+  ValidationWarning,
+} from "../shared/validation-result";
 import type { PlanRule, RuleVersion } from "./models";
 import type { PopulationDecisionProjection } from "../population/population-profile";
 
@@ -15,15 +18,15 @@ export interface ValidationResult {
   readonly warnings: readonly ValidationWarning[];
 }
 
-export function validateRuleSet(
-  context: ValidationContext,
-): ValidationResult {
+export function validateRuleSet(context: ValidationContext): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
   const effectiveRules = context.rules.filter((rule) => {
     if (!rule.endDate) return true;
-    return rule.effectiveDate <= "9999-12-31" && (rule.endDate ?? "") > "1900-01-01";
+    return (
+      rule.effectiveDate <= "9999-12-31" && (rule.endDate ?? "") > "1900-01-01"
+    );
   });
 
   if (effectiveRules.length === 0) {
@@ -32,7 +35,8 @@ export function validateRuleSet(
       severity: "warning",
       affectedCells: [],
       message: "No rules are effective for the given population date",
-      detail: "The population date does not fall within any rule's effective period",
+      detail:
+        "The population date does not fall within any rule's effective period",
     });
   }
 
@@ -40,7 +44,8 @@ export function validateRuleSet(
   for (const rule of effectiveRules) {
     const classifications = rule.applicability.split(",").map((c) => c.trim());
     for (const classification of classifications) {
-      classificationCounts[classification] = (classificationCounts[classification] ?? 0) + 1;
+      classificationCounts[classification] =
+        (classificationCounts[classification] ?? 0) + 1;
     }
   }
 
@@ -50,20 +55,30 @@ export function validateRuleSet(
         code: "OVERLAPPING_APPLICABILITY",
         severity: "warning",
         affectedCells: [],
-        message: "Classification " + classification + " has " + String(count) + " overlapping rules",
-        detail: "Multiple rules apply to the same classification. Verify rule precedence.",
+        message:
+          "Classification " +
+          classification +
+          " has " +
+          String(count) +
+          " overlapping rules",
+        detail:
+          "Multiple rules apply to the same classification. Verify rule precedence.",
       });
     }
   }
 
-  const approverRules = effectiveRules.filter((rule) => rule.createdBy !== context.caseApproverId);
+  const approverRules = effectiveRules.filter(
+    (rule) => rule.createdBy !== context.caseApproverId,
+  );
   if (approverRules.length > 0) {
     warnings.push({
       code: "UNAPPROVED_RULE_AUTHOR",
       severity: "warning",
       affectedCells: [],
       message: "Some rules were created by non-approver authors",
-      detail: String(approverRules.length) + " rules have authors different from the case approver",
+      detail:
+        String(approverRules.length) +
+        " rules have authors different from the case approver",
     });
   }
 
@@ -83,7 +98,9 @@ export function validatePopulationApplicability(
 
   const effectiveRules = rules.filter((rule) => {
     if (!rule.endDate) return true;
-    return rule.effectiveDate <= "9999-12-31" && (rule.endDate ?? "") > "1900-01-01";
+    return (
+      rule.effectiveDate <= "9999-12-31" && (rule.endDate ?? "") > "1900-01-01"
+    );
   });
 
   if (effectiveRules.length === 0) {
@@ -94,7 +111,8 @@ export function validatePopulationApplicability(
       affectedNames: [],
       message: "No effective rules available for population",
       detail: "No rules are effective for the current date range",
-      remediation: "Ensure at least one rule has an effective date range covering the population",
+      remediation:
+        "Ensure at least one rule has an effective date range covering the population",
     });
   }
 
@@ -108,7 +126,11 @@ export function validatePopulationApplicability(
 export function validateRuleVersions(
   versions: readonly import("./models").RuleVersion[],
   rules: readonly import("./models").PlanRule[],
-): { valid: boolean; errors: ValidationError[]; warnings: ValidationWarning[] } {
+): {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+} {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -122,7 +144,11 @@ export function validateRuleVersions(
         severity: "error",
         affectedCells: [],
         affectedNames: [],
-        message: "Duplicate version " + version.version + " for rule " + version.ruleId,
+        message:
+          "Duplicate version " +
+          version.version +
+          " for rule " +
+          version.ruleId,
         detail: "Each rule must have unique versions",
         remediation: "Remove duplicate version or increment version number",
       });
@@ -147,7 +173,12 @@ export function validateRuleVersions(
           code: "NON_INITIAL_VERSION",
           severity: "warning",
           affectedCells: [],
-          message: "Rule " + rule.ruleId + " has non-initial version " + singleVersion.version + " as only version",
+          message:
+            "Rule " +
+            rule.ruleId +
+            " has non-initial version " +
+            singleVersion.version +
+            " as only version",
           detail: "First version of a rule should typically be 1.0.0",
         });
       }
@@ -165,7 +196,11 @@ export function validateApprovalCompleteness(
   approvals: readonly import("./models").ApprovalDecision[],
   _rules: readonly import("./models").PlanRule[],
   ruleVersions: readonly import("./models").RuleVersion[],
-): { valid: boolean; errors: ValidationError[]; warnings: ValidationWarning[] } {
+): {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+} {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -182,8 +217,14 @@ export function validateApprovalCompleteness(
         code: "UNAPPROVED_RULE_VERSION",
         severity: "warning",
         affectedCells: [],
-        message: "Rule version " + version.version + " of rule " + version.ruleId + " is not approved",
-        detail: "Unapproved rule versions cannot be used in workbook generation",
+        message:
+          "Rule version " +
+          version.version +
+          " of rule " +
+          version.ruleId +
+          " is not approved",
+        detail:
+          "Unapproved rule versions cannot be used in workbook generation",
       });
     }
   }
@@ -196,8 +237,16 @@ export function validateApprovalCompleteness(
 }
 
 export function combineValidationResults(
-  ...results: { valid: boolean; errors: readonly ValidationError[]; warnings: readonly ValidationWarning[] }[]
-): { valid: boolean; errors: ValidationError[]; warnings: ValidationWarning[] } {
+  ...results: {
+    valid: boolean;
+    errors: readonly ValidationError[];
+    warnings: readonly ValidationWarning[];
+  }[]
+): {
+  valid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+} {
   const allErrors: ValidationError[] = [];
   const allWarnings: ValidationWarning[] = [];
 

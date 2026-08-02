@@ -1,12 +1,15 @@
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020";
 import { describe, expect, it } from "vitest";
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
 const schema = JSON.parse(
   readFileSync(
     resolve(
-      import.meta.dirname,
+      currentDirectory,
       "../../../specs/007-workbook-builder/contracts/workbook.schema.json",
     ),
   ).toString("utf8"),
@@ -211,18 +214,14 @@ function formulaCell(
   return result;
 }
 
-function support(
-  value: Record<string, unknown>,
-): Record<string, unknown> {
+function support(value: Record<string, unknown>): Record<string, unknown> {
   const result = value.support;
   if (result === undefined || typeof result !== "object" || result === null)
     throw new Error("Fixture support is missing.");
   return result as Record<string, unknown>;
 }
 
-function summarySheet(
-  value: Record<string, unknown>,
-): Record<string, unknown> {
+function summarySheet(value: Record<string, unknown>): Record<string, unknown> {
   const s = support(value);
   const result = s.summarySheet;
   if (result === undefined || typeof result !== "object" || result === null)
@@ -230,9 +229,7 @@ function summarySheet(
   return result as Record<string, unknown>;
 }
 
-function tablesSheet(
-  value: Record<string, unknown>,
-): Record<string, unknown> {
+function tablesSheet(value: Record<string, unknown>): Record<string, unknown> {
   const s = support(value);
   const result = s.tablesSheet;
   if (result === undefined || typeof result !== "object" || result === null)
@@ -303,10 +300,7 @@ describe("Workbook contract", () => {
 
   it("rejects a population data source with invalid recordCount", () => {
     const value = validWorkbook();
-    const dataSource = cell(value, 0, 0).dataSource as Record<
-      string,
-      unknown
-    >;
+    const dataSource = cell(value, 0, 0).dataSource as Record<string, unknown>;
     dataSource.recordCount = -1;
     expect(validator()(value)).toBe(false);
   });

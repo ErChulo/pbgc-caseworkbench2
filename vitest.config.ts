@@ -1,9 +1,11 @@
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import react from "@vitejs/plugin-react";
 import { defineConfig, defineProject } from "vitest/config";
 
-const webRoot = resolve(import.meta.dirname, "web");
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
+const webRoot = resolve(currentDirectory, "web");
 
 export default defineConfig({
   root: webRoot,

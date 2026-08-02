@@ -1,5 +1,5 @@
-import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -7,6 +7,8 @@ import {
   invalidAuditHistories,
   validAuditHistory,
 } from "../../fixtures/contracts/audit-events";
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
 interface AuditApi {
   encodeAuditJsonl(events: readonly unknown[]): string;
@@ -22,7 +24,7 @@ interface AuditApi {
 
 async function loadAuditApi(): Promise<AuditApi> {
   const implementationUrl = pathToFileURL(
-    resolve(import.meta.dirname, "../../../src/domain/lineage/audit-log.ts"),
+    resolve(currentDirectory, "../../../src/domain/lineage/audit-log.ts"),
   ).href;
   return (await import(/* @vite-ignore */ implementationUrl)) as AuditApi;
 }

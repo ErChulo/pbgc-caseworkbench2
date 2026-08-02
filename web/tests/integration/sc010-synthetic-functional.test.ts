@@ -424,7 +424,13 @@ describe("SC-010 synthetic functional: Task 3 — identify quarantined artifacts
       "text/csv",
     );
 
-    const artifacts = [executable, macroEnabled, archiveWithRisk, cleanText, cleanCsv];
+    const artifacts = [
+      executable,
+      macroEnabled,
+      archiveWithRisk,
+      cleanText,
+      cleanCsv,
+    ];
 
     const screenFn = async (item: ArtifactRecord) => {
       if (item.artifactId === executable.artifactId) {
@@ -501,12 +507,8 @@ describe("SC-010 synthetic functional: Task 3 — identify quarantined artifacts
     expect(categories).toContain("archive-risk");
 
     expect(inspected).toHaveLength(2);
-    expect(
-      clean.every((o) => o.passiveExtractionAttempted),
-    ).toBe(true);
-    expect(
-      quarantined.every((o) => o.passiveExtractionAttempted),
-    ).toBe(false);
+    expect(clean.every((o) => o.passiveExtractionAttempted)).toBe(true);
+    expect(quarantined.every((o) => o.passiveExtractionAttempted)).toBe(false);
   });
 
   it("enumerates quarantine findings per artifact with correct severity", async () => {
@@ -526,18 +528,8 @@ describe("SC-010 synthetic functional: Task 3 — identify quarantined artifacts
           return Promise.resolve({
             artifactSha256: item.sha256,
             findings: [
-              blockingFinding(
-                "f1",
-                item.sha256,
-                "executable",
-                "exec-rule",
-              ),
-              blockingFinding(
-                "f2",
-                item.sha256,
-                "secret",
-                "secret-rule",
-              ),
+              blockingFinding("f1", item.sha256, "executable", "exec-rule"),
+              blockingFinding("f2", item.sha256, "secret", "secret-rule"),
             ],
             provisionalState: "provisional-safety-block" as const,
             downstreamBlocked: true as const,
@@ -657,8 +649,7 @@ describe("SC-010 synthetic functional: Task 4 — locate unresolved items", () =
           {
             artifactId: item.artifactId,
             stage: "screened" as const,
-            message:
-              "Unresolved: ambiguous date source requires human review.",
+            message: "Unresolved: ambiguous date source requires human review.",
           },
         ];
       }
@@ -723,15 +714,15 @@ describe("SC-010 synthetic functional: Task 4 — locate unresolved items", () =
     expect(artifactUnresolvedMap.size).toBe(2);
     expect(artifactUnresolvedMap.get(textArtifact.artifactId)).toHaveLength(2);
     expect(artifactUnresolvedMap.get(csvArtifact.artifactId)).toHaveLength(1);
-    expect(
-      artifactUnresolvedMap.get(textArtifact.artifactId),
-    ).toContain("conflicting-author-dates");
-    expect(
-      artifactUnresolvedMap.get(textArtifact.artifactId),
-    ).toContain("ambiguous-effective-period");
-    expect(
-      artifactUnresolvedMap.get(csvArtifact.artifactId),
-    ).toContain("missing-compensation-field");
+    expect(artifactUnresolvedMap.get(textArtifact.artifactId)).toContain(
+      "conflicting-author-dates",
+    );
+    expect(artifactUnresolvedMap.get(textArtifact.artifactId)).toContain(
+      "ambiguous-effective-period",
+    );
+    expect(artifactUnresolvedMap.get(csvArtifact.artifactId)).toContain(
+      "missing-compensation-field",
+    );
   });
 
   it("generates unresolved items from both quarantined and non-quarantined artifacts", async () => {
@@ -848,7 +839,13 @@ describe("SC-010 synthetic functional: Task 4 — locate unresolved items", () =
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
 
-    const allArtifacts = [executable, planDoc, populationCsv, archive, workbook];
+    const allArtifacts = [
+      executable,
+      planDoc,
+      populationCsv,
+      archive,
+      workbook,
+    ];
 
     const screenFn = async (item: ArtifactRecord) => {
       if (item.artifactId === executable.artifactId) {
@@ -866,12 +863,7 @@ describe("SC-010 synthetic functional: Task 4 — locate unresolved items", () =
         return {
           artifactSha256: item.sha256,
           findings: [
-            blockingFinding(
-              "a-f",
-              item.sha256,
-              "archive-risk",
-              "archive-rule",
-            ),
+            blockingFinding("a-f", item.sha256, "archive-risk", "archive-rule"),
           ],
           provisionalState: "provisional-safety-block" as const,
           downstreamBlocked: true as const,
@@ -914,9 +906,7 @@ describe("SC-010 synthetic functional: Task 4 — locate unresolved items", () =
           `blocked-${outcome.artifact.artifactId}`,
         );
       } else {
-        unresolvedFromClean.push(
-          `unresolved-${outcome.artifact.artifactId}`,
-        );
+        unresolvedFromClean.push(`unresolved-${outcome.artifact.artifactId}`);
       }
     }
 

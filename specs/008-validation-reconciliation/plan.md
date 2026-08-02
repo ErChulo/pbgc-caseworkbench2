@@ -2,7 +2,7 @@
 
 **Feature**: 008 Validation and Reconciliation
 **Date**: 2026-07-29
-**Status**: Planning; implementation not yet started
+**Status**: Implemented and tested; ready for human approval
 
 ## Summary
 
@@ -64,15 +64,15 @@ web/tests/integration/
 
 ## Constitution Check
 
-| Requirement | Result |
-|---|---|
-| Deterministic actuarial computation | Pass: validation and reconciliation are deterministic; no LLM use |
+| Requirement                              | Result                                                                       |
+| ---------------------------------------- | ---------------------------------------------------------------------------- |
+| Deterministic actuarial computation      | Pass: validation and reconciliation are deterministic; no LLM use            |
 | Evidence and effective-date traceability | Pass: complete metadata (versions, oracle IDs, reviewer, timestamp) recorded |
-| Missing data | Pass: validates population application without inventing values |
-| V1 concept separation | Pass: structural validation respects CALC, CALCULATION, I/O/B |
-| Human review | Pass: manual review supported; records reviewer and rationale |
-| Reproducibility | Pass: deterministic hashing of validation and reconciliation results |
-| Validation evidence | Feature 008 *is* the validation evidence generator |
+| Missing data                             | Pass: validates population application without inventing values              |
+| V1 concept separation                    | Pass: structural validation respects CALC, CALCULATION, I/O/B                |
+| Human review                             | Pass: manual review supported; records reviewer and rationale                |
+| Reproducibility                          | Pass: deterministic hashing of validation and reconciliation results         |
+| Validation evidence                      | Feature 008 _is_ the validation evidence generator                           |
 
 No constitutional exception required.
 

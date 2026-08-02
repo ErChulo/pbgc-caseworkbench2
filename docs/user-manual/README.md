@@ -1,6 +1,9 @@
 # PBGC CaseworkBench 2.0 User Manual
 
 This folder contains the user-facing documentation for PBGC CaseworkBench 2.0.
+The Markdown manuals are the current source for browser use and explain the
+final casework output package, workspace artifact linking, and Section 436
+evaluation artifact handling.
 
 ## Start Here
 
@@ -25,6 +28,9 @@ The PDF sources are in [latex/](latex/):
 - `book-edition.tex` builds the book-style edition.
 - `manual-content.tex` contains shared content used by both editions.
 
+Regenerate the PDFs after changing manual content so the printable editions do
+not lag the Markdown source.
+
 ## Recommended Reading Order
 
 1. Read the Quick-Start Guide before first use.
@@ -37,3 +43,4 @@ The PDF sources are in [latex/](latex/):
 - Do not copy real participant PII into documentation, screenshots, logs, fixtures, or Git.
 - Manual real-data testing is deferred until the app is used in the approved office environment.
 - The SC-010 usability study remains incomplete until performed with authorized human participants.
+- Final output packages reference generated artifacts by hash; they do not prove Excel, ValTool, Runtime, ATPBGC, BCV, or other external execution unless separate evidence is linked.

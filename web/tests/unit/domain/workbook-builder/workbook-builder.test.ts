@@ -37,7 +37,10 @@ async function createFixture() {
         scope: "workbook" as const,
         genericField: "COMP",
         scenarioId: null,
-        provenance: { source: "architecture" as const, architectureNamedRange: "COMP" },
+        provenance: {
+          source: "architecture" as const,
+          architectureNamedRange: "COMP",
+        },
       },
       {
         rangeName: "SUBTOTAL",
@@ -46,7 +49,10 @@ async function createFixture() {
         scope: "sheet" as const,
         genericField: null,
         scenarioId: null,
-        provenance: { source: "architecture" as const, architectureNamedRange: "SUBTOTAL" },
+        provenance: {
+          source: "architecture" as const,
+          architectureNamedRange: "SUBTOTAL",
+        },
       },
     ],
   };
@@ -234,7 +240,9 @@ describe("workbook builder foundation", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => e.code === "POPULATION_UNAPPROVED")).toBe(true);
+      expect(
+        result.errors.some((e) => e.code === "POPULATION_UNAPPROVED"),
+      ).toBe(true);
     }
   });
 
@@ -244,7 +252,8 @@ describe("workbook builder foundation", () => {
       ...fixture.buildSpec,
       cellMappings: [
         {
-          mappingId: "00000000-0000-4000-8000-000000000001" as import("../../../../src/domain/shared/types").Uuid,
+          mappingId:
+            "00000000-0000-4000-8000-000000000001" as import("../../../../src/domain/shared/types").Uuid,
           field: "DOB",
           tabName: "Retirees",
           cellAddress: "A1",
@@ -263,7 +272,9 @@ describe("workbook builder foundation", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.errors.some((e) => e.code === "MISSING_DATA_SOURCE")).toBe(true);
+      expect(result.errors.some((e) => e.code === "MISSING_DATA_SOURCE")).toBe(
+        true,
+      );
     }
   });
 
@@ -314,9 +325,7 @@ describe("validation: formula references", () => {
       ),
     };
     const result = validateFormulaReferences(buildSpec);
-    expect(result.errors.some((e) => e.code === "BROKEN_REFERENCE")).toBe(
-      true,
-    );
+    expect(result.errors.some((e) => e.code === "BROKEN_REFERENCE")).toBe(true);
   });
 
   it("accepts valid formula dependencies", async () => {
@@ -359,12 +368,11 @@ describe("validation: multi-error aggregation", () => {
     }
     const buildSpec: BuildSpecV2 = {
       ...baseSpec,
-      formulas: [
-        { ...firstFormula, formulaId: "X", dependencies: ["Y"] },
-      ],
+      formulas: [{ ...firstFormula, formulaId: "X", dependencies: ["Y"] }],
       cellMappings: [
         {
-          mappingId: "00000000-0000-4000-8000-000000000099" as import("../../../../src/domain/shared/types").Uuid,
+          mappingId:
+            "00000000-0000-4000-8000-000000000099" as import("../../../../src/domain/shared/types").Uuid,
           field: "Z",
           tabName: "RETIREES",
           cellAddress: "Z1",

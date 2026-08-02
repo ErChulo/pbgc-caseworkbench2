@@ -201,9 +201,11 @@ export type AuthoringError =
  * Governance & Authoring Types (Feature 002 Phase B3)
  * ============================================================================ */
 
-export type RuleSourceType = "plan-document" | "legal-opinion" | "board-decision" | "policy";
+export type RuleSourceType =
+  "plan-document" | "legal-opinion" | "board-decision" | "policy";
 export type ApprovalStatus = "approved" | "rejected" | "pending-review";
-export type AuditAction = "created" | "approved" | "rejected" | "superseded" | "effective-dated";
+export type AuditAction =
+  "created" | "approved" | "rejected" | "superseded" | "effective-dated";
 
 export interface Citation {
   readonly sourceType: RuleSourceType;

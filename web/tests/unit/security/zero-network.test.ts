@@ -1,6 +1,6 @@
 import { readFile, readdir } from "node:fs/promises";
-import { extname, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { dirname, extname, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -8,6 +8,8 @@ import {
   prohibitedExternalAssetUrls,
   prohibitedNetworkCapabilities,
 } from "../../fixtures/contracts/network-boundary-cases";
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url));
 
 interface SecurityBoundaryApi {
   installProductionSecurityBoundary(scope: Record<string, unknown>): void;
@@ -17,7 +19,7 @@ interface SecurityBoundaryApi {
 
 async function loadSecurityBoundary(): Promise<SecurityBoundaryApi> {
   const implementationUrl = pathToFileURL(
-    resolve(import.meta.dirname, "../../../src/app/security-boundary.ts"),
+    resolve(currentDirectory, "../../../src/app/security-boundary.ts"),
   ).href;
   return (await import(
     /* @vite-ignore */ implementationUrl
@@ -39,10 +41,8 @@ async function sourceFiles(directory: string): Promise<string[]> {
 
 describe("T017 production zero-network boundary (red until T028)", () => {
   it("contains no external HTTP(S) asset URL in production source", async () => {
-    const files = await sourceFiles(
-      resolve(import.meta.dirname, "../../../src"),
-    );
-    files.push(resolve(import.meta.dirname, "../../../index.html"));
+    const files = await sourceFiles(resolve(currentDirectory, "../../../src"));
+    files.push(resolve(currentDirectory, "../../../index.html"));
     for (const file of files) {
       const content = await readFile(file, "utf8");
       expect(content, file).not.toMatch(/\bhttps?:\/\//u);

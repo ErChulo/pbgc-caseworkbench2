@@ -1,5 +1,9 @@
 import type { Uuid, Sha256, UtcTimestamp } from "../shared/types";
-import type { BuildSpecV2, NamedRangeDefinition, CellMapping } from "../build-spec/models";
+import type {
+  BuildSpecV2,
+  NamedRangeDefinition,
+  CellMapping,
+} from "../build-spec/models";
 import type { PopulationDecisionProjection } from "../population/population-profile";
 import type {
   ValidationError,
@@ -11,7 +15,10 @@ export interface WorkbookGenerationInput {
   readonly populationProfile: PopulationDecisionProjection;
   readonly workbookProfileContentSha256: Sha256;
   readonly generatorVersion: string;
-  readonly populationData?: ReadonlyMap<string, ReadonlyMap<string, readonly unknown[]>>;
+  readonly populationData?: ReadonlyMap<
+    string,
+    ReadonlyMap<string, readonly unknown[]>
+  >;
 }
 
 export interface V1Workbook {

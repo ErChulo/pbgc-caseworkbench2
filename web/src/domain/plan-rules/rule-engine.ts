@@ -25,7 +25,8 @@ export async function createPlanRule(input: {
     applicability: input.applicability,
   });
   const ruleIdResult = parseUuid(ruleIdString);
-  if (!ruleIdResult.ok) throw new Error(`Failed to parse UUID: ${ruleIdResult.error.message}`);
+  if (!ruleIdResult.ok)
+    throw new Error(`Failed to parse UUID: ${ruleIdResult.error.message}`);
   const ruleId = ruleIdResult.value;
 
   const deterministicPayload = {
@@ -119,7 +120,8 @@ export async function recordApprovalDecision(input: {
 
 export async function recordAuditEvent(input: {
   readonly ruleId: Uuid;
-  readonly action: "created" | "approved" | "rejected" | "superseded" | "effective-dated";
+  readonly action:
+    "created" | "approved" | "rejected" | "superseded" | "effective-dated";
   readonly actor: string;
   readonly timestamp: UtcTimestamp;
   readonly rationale: string;
@@ -132,7 +134,8 @@ export async function recordAuditEvent(input: {
     actor: input.actor,
   });
   const eventIdResult = parseUuid(eventIdString);
-  if (!eventIdResult.ok) throw new Error(`Failed to parse UUID: ${eventIdResult.error.message}`);
+  if (!eventIdResult.ok)
+    throw new Error(`Failed to parse UUID: ${eventIdResult.error.message}`);
   const eventId = eventIdResult.value;
 
   const deterministicPayload = {
@@ -166,10 +169,7 @@ export function validateSemanticVersion(version: string): boolean {
 }
 
 export function isRuleEffectiveOn(rule: PlanRule, date: string): boolean {
-  return (
-    rule.effectiveDate <= date &&
-    (!rule.endDate || rule.endDate > date)
-  );
+  return rule.effectiveDate <= date && (!rule.endDate || rule.endDate > date);
 }
 
 export function matchesApplicability(
@@ -178,6 +178,8 @@ export function matchesApplicability(
 ): boolean {
   const classificationLower = classification.toLowerCase();
   const applicabilityLower = applicability.toLowerCase();
-  return applicabilityLower.includes(classificationLower) ||
-    classificationLower.includes(applicabilityLower);
+  return (
+    applicabilityLower.includes(classificationLower) ||
+    classificationLower.includes(applicabilityLower)
+  );
 }

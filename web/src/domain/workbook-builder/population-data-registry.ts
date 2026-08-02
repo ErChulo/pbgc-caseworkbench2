@@ -39,7 +39,12 @@ export function parseCsvToRegistry(
     return createPopulationDataRegistry(new Map());
   }
 
-  const headers = parseCsvLine(lines[0]);
+  const headerLine = lines[0];
+  if (headerLine === undefined) {
+    return createPopulationDataRegistry(new Map());
+  }
+
+  const headers = parseCsvLine(headerLine);
   const data = new Map<string, Map<string, unknown[]>>();
   const fieldColumns = new Map<string, unknown[]>();
 
@@ -47,15 +52,14 @@ export function parseCsvToRegistry(
     fieldColumns.set(header, []);
   }
 
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCsvLine(lines[i]);
-    for (let j = 0; j < headers.length; j++) {
-      const header = headers[j];
+  for (const line of lines.slice(1)) {
+    const values = parseCsvLine(line);
+    headers.forEach((header, j) => {
       const column = fieldColumns.get(header);
       if (column !== undefined) {
         column.push(j < values.length ? values[j] : null);
       }
-    }
+    });
   }
 
   data.set(tabName, fieldColumns);

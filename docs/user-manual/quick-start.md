@@ -8,13 +8,15 @@
 
 ## What This App Does
 
-PBGC CaseworkBench 2.0 is a **local-first, offline evidence intake and review workbench** for terminated defined-benefit pension plan cases. It helps you:
+PBGC CaseworkBench 2.0 is a **local-first, offline evidence intake, review, and casework-output workbench** for terminated defined-benefit pension plan cases. It helps you:
 
 - Create and manage controlled case identities
 - Preserve submitted files and folders exactly as received
 - Review files that the system flags for safety or quality issues
 - Make human decisions on automated suggestions
 - Export an auditable, deterministic manifest of everything you reviewed
+- Link generated V1 and validation artifacts that already exist in the workspace
+- Export a final casework output package that records ready stages and blockers
 
 **Key principle:** Your case data never leaves your device. The app runs entirely in your browser with no server required.
 
@@ -39,7 +41,7 @@ PBGC CaseworkBench 2.0 is a **local-first, offline evidence intake and review wo
 
 ---
 
-## Your First Session (10-15 Minutes)
+## Your First Session (15-20 Minutes)
 
 ### Step 1: Verify Compatibility
 
@@ -123,6 +125,29 @@ When reviews are complete, go to **Manifest Export**:
 - Click **Export Manifest** to save a local JSON file
 - This is your auditable record of everything processed
 
+### Step 9: Link Generated Output Artifacts
+
+When V1 artifacts already exist in the selected workspace, go to **Case Output Package**:
+
+1. Choose the artifact type, such as `v1-architecture`, `build-spec`, `compiled-formula-artifact`, `v1-workbook`, `validation-result`, `reconciliation-result`, or `section-436-evaluation`
+2. Enter the artifact ID and workspace-relative path
+3. Confirm the media type and maturity level
+4. Enter a clear description
+5. Click **Hash and link workspace artifact**
+
+**What happens:** The app reads the selected workspace file, computes its SHA-256, and records the reference under `cases/<case-uuid>/outputs/artifact-references.json`. Do not type or invent hashes.
+
+### Step 10: Export the Final Output Package
+
+In **Case Output Package**:
+
+1. Review each required stage and any blockers
+2. Confirm linked artifacts are the intended generated files
+3. Confirm Section 436 is linked when required for the case
+4. Click **Export final output package**
+
+The package is saved locally as `cases/<case-uuid>/exports/final-casework-output-package.json`. If required artifacts are missing, the package exports as blocked instead of pretending the case is complete.
+
 ---
 
 ## Keyboard Shortcuts
@@ -150,8 +175,14 @@ A: Your workspace data is safe on disk. Reopen the app, select the same workspac
 **Q: Can I send case data to a colleague?**
 A: No - production case data stays on your device. Use the **export manifest** for sharing review records (contains no file content).
 
+**Q: Does the final output package contain the workbook or validation files?**
+A: No. It references linked artifacts by SHA-256 and workspace path. Keep the referenced files under approved workspace controls.
+
+**Q: Does Section 436 produce a finished memo?**
+A: No. The current implementation supports a deterministic Section 436 evaluation artifact and Markdown report renderer. DOCX/PDF memo generation and fact-entry screens are not yet provided.
+
 **Q: What does "deterministic" mean?**
-A: Same inputs + same rules = exactly the same output every time. The manifest hash proves this.
+A: Same inputs + same rules = exactly the same output every time. Manifest, evaluation, and final-package hashes help prove this.
 
 ---
 

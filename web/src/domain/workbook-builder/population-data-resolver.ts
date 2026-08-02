@@ -19,9 +19,6 @@ export function resolveCellValue(
   dataSource: DataSourceReference,
   rowIndex: number,
 ): unknown {
-  const values = resolver.resolve(
-    dataSource.sourceTab,
-    dataSource.sourceField,
-  );
+  const values = resolver.resolve(dataSource.sourceTab, dataSource.sourceField);
   return rowIndex < values.length ? values[rowIndex] : null;
 }

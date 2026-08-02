@@ -21,7 +21,14 @@ export interface SupersessionLink {
   readonly predecessorRuleId: Uuid | null;
   readonly predecessorRuleContentSha256: Sha256 | null;
   readonly effectiveDate: string;
-  readonly linkType: "initial" | "supersession" | "amendment" | "re-authoring" | "repeal" | "reinstate" | "branch";
+  readonly linkType:
+    | "initial"
+    | "supersession"
+    | "amendment"
+    | "re-authoring"
+    | "repeal"
+    | "reinstate"
+    | "branch";
 }
 
 export function createSupersessionLink(
@@ -61,10 +68,16 @@ export function buildSupersessionChain(
   };
 }
 
-export function validateSemanticVersion(version: string): { valid: boolean; error?: string } {
+export function validateSemanticVersion(version: string): {
+  valid: boolean;
+  error?: string;
+} {
   const semverPattern = /^\d+\.\d+\.\d+$/;
   if (!semverPattern.test(version)) {
-    return { valid: false, error: "Version must follow semantic versioning (major.minor.patch)" };
+    return {
+      valid: false,
+      error: "Version must follow semantic versioning (major.minor.patch)",
+    };
   }
   return { valid: true };
 }
@@ -91,7 +104,8 @@ export function getNextPatchVersion(current: string): string {
   const major = parts[0];
   const minor = parts[1];
   const patch = parts[2];
-  if (major === undefined || minor === undefined || patch === undefined) return current;
+  if (major === undefined || minor === undefined || patch === undefined)
+    return current;
   return String(major) + "." + String(minor) + "." + String(patch + 1);
 }
 
@@ -137,9 +151,10 @@ export async function computeRuleVersionHash(
   })) as import("../shared/types").Sha256;
 }
 
-export function validateSupersessionChain(
-  chain: readonly SupersessionLink[],
-): { valid: boolean; errors: string[] } {
+export function validateSupersessionChain(chain: readonly SupersessionLink[]): {
+  valid: boolean;
+  errors: string[];
+} {
   const errors: string[] = [];
 
   if (chain.length === 0) {
@@ -155,7 +170,9 @@ export function validateSupersessionChain(
   const seenOrdinals = new Set<number>();
   for (const link of chain) {
     if (seenOrdinals.has(link.ordinal)) {
-      errors.push("Duplicate ordinal " + String(link.ordinal) + " in supersession chain");
+      errors.push(
+        "Duplicate ordinal " + String(link.ordinal) + " in supersession chain",
+      );
     }
     seenOrdinals.add(link.ordinal);
 
@@ -168,8 +185,14 @@ export function validateSupersessionChain(
   for (let i = 1; i < sortedLinks.length; i++) {
     const current = sortedLinks[i];
     const previous = sortedLinks[i - 1];
-    if (current && previous && current.effectiveDate <= previous.effectiveDate) {
-      errors.push("Effective dates must be strictly increasing in supersession chain");
+    if (
+      current &&
+      previous &&
+      current.effectiveDate <= previous.effectiveDate
+    ) {
+      errors.push(
+        "Effective dates must be strictly increasing in supersession chain",
+      );
     }
   }
 

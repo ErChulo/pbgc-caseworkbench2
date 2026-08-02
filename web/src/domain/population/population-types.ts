@@ -10,10 +10,7 @@ import type { Sha256 } from "../shared/types";
 
 export type PopulationCandidateStatus = "proposed" | "unresolved";
 export type PopulationGovernedStatus =
-  | "approved"
-  | "rejected"
-  | "revoked"
-  | "superseded";
+  "approved" | "rejected" | "revoked" | "superseded";
 
 export interface PopulationEvidenceObservation {
   readonly evidenceKey: Sha256;
@@ -42,10 +39,7 @@ export interface PopulationCandidateProfile {
   readonly observedFields: readonly string[];
   readonly recordCounts: readonly number[];
   readonly sensitivity:
-    | "authorized-real"
-    | "de-identified"
-    | "synthetic-mock"
-    | "unknown";
+    "authorized-real" | "de-identified" | "synthetic-mock" | "unknown";
   readonly correctionsOrImputationsApplied: false;
 }
 

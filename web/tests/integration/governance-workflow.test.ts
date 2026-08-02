@@ -84,7 +84,10 @@ describe("Feature 002 governance workflow integration", () => {
       evidence: ["evidence-ref-1"],
     };
 
-    const authorityCheck = validateApprovalAuthority(approvalInput.approverId, approvalInput.caseApproverId);
+    const authorityCheck = validateApprovalAuthority(
+      approvalInput.approverId,
+      approvalInput.caseApproverId,
+    );
     expect(authorityCheck.valid).toBe(true);
 
     const inputCheck = validateApprovalInput(approvalInput);
@@ -112,7 +115,9 @@ describe("Feature 002 governance workflow integration", () => {
     const integrity = verifyAuditLogIntegrity(log);
     expect(integrity.valid).toBe(true);
 
-    expect(getApprovalStatus([approval], version.ruleVersionId)).toBe("approved");
+    expect(getApprovalStatus([approval], version.ruleVersionId)).toBe(
+      "approved",
+    );
     expect(isRuleApproved([approval], version.ruleVersionId)).toBe(true);
   });
 
@@ -153,18 +158,35 @@ describe("Feature 002 governance workflow integration", () => {
       population,
       caseApproverId: "approver-1",
     });
-    expect(ruleSetResult.warnings.some((w) => w.code === "NO_EFFECTIVE_RULES")).toBe(false);
+    expect(
+      ruleSetResult.warnings.some((w) => w.code === "NO_EFFECTIVE_RULES"),
+    ).toBe(false);
 
-    const populationResult = validatePopulationApplicability(population, [rule]);
+    const populationResult = validatePopulationApplicability(population, [
+      rule,
+    ]);
     expect(populationResult.valid).toBe(true);
 
     const versionResult = validateRuleVersions([version], [rule]);
-    expect(versionResult.errors.some((e) => e.code === "DUPLICATE_RULE_VERSION")).toBe(false);
+    expect(
+      versionResult.errors.some((e) => e.code === "DUPLICATE_RULE_VERSION"),
+    ).toBe(false);
 
-    const approvalResult = validateApprovalCompleteness([approval], [rule], [version]);
-    expect(approvalResult.warnings.some((w) => w.code === "UNAPPROVED_RULE_VERSION")).toBe(false);
+    const approvalResult = validateApprovalCompleteness(
+      [approval],
+      [rule],
+      [version],
+    );
+    expect(
+      approvalResult.warnings.some((w) => w.code === "UNAPPROVED_RULE_VERSION"),
+    ).toBe(false);
 
-    const combined = combineValidationResults(ruleSetResult, populationResult, versionResult, approvalResult);
+    const combined = combineValidationResults(
+      ruleSetResult,
+      populationResult,
+      versionResult,
+      approvalResult,
+    );
     expect(combined.valid).toBe(true);
   });
 
@@ -173,7 +195,11 @@ describe("Feature 002 governance workflow integration", () => {
       statement: "Rule effective 2024.",
       effectiveDate: "2024-01-01",
       applicability: "participant-group",
-      primaryCitation: { sourceType: "plan-document", locator: "Art 1", date: "2023-01-01" },
+      primaryCitation: {
+        sourceType: "plan-document",
+        locator: "Art 1",
+        date: "2023-01-01",
+      },
       createdBy: "author-1",
       createdAt: ts("2024-01-01T00:00:00.000Z"),
     });
@@ -182,7 +208,11 @@ describe("Feature 002 governance workflow integration", () => {
       statement: "Rule effective 2025.",
       effectiveDate: "2025-01-01",
       applicability: "participant-group",
-      primaryCitation: { sourceType: "plan-document", locator: "Art 2", date: "2024-01-01" },
+      primaryCitation: {
+        sourceType: "plan-document",
+        locator: "Art 2",
+        date: "2024-01-01",
+      },
       createdBy: "author-1",
       createdAt: ts("2025-01-01T00:00:00.000Z"),
     });
@@ -191,10 +221,16 @@ describe("Feature 002 governance workflow integration", () => {
     expect(effectiveOnDate.length).toBe(1);
     expect(effectiveOnDate[0]?.ruleId).toBe(rule1.ruleId);
 
-    const workbookContext = getApplicableRulesForWorkbook([rule1, rule2], "2024-06-15", "participant-group");
+    const workbookContext = getApplicableRulesForWorkbook(
+      [rule1, rule2],
+      "2024-06-15",
+      "participant-group",
+    );
     expect(workbookContext.applicableRuleIds.length).toBe(1);
 
-    const filtered = queryRules([rule1, rule2], { effectiveDate: "2024-06-15" });
+    const filtered = queryRules([rule1, rule2], {
+      effectiveDate: "2024-06-15",
+    });
     expect(filtered.length).toBe(1);
   });
 
@@ -208,14 +244,20 @@ describe("Feature 002 governance workflow integration", () => {
   });
 
   it("audit log tracks full governance history", async () => {
-    const ruleId = (await createPlanRule({
-      statement: "Audit trail test rule.",
-      effectiveDate: "2024-01-01",
-      applicability: "participant-group",
-      primaryCitation: { sourceType: "plan-document", locator: "Art 1", date: "2023-01-01" },
-      createdBy: "author-1",
-      createdAt: ts("2024-01-01T00:00:00.000Z"),
-    })).ruleId;
+    const ruleId = (
+      await createPlanRule({
+        statement: "Audit trail test rule.",
+        effectiveDate: "2024-01-01",
+        applicability: "participant-group",
+        primaryCitation: {
+          sourceType: "plan-document",
+          locator: "Art 1",
+          date: "2023-01-01",
+        },
+        createdBy: "author-1",
+        createdAt: ts("2024-01-01T00:00:00.000Z"),
+      })
+    ).ruleId;
 
     const created = await createAuditEvent({
       ruleId,
@@ -233,7 +275,10 @@ describe("Feature 002 governance workflow integration", () => {
       timestamp: ts("2024-01-02T00:00:00.000Z"),
     });
 
-    const log = appendAuditEvent(appendAuditEvent(createAuditLog(), created), approved);
+    const log = appendAuditEvent(
+      appendAuditEvent(createAuditLog(), created),
+      approved,
+    );
     expect(log.events.length).toBe(2);
 
     const summary = getAuditSummary(log);

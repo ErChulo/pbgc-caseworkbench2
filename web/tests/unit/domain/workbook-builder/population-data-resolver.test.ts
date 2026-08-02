@@ -26,14 +26,24 @@ describe("PopulationDataResolver", () => {
     expect(
       resolveCellValue(
         resolver,
-        { sourceType: "population", sourceTab: "RETIREES", sourceField: "COMP", evidenceKey: null },
+        {
+          sourceType: "population",
+          sourceTab: "RETIREES",
+          sourceField: "COMP",
+          evidenceKey: null,
+        },
         0,
       ),
     ).toBe(50000);
     expect(
       resolveCellValue(
         resolver,
-        { sourceType: "population", sourceTab: "RETIREES", sourceField: "COMP", evidenceKey: null },
+        {
+          sourceType: "population",
+          sourceTab: "RETIREES",
+          sourceField: "COMP",
+          evidenceKey: null,
+        },
         2,
       ),
     ).toBe(70000);
@@ -44,7 +54,12 @@ describe("PopulationDataResolver", () => {
     expect(
       resolveCellValue(
         resolver,
-        { sourceType: "population", sourceTab: "RETIREES", sourceField: "COMP", evidenceKey: null },
+        {
+          sourceType: "population",
+          sourceTab: "RETIREES",
+          sourceField: "COMP",
+          evidenceKey: null,
+        },
         10,
       ),
     ).toBeNull();
@@ -100,7 +115,9 @@ describe("workbook builder with population data", () => {
     });
     if (!result.ok) throw new Error("workbook build failed");
 
-    const retireeSheet = result.workbook.sheets.find((s) => s.name === "RETIREES");
+    const retireeSheet = result.workbook.sheets.find(
+      (s) => s.name === "RETIREES",
+    );
     expect(retireeSheet).toBeDefined();
     if (retireeSheet === undefined) return;
 
@@ -153,7 +170,9 @@ describe("workbook builder with population data", () => {
     });
     if (!result.ok) throw new Error("workbook build failed");
 
-    const retireeSheet = result.workbook.sheets.find((s) => s.name === "RETIREES");
+    const retireeSheet = result.workbook.sheets.find(
+      (s) => s.name === "RETIREES",
+    );
     expect(retireeSheet).toBeDefined();
     if (retireeSheet === undefined) return;
 

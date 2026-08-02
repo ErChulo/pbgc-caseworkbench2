@@ -146,9 +146,7 @@ export async function detectWorkbookPopulation(
     recordCounts: profile.sheets.map((sheet) =>
       Math.max(
         0,
-        new Set(
-          sheet.cells.map((cell) => rowNumber(cell.address)),
-        ).size - 1,
+        new Set(sheet.cells.map((cell) => rowNumber(cell.address))).size - 1,
       ),
     ),
     sensitivity,

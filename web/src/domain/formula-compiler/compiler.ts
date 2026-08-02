@@ -1,4 +1,8 @@
-import type { BuildSpecV2, FormulaDefinitionV2 } from "../build-spec/models";
+import type {
+  BuildSpecV2,
+  CellMapping,
+  FormulaDefinitionV2,
+} from "../build-spec/models";
 import { computeContentHash } from "../build-spec/serialization";
 import { hashTyped } from "../manifests/canonical-json";
 import { validateContract } from "../../contracts/schema-validator";
@@ -144,11 +148,9 @@ function validateProvenance(
 
 function validateCellMapping(
   formula: FormulaDefinitionV2,
-  buildSpec: BuildSpecV2,
+  mappingsByFormulaId: ReadonlyMap<string, readonly CellMapping[]>,
 ): readonly DiagnosticDraft[] {
-  const mappings = buildSpec.cellMappings.filter(
-    (mapping) => mapping.formulaId === formula.formulaId,
-  );
+  const mappings = mappingsByFormulaId.get(formula.formulaId) ?? [];
   if (mappings.length !== 1)
     return [
       diagnostic(
@@ -187,6 +189,19 @@ function validateCellMapping(
           },
         ),
       ];
+}
+
+function groupCellMappingsByFormulaId(
+  cellMappings: readonly CellMapping[],
+): ReadonlyMap<string, readonly CellMapping[]> {
+  const indexed = new Map<string, CellMapping[]>();
+  for (const mapping of cellMappings) {
+    if (mapping.formulaId === null) continue;
+    const existing = indexed.get(mapping.formulaId);
+    if (existing === undefined) indexed.set(mapping.formulaId, [mapping]);
+    else existing.push(mapping);
+  }
+  return indexed;
 }
 
 function sameDependencies(
@@ -336,13 +351,16 @@ export async function compileBuildSpec(
     ]);
     return { status: "blocked", artifact: null, diagnostics };
   }
+  const formulasById = new Map(
+    buildSpec.formulas.map((formula) => [formula.formulaId, formula]),
+  );
+  const mappingsByFormulaId = groupCellMappingsByFormulaId(
+    buildSpec.cellMappings,
+  );
   const duplicateIssues = validateUniqueIdentities(buildSpec);
   if (duplicateIssues.length > 0) {
-    const formulasById = new Map(
-      buildSpec.formulas.map((formula) => [formula.formulaId, formula]),
-    );
     const mappingIssues = [...formulasById.values()].flatMap((formula) =>
-      validateCellMapping(formula, buildSpec),
+      validateCellMapping(formula, mappingsByFormulaId),
     );
     const diagnostics = await materializeDiagnostics([
       ...duplicateIssues,
@@ -402,7 +420,7 @@ export async function compileBuildSpec(
   )) {
     const formulaIssues = [
       ...validateProvenance(formula),
-      ...validateCellMapping(formula, buildSpec),
+      ...validateCellMapping(formula, mappingsByFormulaId),
     ];
     if (normalizeCellAddress(formula.cellAddress) !== formula.cellAddress)
       formulaIssues.push(
@@ -483,9 +501,9 @@ export async function compileBuildSpec(
     ...analysis.issues.map((entry) => ({
       ...entry,
       scenarioId:
-        buildSpec.formulas.find(
-          (formula) => formula.formulaId === entry.formulaId,
-        )?.scenarioId ?? null,
+        entry.formulaId === null
+          ? null
+          : (formulasById.get(entry.formulaId)?.scenarioId ?? null),
     })),
   );
   const diagnostics = await materializeDiagnostics(drafts);

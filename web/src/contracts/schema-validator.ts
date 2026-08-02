@@ -19,6 +19,8 @@ import provisionCandidateSchema from "./schemas/provision-candidate.schema.json"
 import evidenceUnresolvedItemSchema from "./schemas/unresolved-item.schema.json";
 import v1ArchitectureSchema from "./schemas/v1-architecture.schema.json";
 import architecturePolicyApprovalSchema from "./schemas/architecture-policy-approval.schema.json";
+import finalCaseworkOutputPackageSchema from "./schemas/final-casework-output-package.schema.json";
+import section436EvaluationSchema from "./schemas/section-436-evaluation.schema.json";
 import { validateV1ArchitectureSemantics } from "../domain/architecture/semantic-validator";
 
 export interface ContractValidationIssue {
@@ -59,6 +61,8 @@ const schemas = [
   evidenceUnresolvedItemSchema,
   v1ArchitectureSchema,
   architecturePolicyApprovalSchema,
+  finalCaseworkOutputPackageSchema,
+  section436EvaluationSchema,
 ] as const;
 
 const ajv = new Ajv2020({
@@ -128,6 +132,16 @@ const validators: Readonly<Record<string, ValidateFunction | undefined>> = {
   ),
   "architecture-policy-approval.schema.json": ajv.getSchema(
     architecturePolicyApprovalSchema.$id,
+  ),
+  finalCaseworkOutputPackage: ajv.getSchema(
+    finalCaseworkOutputPackageSchema.$id,
+  ),
+  "final-casework-output-package.schema.json": ajv.getSchema(
+    finalCaseworkOutputPackageSchema.$id,
+  ),
+  section436Evaluation: ajv.getSchema(section436EvaluationSchema.$id),
+  "section-436-evaluation.schema.json": ajv.getSchema(
+    section436EvaluationSchema.$id,
   ),
   unresolvedItem: ajv.getSchema(`${governedId}#/$defs/unresolvedItem`),
   quarantineDecision: ajv.getSchema(`${governedId}#/$defs/quarantineDecision`),
