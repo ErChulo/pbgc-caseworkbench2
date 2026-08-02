@@ -4,12 +4,6 @@
 
 Deterministic, evidence-traceable V1 compiler for PBGC terminated-plan casework.
 
-## Pilot
-
-- Plan: College of Saint Rose Non-Contract Employees Pension Plan
-- PBGC case: 24884900
-- DOPT: 2024-06-30
-- Benefit/participation freeze: 2020-07-31
 
 ## Initial workflow
 
