@@ -4,6 +4,7 @@ import { parseSha256, type Sha256 } from "../shared/types";
 import type {
   WorkbookGenerationInput,
   V1Workbook,
+  WorkbookSheet,
   SummarySheetData,
   TablesSheetData,
   UDTableSheetData,
@@ -18,6 +19,11 @@ import {
   validateNoCycles,
   aggregateValidationResults,
 } from "./validation";
+import {
+  generateFormulaCells,
+  populateDataCells,
+  mergeSheetCells,
+} from "./formula-sheets";
 
 export async function buildWorkbook(
   input: WorkbookGenerationInput,
@@ -77,6 +83,21 @@ export async function buildWorkbook(
   const populationProfileContentSha256 =
     input.populationProfile.effectiveWorkbookProfileContentSha256 ?? zeroHash;
 
+  const formulaResult = generateFormulaCells({
+    formulas: input.buildSpec.formulas,
+    executionOrder: input.buildSpec.executionOrder,
+  });
+  const dataCells = populateDataCells(input.buildSpec.cellMappings);
+  const allCells = mergeSheetCells(formulaResult.cellsByTab, dataCells);
+
+  const sheets: WorkbookSheet[] = [...allCells.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .map(([name, cells]) => ({
+      name,
+      hidden: false,
+      cells,
+    }));
+
   const workbookId = await deterministicUuid("V1Workbook", {
     buildSpecId: input.buildSpec.buildSpecId,
     buildSpecContentSha256: input.buildSpec.buildSpecContentSha256,
@@ -95,10 +116,10 @@ export async function buildWorkbook(
       input.populationProfile.effectiveDecisionId ?? null,
     populationProfileContentSha256: populationProfileContentSha256,
     generatedAt: input.buildSpec.generatedAt,
-    sheets: [],
+    sheets,
     namedRanges: input.buildSpec.namedRanges,
     cellMappings: input.buildSpec.cellMappings,
-    formulaCells: [],
+    formulaCells: formulaResult.formulaCells,
     support: supportContent,
     workbookContentSha256: zeroHash,
   };

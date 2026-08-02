@@ -94,15 +94,67 @@ describe("workbook builder foundation", () => {
     if (!result.ok) throw new Error("workbook build failed");
 
     const spec = buildXLSXSpec(result.workbook);
-    expect(spec.sheets.map((sheet) => sheet.name)).toEqual([
-      "Summary",
-      "Tables",
-      "UD Table",
-    ]);
+    expect(spec.sheets.map((sheet) => sheet.name)).toContain("Summary");
+    expect(spec.sheets.map((sheet) => sheet.name)).toContain("Tables");
+    expect(spec.sheets.map((sheet) => sheet.name)).toContain("UD Table");
     expect(spec.namedRanges.map((range) => range.name)).toEqual([
       "COMP",
       "SUBTOTAL",
     ]);
+  });
+
+  it("generates per-tab sheets with formula and data cells", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const { workbook } = result;
+    expect(workbook.sheets.length).toBeGreaterThan(0);
+    const retireeSheet = workbook.sheets.find((s) => s.name === "RETIREES");
+    expect(retireeSheet).toBeDefined();
+    if (retireeSheet === undefined) return;
+    expect(retireeSheet.cells.length).toBeGreaterThan(0);
+
+    const inputCells = retireeSheet.cells.filter((c) => c.kind === "input");
+    expect(inputCells.length).toBeGreaterThan(0);
+    for (const cell of inputCells) {
+      expect(cell.dataSource).not.toBeNull();
+    }
+
+    const formulaCells = retireeSheet.cells.filter((c) => c.kind === "formula");
+    expect(formulaCells.length).toBeGreaterThan(0);
+    for (const cell of formulaCells) {
+      expect(cell.formulaText).toBeTruthy();
+    }
+  });
+
+  it("populates formulaCells with execution order metadata", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const { workbook } = result;
+    expect(workbook.formulaCells.length).toBe(2);
+    const ids = workbook.formulaCells.map((fc) => fc.formulaId);
+    expect(ids).toContain("FORMULA-RETIREES-SUBTOTAL-DOR");
+    expect(ids).toContain("FORMULA-RETIREES-BENEFIT-DOR");
+
+    for (const fc of workbook.formulaCells) {
+      expect(fc.executionOrder).toBeGreaterThanOrEqual(0);
+      expect(fc.executionLevel).toBeGreaterThanOrEqual(0);
+      expect(fc.formulaText).toBeTruthy();
+      expect(fc.tabName).toBe("RETIREES");
+    }
   });
 
   it("computes a deterministic content hash for the workbook", async () => {
