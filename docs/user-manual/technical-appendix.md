@@ -263,6 +263,8 @@ The app reads the file and computes the SHA-256 itself. This avoids typed, copie
 - Paths are workspace-relative.
 - Supported final-package artifact types include architecture, BuildSpec, compiled formulas, workbook, validation, reconciliation, and Section 436 evaluation artifacts.
 - Linking proves byte identity, not actuarial correctness.
+- A `draft-v1-summary` is intentionally outside the final-package artifact-type list. It is a pre-package scaffold-selection artifact saved at `cases/<case-uuid>/outputs/draft-v1-summary.json`.
+- Draft V1 summary matching compares R5 JSON signals with approved reference-summary metadata. It does not make the selected reference canonical for the active case.
 
 ---
 

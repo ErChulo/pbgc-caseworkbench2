@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "draft-v1-summary.schema.json",
+  "title": "Draft V1 Summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "artifactType",
+    "deterministicPayload",
+    "contentSha256",
+    "operationalMetadata"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "artifactType": { "const": "draft-v1-summary" },
+    "deterministicPayload": { "$ref": "#/$defs/DeterministicPayload" },
+    "contentSha256": { "$ref": "#/$defs/Sha256" },
+    "operationalMetadata": { "$ref": "#/$defs/OperationalMetadata" }
+  },
+  "$defs": {
+    "Sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "StringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "IobCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["I", "O", "B", "N", "C", "other"],
+      "properties": {
+        "I": { "type": "integer", "minimum": 0 },
+        "O": { "type": "integer", "minimum": 0 },
+        "B": { "type": "integer", "minimum": 0 },
+        "N": { "type": "integer", "minimum": 0 },
+        "C": { "type": "integer", "minimum": 0 },
+        "other": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "R5Source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "contentSha256",
+        "schemaName",
+        "schemaStrictness"
+      ],
+      "properties": {
+        "fileName": { "type": ["string", "null"] },
+        "contentSha256": { "$ref": "#/$defs/Sha256" },
+        "schemaName": { "const": "r5-summary.schema.json" },
+        "schemaStrictness": { "const": "open-additional-properties" }
+      }
+    },
+    "ReferenceCorpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["corpusPath", "indexVersion", "referenceCount"],
+      "properties": {
+        "corpusPath": { "const": "reference/approved-v1-summaries" },
+        "indexVersion": {
+          "const": "approved-v1-summary-reference-index-v1.0.0"
+        },
+        "referenceCount": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "SignalProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "sourceKind",
+        "sourceTabs",
+        "runs",
+        "genericFields",
+        "tokens",
+        "comparableSignalCounts",
+        "numericSignals",
+        "normalizationWarnings"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "sourceKind": { "const": "r5-summary" },
+        "sourceTabs": { "$ref": "#/$defs/StringList" },
+        "runs": { "$ref": "#/$defs/StringList" },
+        "genericFields": { "$ref": "#/$defs/StringList" },
+        "tokens": { "$ref": "#/$defs/StringList" },
+        "comparableSignalCounts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sourceTabs", "runs", "genericFields", "tokens"],
+          "properties": {
+            "sourceTabs": { "type": "integer", "minimum": 0 },
+            "runs": { "type": "integer", "minimum": 0 },
+            "genericFields": { "type": "integer", "minimum": 0 },
+            "tokens": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "numericSignals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cellCount", "formulaCellCount"],
+          "properties": {
+            "cellCount": { "type": ["integer", "null"], "minimum": 0 },
+            "formulaCellCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            }
+          }
+        },
+        "normalizationWarnings": { "$ref": "#/$defs/StringList" }
+      }
+    },
+    "SelectedScaffold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "referenceId",
+        "fileName",
+        "workbookName",
+        "referenceContentSha256",
+        "schemaVersion",
+        "keyMode",
+        "sourceTabs",
+        "runs",
+        "cellCount",
+        "uniqueFieldCount",
+        "formulaCellCount",
+        "iobCounts",
+        "matchedFieldCount",
+        "matchedRunCount",
+        "matchedSourceTabCount"
+      ],
+      "properties": {
+        "referenceId": { "type": "string", "minLength": 1 },
+        "fileName": { "type": "string", "minLength": 1 },
+        "workbookName": { "type": "string", "minLength": 1 },
+        "referenceContentSha256": { "$ref": "#/$defs/Sha256" },
+        "schemaVersion": { "type": "string", "minLength": 1 },
+        "keyMode": { "type": "string", "minLength": 1 },
+        "sourceTabs": { "$ref": "#/$defs/StringList" },
+        "runs": { "$ref": "#/$defs/StringList" },
+        "cellCount": { "type": "integer", "minimum": 0 },
+        "uniqueFieldCount": { "type": "integer", "minimum": 0 },
+        "formulaCellCount": { "type": "integer", "minimum": 0 },
+        "iobCounts": { "$ref": "#/$defs/IobCounts" },
+        "matchedFieldCount": { "type": "integer", "minimum": 0 },
+        "matchedRunCount": { "type": "integer", "minimum": 0 },
+        "matchedSourceTabCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Match": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "referenceId",
+        "fileName",
+        "workbookName",
+        "referenceContentSha256",
+        "scoreBasisPoints",
+        "matchedFieldCount",
+        "matchedRunCount",
+        "matchedSourceTabCount",
+        "cellCountDistance"
+      ],
+      "properties": {
+        "referenceId": { "type": "string", "minLength": 1 },
+        "fileName": { "type": "string", "minLength": 1 },
+        "workbookName": { "type": "string", "minLength": 1 },
+        "referenceContentSha256": { "$ref": "#/$defs/Sha256" },
+        "scoreBasisPoints": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "matchedFieldCount": { "type": "integer", "minimum": 0 },
+        "matchedRunCount": { "type": "integer", "minimum": 0 },
+        "matchedSourceTabCount": { "type": "integer", "minimum": 0 },
+        "cellCountDistance": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "DraftSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "draftStatus",
+        "keyMode",
+        "workbookName",
+        "sourceTabs",
+        "runs",
+        "cellCount",
+        "uniqueFieldCount",
+        "formulaCellCount",
+        "fieldPreview",
+        "omittedCellsReason"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "draft-v1-summary-1.0" },
+        "draftStatus": { "const": "blocked" },
+        "keyMode": { "type": "string", "minLength": 1 },
+        "workbookName": { "type": "string", "minLength": 1 },
+        "sourceTabs": { "$ref": "#/$defs/StringList" },
+        "runs": { "$ref": "#/$defs/StringList" },
+        "cellCount": { "type": "integer", "minimum": 0 },
+        "uniqueFieldCount": { "type": "integer", "minimum": 0 },
+        "formulaCellCount": { "type": "integer", "minimum": 0 },
+        "fieldPreview": { "$ref": "#/$defs/StringList" },
+        "omittedCellsReason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "MaturityClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "level", "evidence", "externalExecutionClaimed"],
+      "properties": {
+        "subject": { "type": "string", "minLength": 1 },
+        "level": { "const": "specified" },
+        "evidence": { "type": "string", "minLength": 1 },
+        "externalExecutionClaimed": { "const": false }
+      }
+    },
+    "LineageEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromArtifactSha256", "toArtifactSha256", "relationship"],
+      "properties": {
+        "fromArtifactSha256": { "$ref": "#/$defs/Sha256" },
+        "toArtifactSha256": { "$ref": "#/$defs/Sha256" },
+        "relationship": { "type": "string", "minLength": 1 }
+      }
+    },
+    "DeterministicPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "caseId",
+        "artifactPurpose",
+        "draftStatus",
+        "r5Source",
+        "referenceCorpus",
+        "normalizedR5Signals",
+        "selectedScaffold",
+        "candidateMatches",
+        "draftSummary",
+        "blockers",
+        "maturityClaims",
+        "lineage"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "caseId": { "type": "string", "format": "uuid" },
+        "artifactPurpose": { "const": "pre-package-v1-summary-scaffold" },
+        "draftStatus": { "const": "blocked" },
+        "r5Source": { "$ref": "#/$defs/R5Source" },
+        "referenceCorpus": { "$ref": "#/$defs/ReferenceCorpus" },
+        "normalizedR5Signals": { "$ref": "#/$defs/SignalProfile" },
+        "selectedScaffold": { "$ref": "#/$defs/SelectedScaffold" },
+        "candidateMatches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Match" },
+          "minItems": 1
+        },
+        "draftSummary": { "$ref": "#/$defs/DraftSummary" },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "maturityClaims": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MaturityClaim" },
+          "minItems": 1
+        },
+        "lineage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/LineageEdge" }
+        }
+      }
+    },
+    "OperationalMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generatedAt", "generatedBy", "generatorVersion"],
+      "properties": {
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "generatedBy": { "type": ["string", "null"] },
+        "generatorVersion": { "const": "draft-v1-summary-generator-v1.0.0" }
+      }
+    }
+  }
+}

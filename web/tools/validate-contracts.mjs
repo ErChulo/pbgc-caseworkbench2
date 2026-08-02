@@ -10,6 +10,7 @@ const sourceDirectories = [
   resolve("specs/007-workbook-builder/contracts"),
   resolve("specs/010-final-casework-output-package/contracts"),
   resolve("specs/011-section-436-evaluation/contracts"),
+  resolve("specs/012-draft-v1-summary/contracts"),
 ];
 const runtimeDirectory = resolve("web/src/contracts/schemas");
 const draft202012 = "https://json-schema.org/draft/2020-12/schema";

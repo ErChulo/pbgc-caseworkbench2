@@ -34,6 +34,7 @@ Feature 009 cannot be treated as the finished product because it explicitly stop
 | User manual and PDFs                        | Added                                                                                                                                                              | `docs/user-manual/`                                                                                                                    | Documentation is not a casework deliverable.                                                                                                  |
 | Final casework output package               | Implemented as governed package contract, deterministic orchestrator, app readiness panel, workspace-artifact linker, and local export action                      | `specs/010-final-casework-output-package/`, `web/src/domain/case-output/`, `web/src/components/case-output/CaseOutputPackagePanel.tsx` | Package exports blocked status until required generated artifacts are linked or supplied. Linked workspace files are hashed before inclusion. |
 | Section 436 evaluation or memo              | Deterministic evaluation artifact and Markdown report renderer implemented; missing approved facts/rules block completion                                          | `specs/011-section-436-evaluation/`, `web/src/domain/section-436/`                                                                     | No fact-entry UI or formatted DOCX/PDF memo generator yet. Reference materials remain source candidates only.                                 |
+| Draft V1 summary scaffold                   | Implemented as a blocked pre-package artifact from R5 summary JSON to closest approved V1 reference-summary metadata                                               | `specs/012-draft-v1-summary/`, `web/src/domain/draft-v1-summary/`, `web/src/components/draft-v1-summary/DraftV1SummaryPanel.tsx`       | Does not replace governed architecture, BuildSpec, formula compiler, workbook, validation, reconciliation, or human approval.                 |
 | Human approval and office/manual validation | Deferred                                                                                                                                                           | `docs/feature-009-usability-results.md`, SC-010/T124 context                                                                           | Cannot claim human-approved or externally executed maturity.                                                                                  |
 
 ## Final deliverables still missing
@@ -49,6 +50,7 @@ Feature 009 cannot be treated as the finished product because it explicitly stop
 | Validation package            | Structural validation, population mapping checks, reconciliation against independent oracle, reviewer rationale, deterministic evidence hash                | Domain built; no final production UI/package; external execution not done                                              |
 | Final casework output bundle  | One exportable package containing workbook, BuildSpec, compiled formulas, validation report, unresolved-items report, lineage manifest, and maturity labels | Package contract/UI/export implemented; real package remains blocked until downstream artifacts are supplied           |
 | Section 436 evaluation/report | Deterministic Section 436 applicability evaluation and case memo/report if required by the work product                                                     | Evaluation artifact and Markdown report renderer implemented; DOCX/PDF memo generation remains missing                 |
+| Draft V1 summary scaffold    | Pre-package scaffold-selection record from R5 summary JSON and approved V1 reference-summary metadata                                                      | Implemented as blocked `draft-v1-summary`; not part of the final package until separately governed                     |
 
 ## Build plan to close the gap
 
@@ -64,7 +66,8 @@ Feature 009 cannot be treated as the finished product because it explicitly stop
 2. Completed in part: added deterministic final-package orchestrator over supplied governed artifacts.
 3. Completed: final-package orchestration fails closed at each missing stage instead of inventing artifacts.
 4. Completed in part: generated workspace artifacts can now be linked by path, hashed locally, persisted, and mapped into the final package by artifact type.
-5. Remaining: add one-click production generation for architecture, BuildSpec, compiled formulas, workbook, validation, and Section 436 from approved inputs.
+5. Completed in part: R5 summary JSON can now generate a blocked draft V1 summary scaffold from approved reference-summary metadata.
+6. Remaining: add one-click production generation for architecture, BuildSpec, compiled formulas, workbook, validation, and Section 436 from approved inputs.
 
 ### Phase 3: Build the caseworker output screen
 
@@ -103,10 +106,11 @@ Feature 009 cannot be treated as the finished product because it explicitly stop
 | P1       | Export final output bundle with manifest and hashes               | Completed for final package manifest JSON; generated workbook/report artifacts still blocked until supplied |
 | P1       | Add validation report export                                      | Still pending                                                                                               |
 | P1       | Implement Section 436 as first-class governed feature             | Completed for deterministic evaluation artifact and Markdown report renderer; DOCX/PDF export pending       |
+| P1       | Generate draft V1 summary scaffold from R5 summary JSON           | Completed as a blocked pre-package artifact; downstream governed generation still pending                   |
 
 ## Corrected status statement
 
-What we have so far is a governed foundation, several deterministic domain engines, a final-output package boundary, and a deterministic Section 436 evaluation/report artifact surface.
+What we have so far is a governed foundation, several deterministic domain engines, a draft V1 summary scaffold, a final-output package boundary, and a deterministic Section 436 evaluation/report artifact surface.
 
 What we do not yet have is a complete end-user casework output flow that supplies all downstream artifacts from production inputs.
 

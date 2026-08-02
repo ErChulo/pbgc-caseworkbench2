@@ -448,7 +448,27 @@ How to export:
 
 Do not manually edit the manifest. If something is wrong, correct the underlying review state and export again.
 
-### 5.12 Case Output Package
+### 5.12 Draft V1 Summary From R5
+
+Purpose: Creates a blocked pre-package `draft-v1-summary` artifact from an uploaded R5 summary JSON.
+
+The panel does the following:
+
+- Reads the selected R5 summary JSON locally.
+- Computes the R5 source SHA-256 from the file bytes.
+- Normalizes comparable fields, runs, source tabs, and counts from the open R5 shape.
+- Scores approved V1 summary reference metadata from `reference/approved-v1-summaries`.
+- Saves `cases/<case-uuid>/outputs/draft-v1-summary.json`.
+
+The artifact records the selected scaffold, top candidate matches, source/reference hashes, and blockers. It is not linked into the final casework package automatically.
+
+Important limits:
+
+- The selected reference summary is not case authority unless a human approval record designates the exact reference hash for a permitted purpose.
+- The draft does not create a governed V1 architecture, BuildSpec, compiled formulas, workbook, validation, reconciliation, or external-execution evidence.
+- The draft remains blocked until reviewed against plan-rule evidence, population profile, case controls, and unresolved items.
+
+### 5.13 Case Output Package
 
 Purpose: Assembles the final casework output boundary for the active case.
 
@@ -497,7 +517,7 @@ How to export the final package:
 
 Important: A blocked package is still useful. It documents exactly which required outputs are missing. Do not hand-edit the package to make a blocked case appear complete.
 
-### 5.13 Section 436 Evaluation Artifact
+### 5.14 Section 436 Evaluation Artifact
 
 Purpose: Represents the deterministic Section 436 evaluation output that can be linked into the final casework package.
 

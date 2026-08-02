@@ -61,3 +61,11 @@ The application includes built-in help describing workspace selection, backups, 
 - The exported final package is stored at `cases/<case-uuid>/exports/final-casework-output-package.json`.
 - A blocked final package is acceptable evidence of missing required outputs; do not mark it complete by hand-editing JSON.
 - Do not claim Excel, ValTool, Runtime, ATPBGC, BCV, or other external execution unless separate execution evidence is linked and reviewed.
+
+## Draft V1 summary operation
+
+- Use the Draft V1 Summary panel only when an R5 summary JSON is available for the active case.
+- The app hashes the R5 JSON bytes and writes `cases/<case-uuid>/outputs/draft-v1-summary.json`.
+- The draft records closest approved V1 summary reference matching and explicit blockers.
+- Do not treat the draft as a final V1 architecture, BuildSpec, formula artifact, workbook, validation result, reconciliation result, or approval.
+- Do not link the draft into the final output package unless a separate governed workflow approves its exact purpose and maturity.

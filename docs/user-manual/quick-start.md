@@ -125,7 +125,17 @@ When reviews are complete, go to **Manifest Export**:
 - Click **Export Manifest** to save a local JSON file
 - This is your auditable record of everything processed
 
-### Step 9: Link Generated Output Artifacts
+### Step 9: Generate A Draft V1 Summary Scaffold
+
+If you have an R5 summary JSON, go to **Draft V1 summary from R5**:
+
+1. Select the R5 summary JSON file
+2. Let the app compute the source hash and compare it with approved V1 summary reference metadata
+3. Review the selected scaffold, score, top matches, and blockers
+
+The draft is saved locally as `cases/<case-uuid>/outputs/draft-v1-summary.json`. It is a blocked pre-package scaffold artifact only. It does not approve a V1 architecture, BuildSpec, workbook, validation result, or external execution.
+
+### Step 10: Link Generated Output Artifacts
 
 When V1 artifacts already exist in the selected workspace, go to **Case Output Package**:
 
@@ -137,7 +147,7 @@ When V1 artifacts already exist in the selected workspace, go to **Case Output P
 
 **What happens:** The app reads the selected workspace file, computes its SHA-256, and records the reference under `cases/<case-uuid>/outputs/artifact-references.json`. Do not type or invent hashes.
 
-### Step 10: Export the Final Output Package
+### Step 11: Export the Final Output Package
 
 In **Case Output Package**:
 
@@ -177,6 +187,9 @@ A: No - production case data stays on your device. Use the **export manifest** f
 
 **Q: Does the final output package contain the workbook or validation files?**
 A: No. It references linked artifacts by SHA-256 and workspace path. Keep the referenced files under approved workspace controls.
+
+**Q: Is the draft V1 summary a complete V1 engine?**
+A: No. It only records deterministic R5 normalization and closest approved-reference scaffold matching. Governed rules, population profile, BuildSpec, formulas, workbook generation, validation, and human approvals remain required.
 
 **Q: Does Section 436 produce a finished memo?**
 A: No. The current implementation supports a deterministic Section 436 evaluation artifact and Markdown report renderer. DOCX/PDF memo generation and fact-entry screens are not yet provided.

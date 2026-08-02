@@ -124,6 +124,7 @@ import {
   CaseOutputPackagePanel,
   type CaseOutputArtifactLinkDraft,
 } from "../components/case-output/CaseOutputPackagePanel";
+import { DraftV1SummaryPanel } from "../components/draft-v1-summary/DraftV1SummaryPanel";
 import { evidenceReviewDemo } from "../components/evidence/demo-evidence";
 import type {
   AuthorityOverride,
@@ -144,6 +145,9 @@ import type {
   CaseworkOutputUnresolvedItemSummary,
   FinalCaseworkOutputInput,
 } from "../domain/case-output/models";
+import { createDraftV1SummaryArtifact } from "../domain/draft-v1-summary/draft-builder";
+import type { DraftV1SummaryArtifact } from "../domain/draft-v1-summary/models";
+import { validateContract } from "../contracts/schema-validator";
 
 const identifierRule: CaseIdentifierRule = {
   ruleId: "pbgc-case-id-basic",
@@ -295,6 +299,11 @@ export function App({
   const [caseOutputArtifacts, setCaseOutputArtifacts] = useState<
     readonly CaseworkOutputArtifactInput[]
   >([]);
+  const [draftV1Summary, setDraftV1Summary] =
+    useState<DraftV1SummaryArtifact | null>(null);
+  const [draftV1SummaryMessage, setDraftV1SummaryMessage] = useState<
+    string | null
+  >(null);
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
   const activeGovernanceDependencies =
@@ -308,9 +317,12 @@ export function App({
       setCaseOutputArtifacts([]);
       setCaseOutputLinkMessage(null);
       setCaseOutputExportMessage(null);
+      setDraftV1Summary(null);
+      setDraftV1SummaryMessage(null);
     }
     setActiveCase(caseRecord);
     void loadCaseOutputArtifactReferences(caseRecord);
+    void loadDraftV1SummaryArtifact(caseRecord);
   };
 
   const selectWorkspace = async (): Promise<void> => {
@@ -729,6 +741,12 @@ export function App({
         <PackageIntake
           enabled={workspaceReady && activeCase !== null}
           onProcess={processPackage}
+        />
+        <DraftV1SummaryPanel
+          enabled={workspaceReady && activeCase !== null}
+          draft={draftV1Summary}
+          message={draftV1SummaryMessage}
+          onGenerate={generateDraftV1Summary}
         />
         <QuarantineQueue
           items={quarantineItems}
@@ -1672,6 +1690,116 @@ export function App({
         "Existing final-output artifact references are not valid JSON and were ignored.",
       );
     }
+  }
+
+  async function loadDraftV1SummaryArtifact(
+    caseRecord: CaseRecord,
+  ): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null) return;
+    const opened = await activeWorkspace.openChunkReader(
+      `cases/${caseRecord.caseId}/outputs/draft-v1-summary.json`,
+    );
+    if (!opened.ok) {
+      if (opened.error.code !== "NOT_FOUND") {
+        setDraftV1SummaryMessage(
+          "Existing draft V1 summary artifact could not be read.",
+        );
+      }
+      return;
+    }
+    try {
+      const value = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          await readAllBytes(opened.value),
+        ),
+      ) as unknown;
+      const validation = validateContract("draftV1Summary", value);
+      if (!validation.valid) {
+        setDraftV1SummaryMessage(
+          "Existing draft V1 summary artifact failed runtime validation and was ignored.",
+        );
+        return;
+      }
+      setDraftV1Summary(value as DraftV1SummaryArtifact);
+    } catch {
+      setDraftV1SummaryMessage(
+        "Existing draft V1 summary artifact is not valid UTF-8 JSON and was ignored.",
+      );
+    }
+  }
+
+  async function generateDraftV1Summary(file: File): Promise<void> {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null || activeCase === null) {
+      setDraftV1SummaryMessage(
+        "Select an active local case before generating a draft V1 summary.",
+      );
+      return;
+    }
+
+    setDraftV1SummaryMessage(null);
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    let r5Summary: unknown;
+    try {
+      r5Summary = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true })
+          .decode(bytes)
+          .replace(/^\uFEFF/u, ""),
+      );
+    } catch {
+      setDraftV1SummaryMessage(
+        "The selected R5 summary must be valid UTF-8 JSON.",
+      );
+      return;
+    }
+
+    const hashed = await hashChunkReader(bytesReader(bytes));
+    if (!hashed.ok) {
+      setDraftV1SummaryMessage(hashed.error.safeMessage);
+      return;
+    }
+
+    const artifact = await createDraftV1SummaryArtifact({
+      caseId: activeCase.caseId,
+      r5Summary,
+      r5SummaryContentSha256: hashed.value.sha256,
+      r5SummaryFileName: file.name,
+      generatedAt: dependencies.clock.now(),
+      generatedBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
+    });
+    const validation = validateContract("draftV1Summary", artifact);
+    if (!validation.valid) {
+      setDraftV1SummaryMessage(
+        `Draft V1 summary failed runtime validation: ${validation.issues[0]?.message ?? "unknown issue"}`,
+      );
+      return;
+    }
+
+    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/outputs`);
+    const storagePath = `cases/${activeCase.caseId}/outputs/draft-v1-summary.json`;
+    const saved = await activeWorkspace.writeAtomic(
+      storagePath,
+      new TextEncoder().encode(`${canonicalize(artifact)}\n`),
+    );
+    if (!saved.ok) {
+      setDraftV1SummaryMessage("Draft V1 summary artifact could not be saved.");
+      return;
+    }
+    await appendReviewEvent({
+      eventType: "draft-v1-summary-generated",
+      artifactType: artifact.artifactType,
+      draftContentSha256: artifact.contentSha256,
+      r5SourceSha256: artifact.deterministicPayload.r5Source.contentSha256,
+      selectedReferenceSha256:
+        artifact.deterministicPayload.selectedScaffold.referenceContentSha256,
+      generatedAt: artifact.operationalMetadata.generatedAt,
+      schemaVersion: "1.0.0",
+    });
+    setDraftV1Summary(artifact);
+    setDraftV1SummaryMessage(
+      `Draft V1 summary saved to ${storagePath} with scaffold ${artifact.deterministicPayload.selectedScaffold.workbookName} and hash ${artifact.contentSha256}.`,
+    );
   }
 
   async function persistCaseOutputArtifactReferences(

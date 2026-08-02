@@ -12,6 +12,7 @@ It helps caseworkers and reviewers:
   \item Review files that the system flags for safety or quality issues.
   \item Make human decisions on automated suggestions.
   \item Export an auditable, deterministic manifest of the review record.
+  \item Generate a blocked draft V1 summary scaffold from an R5 summary JSON.
   \item Link generated V1, workbook, validation, reconciliation, and Section 436 artifacts by computed hash.
   \item Export a final casework output package that records ready stages and blockers.
 \end{itemize}
@@ -44,6 +45,7 @@ Network & No case-data network access is required after the app is available loc
   \item Review blocked items in the quarantine queue.
   \item Review classification, relationship, and population suggestions if present.
   \item Export the local manifest.
+  \item Generate a draft V1 summary scaffold if an R5 summary JSON is available.
   \item Link generated output artifacts that already exist in the workspace.
   \item Export the final casework output package.
 \end{enumerate}
@@ -92,11 +94,15 @@ For each blocked item, read the block reason, enter reviewer name and rationale,
 
 When reviews are complete enough for your work stage, open Manifest Export, review the counts and fingerprint, and export the local manifest.
 
-\section{Step 7: Link Generated Output Artifacts}
+\section{Step 7: Generate Draft V1 Summary Scaffold}
+
+If an R5 summary JSON is available, open Draft V1 Summary From R5, select the JSON file, and review the selected approved-reference scaffold, score, candidate matches, and blockers. The app writes \texttt{cases/\textless case-uuid\textgreater/outputs/draft-v1-summary.json}. This is a blocked pre-package artifact only; it is not a governed V1 architecture, BuildSpec, workbook, validation result, or approval.
+
+\section{Step 8: Link Generated Output Artifacts}
 
 When generated V1 artifacts already exist in the selected workspace, open Case Output Package, choose the artifact type, enter the workspace-relative path and description, then select Hash and link workspace artifact. The app computes the SHA-256 from the file bytes; do not type or invent hashes.
 
-\section{Step 8: Export Final Output Package}
+\section{Step 9: Export Final Output Package}
 
 Review each required stage and blocker, confirm linked artifacts are the intended files, and export \texttt{cases/\textless case-uuid\textgreater/exports/final-casework-output-package.json}. A blocked package documents missing outputs instead of pretending the case is complete.
 
@@ -106,7 +112,7 @@ Review each required stage and blocker, confirm linked artifacts are the intende
 
 \section{Purpose}
 
-PBGC CaseworkBench 2.0 supports local case intake, evidence preservation, human review, manifest export, generated-artifact linking, and final casework package export. It is built to preserve evidence lineage and separate automated suggestions from human approval.
+PBGC CaseworkBench 2.0 supports local case intake, evidence preservation, human review, manifest export, draft V1 summary scaffold generation, generated-artifact linking, and final casework package export. It is built to preserve evidence lineage and separate automated suggestions from human approval.
 
 \section{Safety Rules}
 
@@ -341,6 +347,12 @@ Required stages include evidence, plan rules, population profile, V1 architectur
 To link a generated artifact, confirm it already exists in the selected workspace, choose the artifact type, enter artifact ID, workspace-relative path, media type, maturity level, and description, then select Hash and link workspace artifact. Linked references are stored at \texttt{cases/\textless case-uuid\textgreater/outputs/artifact-references.json}.
 
 To export the final package, review the stage list, confirm required stages are ready or blocked with explicit reasons, confirm no external execution is claimed without evidence, and select Export final output package.
+
+\section{Draft V1 Summary From R5}
+
+The Draft V1 Summary panel creates a blocked pre-package \texttt{draft-v1-summary} artifact from an uploaded R5 summary JSON. It hashes the R5 source bytes, normalizes comparable fields, runs, source tabs, and counts, scores approved V1 summary reference metadata from \texttt{reference/approved-v1-summaries}, and saves \texttt{cases/\textless case-uuid\textgreater/outputs/draft-v1-summary.json}.
+
+The draft records selected scaffold metadata, top candidate matches, source/reference hashes, and blockers. It does not make a selected reference canonical for the active case, does not create governed architecture or BuildSpec artifacts, and does not claim workbook generation, validation, reconciliation, external execution, or human approval.
 
 \section{Section 436 Evaluation Artifact}
 
@@ -620,6 +632,7 @@ This manual does not claim:
   \item That the browser can certify files are malware-free.
   \item That missing participant data can be inferred or replaced with zero.
   \item That a linked artifact is correct merely because it was linked by hash.
+  \item That a draft V1 summary scaffold is a complete V1 engine or approval.
   \item That Section 436 DOCX/PDF memo generation is available.
 \end{itemize}
 
