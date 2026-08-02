@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkbook } from "../../../../src/domain/workbook-builder/workbook-builder";
-import { buildXLSXSpec, computeWorkbookHash } from "../../../../src/domain/workbook-builder/serialization";
+import {
+  buildXLSXSpec,
+  computeWorkbookHash,
+} from "../../../../src/domain/workbook-builder/serialization";
+import {
+  validateFormulaReferences,
+  validateNoCycles,
+} from "../../../../src/domain/workbook-builder/validation";
 import type { Sha256 } from "../../../../src/domain/shared/types";
+import type { BuildSpecV2 } from "../../../../src/domain/build-spec/models";
 import { buildSpecV2 } from "../../../fixtures/formula-compiler";
 
 async function createFixture() {
@@ -204,6 +212,136 @@ describe("workbook builder foundation", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.errors.some((e) => e.code === "MISSING_DATA_SOURCE")).toBe(true);
+    }
+  });
+
+  it("populates tables sheet with plan rules from formula provenance", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const tables = result.workbook.support.tablesSheet;
+    expect(tables.rules.length).toBeGreaterThan(0);
+    const firstRule = tables.rules[0];
+    expect(firstRule?.ruleId).toBeTruthy();
+    expect(firstRule?.statement).toBeTruthy();
+    expect(firstRule?.effectiveDate).toBeTruthy();
+  });
+
+  it("deduplicates plan rules across formulas", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const tables = result.workbook.support.tablesSheet;
+    const ruleIds = tables.rules.map((r) => r.ruleId);
+    const uniqueRuleIds = [...new Set(ruleIds)];
+    expect(ruleIds).toEqual(uniqueRuleIds);
+  });
+});
+
+describe("validation: formula references", () => {
+  it("rejects broken formula dependencies", async () => {
+    const baseSpec = await buildSpecV2();
+    const buildSpec: BuildSpecV2 = {
+      ...baseSpec,
+      formulas: baseSpec.formulas.map((f) =>
+        f.formulaId === "FORMULA-RETIREES-BENEFIT-DOR"
+          ? { ...f, dependencies: ["NONEXISTENT-FORMULA"] }
+          : f,
+      ),
+    };
+    const result = validateFormulaReferences(buildSpec);
+    expect(result.errors.some((e) => e.code === "BROKEN_REFERENCE")).toBe(
+      true,
+    );
+  });
+
+  it("accepts valid formula dependencies", async () => {
+    const buildSpec = await buildSpecV2();
+    const result = validateFormulaReferences(buildSpec);
+    expect(result.errors).toHaveLength(0);
+  });
+});
+
+describe("validation: cycle detection", () => {
+  it("rejects circular formula dependencies", async () => {
+    const baseSpec = await buildSpecV2();
+    const formulas = baseSpec.formulas;
+    const first = formulas[0];
+    const second = formulas[1];
+    if (first === undefined || second === undefined) {
+      throw new Error("Fixture must contain at least two formulas");
+    }
+    const buildSpec: BuildSpecV2 = {
+      ...baseSpec,
+      formulas: [
+        { ...first, formulaId: "A", dependencies: ["B"] },
+        { ...second, formulaId: "B", dependencies: ["A"] },
+      ],
+    };
+    const result = validateNoCycles(buildSpec);
+    expect(result.errors.some((e) => e.code === "CYCLE_DETECTED")).toBe(true);
+  });
+
+  it("accepts acyclic formula dependencies", async () => {
+    const buildSpec = await buildSpecV2();
+    const result = validateNoCycles(buildSpec);
+    expect(result.errors).toHaveLength(0);
+  });
+});
+
+describe("validation: multi-error aggregation", () => {
+  it("collects errors from all validation stages", async () => {
+    const baseSpec = await buildSpecV2();
+    const firstFormula = baseSpec.formulas[0];
+    if (firstFormula === undefined) {
+      throw new Error("Fixture must contain at least one formula");
+    }
+    const buildSpec: BuildSpecV2 = {
+      ...baseSpec,
+      formulas: [
+        { ...firstFormula, formulaId: "X", dependencies: ["Y"] },
+      ],
+      cellMappings: [
+        {
+          mappingId: "00000000-0000-4000-8000-000000000099" as import("../../../../src/domain/shared/types").Uuid,
+          field: "Z",
+          tabName: "RETIREES",
+          cellAddress: "Z1",
+          iobClassification: "I" as const,
+          dataSource: null,
+          formulaId: null,
+          scenarioId: "DOR",
+        },
+      ],
+    };
+    const result = await buildWorkbook({
+      buildSpec,
+      populationProfile: {
+        status: "approved" as const,
+        effectiveDecisionId: "pop-1",
+        effectiveWorkbookProfileContentSha256: "e".repeat(64) as Sha256,
+        provenance: ["pop-1"],
+      },
+      workbookProfileContentSha256: "e".repeat(64) as Sha256,
+      generatorVersion: "1.0.0",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const codes = result.errors.map((e) => e.code);
+      expect(codes).toContain("MISSING_DATA_SOURCE");
+      expect(codes).toContain("BROKEN_REFERENCE");
     }
   });
 });

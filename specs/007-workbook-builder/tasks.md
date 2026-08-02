@@ -19,10 +19,10 @@
 
 ## Phase 3: Support Sheet Generation
 
-- [ ] T010 Implement Summary sheet (metadata: case, architecture, population, hashes)
-- [ ] T011 Implement Tables sheet (plan rules with effective dates, citations, applicability)
-- [ ] T012 Implement UD Table sheet (user-defined ranges, mappings, validation state)
-- [ ] T013 Test support sheet determinism and completeness
+- [x] T010 Implement Summary sheet (metadata: case, architecture, population, hashes)
+- [x] T011 Implement Tables sheet (plan rules with effective dates, citations, applicability)
+- [x] T012 Implement UD Table sheet (user-defined ranges, mappings, validation state)
+- [x] T013 Test support sheet determinism and completeness
 
 ## Phase 4: Formula Sheet Generation
 
@@ -44,10 +44,10 @@
 - [x] T023 Implement BuildSpec validation for workbook generation
 - [x] T024 Implement population profile validation
 - [x] T025 Implement data source availability checking
-- [ ] T026 Implement reference resolution (named ranges, external links)
-- [ ] T027 Implement cycle detection in formula dependencies
+- [x] T026 Implement reference resolution (named ranges, external links)
+- [x] T027 Implement cycle detection in formula dependencies
 - [x] T028 Aggregate and deterministically sort all validation errors
-- [ ] T029 Test fail-closed validation with multiple error types
+- [x] T029 Test fail-closed validation with multiple error types
 
 ## Phase 7: Workbook Builder Engine
 

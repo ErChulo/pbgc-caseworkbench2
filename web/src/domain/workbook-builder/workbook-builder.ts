@@ -7,12 +7,15 @@ import type {
   SummarySheetData,
   TablesSheetData,
   UDTableSheetData,
+  PlanRuleRow,
   WorkbookGenerationError,
 } from "./models";
 import {
   validateBuildSpec,
   validatePopulationProfile,
   validateDataSources,
+  validateFormulaReferences,
+  validateNoCycles,
   aggregateValidationResults,
 } from "./validation";
 
@@ -27,11 +30,15 @@ export async function buildWorkbook(
     input.populationProfile,
   );
   const validationDataSources = validateDataSources(input.buildSpec);
+  const validationReferences = validateFormulaReferences(input.buildSpec);
+  const validationCycles = validateNoCycles(input.buildSpec);
 
   const validation = aggregateValidationResults(
     validationBuildSpec,
     validationPopulation,
     validationDataSources,
+    validationReferences,
+    validationCycles,
   );
 
   if (validation.errors.length > 0) {
@@ -58,7 +65,7 @@ export async function buildWorkbook(
   const zeroHash = zeroHashParsed.value;
 
   const summarySheet = generateSummarySheet(input, zeroHash);
-  const tablesSheet = generateTablesSheet();
+  const tablesSheet = generateTablesSheet(input);
   const udTableSheet = generateUDTableSheet(input);
 
   const supportContent = {
@@ -141,10 +148,31 @@ function generateSummarySheet(
   };
 }
 
-function generateTablesSheet(): TablesSheetData {
-  return {
-    rules: [],
-  };
+function generateTablesSheet(input: WorkbookGenerationInput): TablesSheetData {
+  const seenRuleIds = new Set<string>();
+  const rules: PlanRuleRow[] = [];
+
+  for (const formula of input.buildSpec.formulas) {
+    for (const sourceRule of formula.provenance.sourcePlanRules) {
+      if (seenRuleIds.has(sourceRule.ruleId)) continue;
+      seenRuleIds.add(sourceRule.ruleId);
+
+      const applicability = sourceRule.applicabilityConditions
+        .map((c) => `${c.dimension}=${c.value}`)
+        .join("; ");
+
+      rules.push({
+        ruleId: sourceRule.ruleId,
+        statement: sourceRule.governingRestatement,
+        effectiveDate: sourceRule.effectiveDate,
+        endDate: sourceRule.endDate,
+        applicability,
+        primaryCitation: sourceRule.primaryCitation.citationLocator,
+      });
+    }
+  }
+
+  return { rules };
 }
 
 function generateUDTableSheet(
