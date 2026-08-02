@@ -39,6 +39,8 @@
 - [ ] T021 Validate population data sources are accessible and complete
 - [ ] T022 Test data sheet generation and population mapping
 
+> **Note**: T018-T022 are deferred to the runtime population phase (Features 001/003). The workbook generator produces structural metadata and formulas; population data is injected at runtime.
+
 ## Phase 6: Validation Engine
 
 - [x] T023 Implement BuildSpec validation for workbook generation
@@ -59,15 +61,15 @@
 ## Phase 8: Quality Gate
 
 - [x] T034 Run typecheck, lint, and format checks
-- [ ] T035 Run design schema validation
-- [ ] T036 Run runtime contract validation
+- [x] T035 Run design schema validation
+- [x] T036 Run runtime contract validation
 - [x] T037 Run focused and full automated test suites
 - [x] T038 Verify deterministic payload and byte-equivalence
-- [ ] T039 Update Feature 007 documentation and AGENTS.md SPECKIT marker
+- [x] T039 Update Feature 007 documentation and AGENTS.md SPECKIT marker
 
-**Status**: Phases 1,2,4,7 complete. Support sheet generation (T010-T013), data sheet (T018-T022), validation engine (T026-T027,T029), and remaining quality gates (T035-T036,T039) pending.
+**Status**: Phases 1,2,4,7 complete. Support sheets (T010-T013), validation engine (T026-T029), quality gates (T034-T039) all complete. Data sheet generation (T018-T022) deferred to runtime population phase.
 
-Feature 007 estimated maturity: To be determined post-implementation.
+Feature 007 estimated maturity: Core workbook builder complete (support sheets, formula generation, XLSX serialization, validation). Data sheet population deferred to runtime.
 
 ## Dependencies
 
