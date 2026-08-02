@@ -15,7 +15,7 @@
 - [x] T006 Define `V1Workbook`, `WorkbookSheet`, `WorkbookCell` types
 - [x] T007 Define `SupportSheetContent`, `PopulationDataSource`, `ValidationResult` types
 - [x] T008 Implement deterministic workbook content hash computation
-- [ ] T009 Test model serialization and hashing
+- [x] T009 Test model serialization and hashing
 
 ## Phase 3: Support Sheet Generation
 
@@ -26,10 +26,10 @@
 
 ## Phase 4: Formula Sheet Generation
 
-- [ ] T014 Implement formula sheet structure from BuildSpec
-- [ ] T015 Generate formula cells in execution order from BuildSpec
-- [ ] T016 Generate named ranges with exact scope and case preservation
-- [ ] T017 Test formula sheet generation and reference preservation
+- [x] T014 Implement formula sheet structure from BuildSpec
+- [x] T015 Generate formula cells in execution order from BuildSpec
+- [x] T016 Generate named ranges with exact scope and case preservation
+- [x] T017 Test formula sheet generation and reference preservation
 
 ## Phase 5: Data Sheet and Population Mapping
 
@@ -52,20 +52,20 @@
 ## Phase 7: Workbook Builder Engine
 
 - [x] T030 Orchestrate BuildSpec authentication, population validation, and generation
-- [ ] T031 Implement XLSX serialization with deterministic cell ordering
-- [ ] T032 Implement workbook content hash and metadata injection
-- [ ] T033 Add synthetic governed Feature005-to-Feature007 integration test
+- [x] T031 Implement XLSX serialization with deterministic cell ordering
+- [x] T032 Implement workbook content hash and metadata injection
+- [x] T033 Add synthetic governed Feature005-to-Feature007 integration test
 
 ## Phase 8: Quality Gate
 
-- [ ] T034 Run typecheck, lint, and format checks
+- [x] T034 Run typecheck, lint, and format checks
 - [ ] T035 Run design schema validation
 - [ ] T036 Run runtime contract validation
-- [ ] T037 Run focused and full automated test suites
-- [ ] T038 Verify deterministic payload and byte-equivalence
+- [x] T037 Run focused and full automated test suites
+- [x] T038 Verify deterministic payload and byte-equivalence
 - [ ] T039 Update Feature 007 documentation and AGENTS.md SPECKIT marker
 
-**Status**: Foundation phase (T001-T008, T023-T030) complete. Core models and validation infrastructure in place. XLSX serialization and support sheet generation pending.
+**Status**: Phases 1,2,4,7 complete. Support sheet generation (T010-T013), data sheet (T018-T022), validation engine (T026-T027,T029), and remaining quality gates (T035-T036,T039) pending.
 
 Feature 007 estimated maturity: To be determined post-implementation.
 

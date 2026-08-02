@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkbook } from "../../../../src/domain/workbook-builder/workbook-builder";
-import { buildXLSXSpec } from "../../../../src/domain/workbook-builder/serialization";
+import { buildXLSXSpec, computeWorkbookHash } from "../../../../src/domain/workbook-builder/serialization";
 import type { Sha256 } from "../../../../src/domain/shared/types";
 import { buildSpecV2 } from "../../../fixtures/formula-compiler";
 
@@ -95,5 +95,115 @@ describe("workbook builder foundation", () => {
       "COMP",
       "SUBTOTAL",
     ]);
+  });
+
+  it("computes a deterministic content hash for the workbook", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const { workbookContentSha256: _, ...payload } = result.workbook;
+    void _;
+    const hash1 = await computeWorkbookHash(payload);
+    const hash2 = await computeWorkbookHash(payload);
+    expect(hash1).toBe(hash2);
+    expect(hash1).toMatch(/^[0-9a-f]{64}$/u);
+    expect(hash1).toBe(result.workbook.workbookContentSha256);
+  });
+
+  it("populates summary sheet with complete lineage metadata", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const summary = result.workbook.support.summarySheet;
+    expect(summary.caseId).toBe(fixture.buildSpec.caseId);
+    expect(summary.architectureId).toBe(fixture.buildSpec.architectureId);
+    expect(summary.architectureContentSha256).toBe(
+      fixture.buildSpec.architectureContentSha256,
+    );
+    expect(summary.buildSpecId).toBe(fixture.buildSpec.buildSpecId);
+    expect(summary.buildSpecContentSha256).toBe(
+      fixture.buildSpec.buildSpecContentSha256,
+    );
+    expect(summary.populationProfileDecisionId).toBe("population-approval-1");
+    expect(summary.generatorVersion).toBe("1.0.0");
+    expect(summary.workbookContentSha256).toMatch(/^[0-9a-f]{64}$/u);
+  });
+
+  it("populates UD Table with named ranges and cell mappings", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+
+    const udTable = result.workbook.support.udTableSheet;
+    expect(udTable.namedRanges).toHaveLength(2);
+    expect(udTable.namedRanges[0]?.name).toBe("COMP");
+    expect(udTable.namedRanges[0]?.scope).toBe("workbook");
+    expect(udTable.namedRanges[1]?.name).toBe("SUBTOTAL");
+    expect(udTable.namedRanges[1]?.scope).toBe("sheet");
+  });
+
+  it("rejects build when population profile is unapproved", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      buildSpec: fixture.buildSpec,
+      populationProfile: {
+        status: "provisional" as const,
+        effectiveDecisionId: null,
+        effectiveWorkbookProfileContentSha256: null,
+        provenance: [],
+      },
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.code === "POPULATION_UNAPPROVED")).toBe(true);
+    }
+  });
+
+  it("rejects build when I cell has no data source", async () => {
+    const fixture = await createFixture();
+    const buildSpec = {
+      ...fixture.buildSpec,
+      cellMappings: [
+        {
+          mappingId: "00000000-0000-4000-8000-000000000001" as import("../../../../src/domain/shared/types").Uuid,
+          field: "DOB",
+          tabName: "Retirees",
+          cellAddress: "A1",
+          iobClassification: "I" as const,
+          dataSource: null,
+          formulaId: null,
+          scenarioId: "NRD",
+        },
+      ],
+    };
+    const result = await buildWorkbook({
+      buildSpec,
+      populationProfile: fixture.populationProfile,
+      workbookProfileContentSha256: fixture.workbookProfileContentSha256,
+      generatorVersion: "1.0.0",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.some((e) => e.code === "MISSING_DATA_SOURCE")).toBe(true);
+    }
   });
 });
