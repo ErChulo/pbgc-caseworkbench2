@@ -163,48 +163,15 @@ export function validateNoCycles(buildSpec: BuildSpecV2): ValidationState {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  const formulaIds = new Set(buildSpec.formulas.map((f) => f.formulaId));
-  const adj = new Map<string, readonly string[]>();
-  for (const formula of buildSpec.formulas) {
-    adj.set(
-      formula.formulaId,
-      formula.dependencies.filter((d) => formulaIds.has(d)),
-    );
-  }
-
-  const WHITE = 0;
-  const GRAY = 1;
-  const BLACK = 2;
-  const color = new Map<string, number>();
-  for (const id of formulaIds) color.set(id, WHITE);
-
-  const cycleNodes: string[] = [];
-
-  function dfs(node: string): void {
-    color.set(node, GRAY);
-    for (const neighbor of adj.get(node) ?? []) {
-      if (color.get(neighbor) === GRAY) {
-        cycleNodes.push(neighbor);
-      } else if (color.get(neighbor) === WHITE) {
-        dfs(neighbor);
-      }
-    }
-    color.set(node, BLACK);
-  }
-
-  for (const id of formulaIds) {
-    if (color.get(id) === WHITE) dfs(id);
-  }
-
-  if (cycleNodes.length > 0) {
-    const uniqueCycles = [...new Set(cycleNodes)].sort();
+  if (buildSpec.executionOrder.hasCycles) {
+    const cycleNodes = [...buildSpec.executionOrder.cycleNodes].sort();
     errors.push({
       code: "CYCLE_DETECTED",
-      message: `Circular dependency detected involving ${String(uniqueCycles.length)} formula(s)`,
+      message: `Circular dependency detected involving ${String(cycleNodes.length)} formula(s)`,
       affectedCells: [],
-      affectedNames: uniqueCycles,
+      affectedNames: cycleNodes,
       severity: "error",
-      detail: `Circular dependencies: ${uniqueCycles.join(", ")}`,
+      detail: `Circular dependencies: ${cycleNodes.join(", ")}`,
       remediation: "Break the circular dependency by removing or restructuring formula dependencies.",
     });
   }
