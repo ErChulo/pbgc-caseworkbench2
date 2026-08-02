@@ -1,0 +1,64 @@
+\documentclass[11pt,oneside]{report}
+
+\usepackage[letterpaper,margin=1in]{geometry}
+\usepackage{fontspec}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}
+
+\definecolor{pbgcblue}{HTML}{174A7C}
+\definecolor{pbgcgray}{HTML}{555555}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=pbgcblue,
+  urlcolor=pbgcblue,
+  pdftitle={PBGC CaseworkBench 2.0 User Manual - Standard Edition},
+  pdfauthor={PBGC CaseworkBench 2.0 Project},
+  pdfsubject={User manual for caseworkers and reviewers}
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlength{\headheight}{14pt}
+\emergencystretch=2em
+\setlist{itemsep=0.2em,topsep=0.3em}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{PBGC CaseworkBench 2.0}
+\rhead{User Manual}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\begin{document}
+\sloppy
+
+\begin{titlepage}
+\centering
+\vspace*{1.5in}
+{\Huge\bfseries PBGC CaseworkBench 2.0\\[0.25in]}
+{\LARGE User Manual\\[0.35in]}
+{\Large Standard PDF Edition\\[0.75in]}
+\vfill
+{\large Audience: Caseworkers, reviewers, supervisors\\[0.1in]}
+{\large Last updated: 2026-08-02\\[0.25in]}
+\textcolor{pbgcgray}{Synthetic examples only. Do not include real participant PII in documentation, screenshots, logs, examples, fixtures, or Git.}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+\input{manual-content.tex}
+
+\end{document}

@@ -1,0 +1,100 @@
+\documentclass[11pt,twoside,openany]{book}
+
+\usepackage[letterpaper,inner=1.1in,outer=0.85in,top=0.9in,bottom=0.95in]{geometry}
+\usepackage{fontspec}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{microtype}
+
+\setmainfont{TeX Gyre Pagella}
+\setsansfont{TeX Gyre Heros}
+\setmonofont{Latin Modern Mono}
+
+\definecolor{ink}{HTML}{1F2933}
+\definecolor{deepblue}{HTML}{153E75}
+\definecolor{teal}{HTML}{0F766E}
+\definecolor{softgray}{HTML}{F3F4F6}
+\definecolor{rulegray}{HTML}{CBD5E1}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=deepblue,
+  urlcolor=teal,
+  pdftitle={PBGC CaseworkBench 2.0 User Manual - Book Edition},
+  pdfauthor={PBGC CaseworkBench 2.0 Project},
+  pdfsubject={Book-style user manual for caseworkers and reviewers}
+}
+
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlength{\headheight}{22pt}
+\emergencystretch=2em
+\setlist{itemsep=0.25em,topsep=0.35em}
+
+\titleformat{\part}[display]
+  {\normalfont\Huge\bfseries\sffamily\color{deepblue}}
+  {Part \thepart}
+  {0.5em}
+  {\Huge}
+\titleformat{\chapter}
+  {\normalfont\huge\bfseries\sffamily\color{ink}}
+  {\thechapter}
+  {0.75em}
+  {}
+\titleformat{\section}
+  {\normalfont\Large\bfseries\sffamily\color{deepblue}}
+  {\thesection}
+  {0.6em}
+  {}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\sffamily\color{deepblue}PBGC CaseworkBench 2.0}
+\fancyhead[RO]{\small\sffamily\color{deepblue}User Manual}
+\fancyfoot[LE,RO]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rulegray}\leaders\hrule height \headrulewidth\hfill}}
+
+\begin{document}
+\sloppy
+
+\begin{titlepage}
+\pagecolor{softgray}
+\centering
+\vspace*{0.8in}
+{\sffamily\Large\color{teal}Local-first evidence intake and review}\par
+\vspace{0.35in}
+{\sffamily\Huge\bfseries\color{deepblue}PBGC CaseworkBench 2.0}\par
+\vspace{0.2in}
+{\sffamily\Huge\bfseries\color{ink}User Manual}\par
+\vspace{0.35in}
+{\Large Book Edition}\par
+\vspace{0.75in}
+\rule{0.72\textwidth}{1.2pt}\par
+\vspace{0.35in}
+{\large For caseworkers, reviewers, and supervisors}\par
+\vfill
+{\small Synthetic examples only. Do not include real participant PII in documentation, screenshots, logs, examples, fixtures, or Git.}\par
+\vspace{0.2in}
+{\small Last updated: 2026-08-02}\par
+\end{titlepage}
+\nopagecolor
+
+\frontmatter
+\tableofcontents
+\mainmatter
+
+\input{manual-content.tex}
+
+\backmatter
+\chapter*{End Note}
+This book edition is designed for printed or PDF reference. The live app remains the source for current workflow behavior, and manual real-data testing remains deferred until performed in the approved office environment.
+
+\end{document}

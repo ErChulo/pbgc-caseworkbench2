@@ -1,0 +1,642 @@
+\part{Quick-Start Guide}
+
+\chapter{What This App Does}
+
+PBGC CaseworkBench 2.0 is a local-first, offline evidence intake and review workbench for terminated defined-benefit pension plan cases.
+
+It helps caseworkers and reviewers:
+
+\begin{itemize}
+  \item Create and manage controlled case identities.
+  \item Preserve submitted files and folders exactly as received.
+  \item Review files that the system flags for safety or quality issues.
+  \item Make human decisions on automated suggestions.
+  \item Export an auditable, deterministic manifest of the review record.
+\end{itemize}
+
+\textbf{Key principle:} case data stays local. The app runs in the browser and stores work in the selected local workspace.
+
+\section{Before You Start}
+
+\begin{longtable}{L{0.28\textwidth}L{0.62\textwidth}}
+\toprule
+\textbf{Requirement} & \textbf{Details} \\
+\midrule
+Browser & Chrome or Edge is recommended for production use. Firefox and Safari may have limited local file access. \\
+File System Access & Required for production workspace selection and durable local records. \\
+Disk space & Enough space for submitted files, preserved copies, and exports. \\
+Network & No case-data network access is required after the app is available locally. \\
+\bottomrule
+\end{longtable}
+
+\section{First Session In 10 To 15 Minutes}
+
+\begin{enumerate}
+  \item Open \texttt{pbgc-caseworkbench.html} in Chrome or Edge.
+  \item Check the compatibility panel.
+  \item Open the help panel and review local PII handling.
+  \item Select an approved local workspace folder.
+  \item Enter reviewer information and the official case number.
+  \item Create or resume the case.
+  \item Select files or a folder for package intake.
+  \item Review blocked items in the quarantine queue.
+  \item Review classification, relationship, and population suggestions if present.
+  \item Export the local manifest.
+\end{enumerate}
+
+\section{Quick Status Meanings}
+
+\begin{longtable}{L{0.25\textwidth}L{0.65\textwidth}}
+\toprule
+\textbf{Status} & \textbf{Meaning} \\
+\midrule
+Compatible & Browser supports required production features. Continue. \\
+Limited & Some features are unavailable. Do not claim production persistence. \\
+Incompatible & Stop and use an approved browser or launcher. \\
+Completed & Intake or review step completed normally. \\
+Partial & Some items completed, but one or more items failed or remain blocked. \\
+Interrupted & Processing stopped before completion. Resume from the same workspace. \\
+Provisional block & Automated screening or validation requires human review. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Quick-Start Workflow}
+
+\section{Step 1: Verify Compatibility}
+
+When the app opens, look at the compatibility panel. If the panel reports compatible status, continue. If it reports limited or incompatible status, do not use it for production case persistence until IT or a supervisor approves the environment.
+
+\section{Step 2: Select Workspace}
+
+In the case creation panel, select an approved local directory. This folder is where the app writes case records, preserved objects, review records, and exports.
+
+\textbf{Important:} choose a workspace you can back up and control. Do not choose an unauthorized cloud-sync folder for production case work.
+
+\section{Step 3: Create Or Resume Case}
+
+Enter reviewer ID, reviewer display name, and the official case number. If the case already exists, the app will show a collision workflow. Choose resume existing only when it is the same intended case.
+
+\section{Step 4: Add Files}
+
+Use Select Files for a small number of files or Select Folder for a complete package. Wait for intake to finish or use Stop Intake to pause safely.
+
+\section{Step 5: Review Quarantine Items}
+
+For each blocked item, read the block reason, enter reviewer name and rationale, then choose release, inherit release, permanent quarantine, reject, or revoke.
+
+\section{Step 6: Export Manifest}
+
+When reviews are complete enough for your work stage, open Manifest Export, review the counts and fingerprint, and export the local manifest.
+
+\part{Full User Manual}
+
+\chapter{Purpose And Operating Rules}
+
+\section{Purpose}
+
+PBGC CaseworkBench 2.0 supports local case intake, evidence preservation, human review, and manifest export. It is built to preserve evidence lineage and separate automated suggestions from human approval.
+
+\section{Safety Rules}
+
+\begin{longtable}{L{0.34\textwidth}L{0.56\textwidth}}
+\toprule
+\textbf{Rule} & \textbf{What It Means} \\
+\midrule
+Keep real participant data local & Do not transmit real participant data outside the approved local workspace. \\
+Do not put PII in Git or docs & Do not put names, SSNs, dates of birth, addresses, or participant identifiers in docs, logs, examples, or screenshots. \\
+Do not manually edit generated records & Fix problems by correcting the input, review state, or generator and export again. \\
+Do not treat suggestions as approvals & Automated findings are proposals until a human decision is recorded. \\
+Do not replace missing values with zero & Missing, blank, malformed, formula-like, and literal-zero values must remain distinct. \\
+Do not claim external execution without evidence & Do not claim Excel, ValTool, Runtime, ATPBGC, or BCV execution unless it actually happened and was recorded. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Screen-By-Screen Reference}
+
+\section{Compatibility Panel}
+
+The compatibility panel checks whether your browser supports the app's local-first features. Review this panel before production work.
+
+Use this panel to decide whether to continue:
+
+\begin{enumerate}
+  \item If the browser is compatible, continue.
+  \item If the browser is limited, do not claim durable production persistence.
+  \item If the browser is incompatible, stop and use an approved browser or launcher.
+\end{enumerate}
+
+\section{Help Panel}
+
+The help panel provides reminders about workspace selection, backups, keyboard operation, static-origin fallback, and local PII handling.
+
+Recommended use:
+
+\begin{enumerate}
+  \item Read the help panel before first production use.
+  \item Review local PII handling before selecting real case files.
+  \item Review recovery rules before large package intake.
+\end{enumerate}
+
+\section{Case Creation Panel}
+
+The case creation panel creates or resumes a controlled case.
+
+\begin{longtable}{L{0.25\textwidth}L{0.45\textwidth}L{0.20\textwidth}}
+\toprule
+\textbf{Field} & \textbf{What To Enter} & \textbf{Example} \\
+\midrule
+Reviewer ID & Your approved local reviewer identifier. & \texttt{reviewer-001} \\
+Display Name & Your name or approved display name. & \texttt{Test Reviewer} \\
+PBGC Case Number & Official case identifier for production work. & \texttt{PBGC-2026-000001} \\
+\bottomrule
+\end{longtable}
+
+Case purposes:
+
+\begin{longtable}{L{0.30\textwidth}L{0.60\textwidth}}
+\toprule
+\textbf{Purpose} & \textbf{When To Use} \\
+\midrule
+Production & Real case work with an official case identifier. \\
+Test & Synthetic or non-production testing. \\
+Training & Practice or onboarding. \\
+Duplicate investigation & Controlled duplicate-case analysis. \\
+\bottomrule
+\end{longtable}
+
+To create a production case:
+
+\begin{enumerate}
+  \item Select the approved workspace folder.
+  \item Enter reviewer ID.
+  \item Enter reviewer display name.
+  \item Enter official PBGC case number.
+  \item Create the production case.
+  \item Review the case summary.
+\end{enumerate}
+
+If a collision appears, do not create another production case to bypass it. Resume the existing case or create an approved non-production case with rationale.
+
+\section{Package Intake Panel}
+
+The package intake panel adds files and folders to the active case.
+
+\begin{longtable}{L{0.30\textwidth}L{0.60\textwidth}}
+\toprule
+\textbf{Button} & \textbf{Use It For} \\
+\midrule
+Select Files & A small number of individual files. \\
+Select Folder & A full submitted package or directory tree. \\
+Stop Intake & Safely stop processing at a safe boundary. \\
+\bottomrule
+\end{longtable}
+
+During intake, the app discovers files, records submitted paths, computes content fingerprints, preserves original bytes, screens for risk, and records local results.
+
+The app does not run macros, formulas, scripts, or executable files.
+
+\section{Artifact Inventory}
+
+The artifact inventory shows files and processing status.
+
+\begin{longtable}{L{0.30\textwidth}L{0.60\textwidth}}
+\toprule
+\textbf{Column} & \textbf{Meaning} \\
+\midrule
+Submitted path & Where the file appeared in the selected package. \\
+Size & File size in bytes. \\
+Status & Current processing state. \\
+SHA-256 & Exact content fingerprint. \\
+\bottomrule
+\end{longtable}
+
+Review the inventory to confirm expected files, identify failed or blocked items, and verify counts.
+
+\section{Quarantine Queue}
+
+The quarantine queue lets reviewers decide what to do with blocked artifacts.
+
+Decision actions:
+
+\begin{longtable}{L{0.30\textwidth}L{0.60\textwidth}}
+\toprule
+\textbf{Action} & \textbf{Plain Meaning} \\
+\midrule
+Release for use & Allow this artifact to be used downstream. \\
+Inherit approved status & Use a prior release for identical content. \\
+Permanently quarantine & Keep it blocked from downstream use. \\
+Reject & Reject it for use or classification. \\
+Withdraw approval & Revoke a prior release decision. \\
+\bottomrule
+\end{longtable}
+
+To make a quarantine decision:
+
+\begin{enumerate}
+  \item Read the finding summary.
+  \item Review the evidence required.
+  \item Enter reviewer name.
+  \item Enter a specific rationale.
+  \item Choose the decision action.
+  \item Confirm irreversible actions when prompted.
+  \item Check that item status updates.
+\end{enumerate}
+
+Good rationale examples:
+
+\begin{itemize}
+  \item \texttt{Reviewed as synthetic test file. Passive inspection only. Macros not executed.}
+  \item \texttt{Executable content is not needed for evidence review and remains blocked.}
+  \item \texttt{Exact SHA-256 match to previously reviewed file. Inheriting release decision.}
+\end{itemize}
+
+Avoid vague rationales such as \texttt{ok}, \texttt{done}, or \texttt{looks fine}.
+
+\section{Classification Review}
+
+Classification review lets reviewers approve or reject automated category and source-role suggestions.
+
+Classifications are proposals until a human decision is recorded.
+
+To review:
+
+\begin{enumerate}
+  \item Read the suggested category.
+  \item Review the evidence and confidence.
+  \item Compare the suggestion with source file context.
+  \item Approve only when supported by evidence.
+  \item Reject or supersede unsupported or incorrect suggestions.
+\end{enumerate}
+
+For date candidates, select a date only if supported by evidence. Leave competing or unclear dates unresolved.
+
+\section{Evidence Review Workspace}
+
+The evidence review workspace is currently a synthetic preview area. It validates in memory and does not persist final production plan rules.
+
+Tabs:
+
+\begin{longtable}{L{0.25\textwidth}L{0.65\textwidth}}
+\toprule
+\textbf{Tab} & \textbf{Purpose} \\
+\midrule
+Catalog & Browse evidence records and exclusions. \\
+Candidates & Review extracted provision candidates. \\
+Rules & Preview plan-rule authoring validation. \\
+Unresolved & Review interpretation issues and competing possibilities. \\
+\bottomrule
+\end{longtable}
+
+\section{Relationship Review}
+
+Relationship review lets reviewers approve or reject proposed relationships between artifacts.
+
+Examples include authority, amendment, supersession, replacement, conflict, near duplicate, and effective-period relationships.
+
+Approve only when the relationship is supported by evidence. Reject or supersede wrong or incomplete proposals.
+
+\section{Population Review}
+
+Population review lets reviewers approve or reject detected population structures.
+
+Review observed fields, record count, structural findings, confidence, and decision history.
+
+Important: the app does not invent missing participant values. Missing, blank, malformed, formula-like, and literal-zero values remain distinct.
+
+\section{Manifest Export}
+
+Manifest export produces the auditable evidence manifest.
+
+Before export:
+
+\begin{enumerate}
+  \item Review artifact count.
+  \item Review validation count.
+  \item Review unresolved item count.
+  \item Read any safety review note.
+  \item Review the manifest fingerprint.
+  \item Review lineage entries as needed.
+\end{enumerate}
+
+Do not manually edit exported manifests. If something is wrong, correct the underlying review state and export again.
+
+\chapter{Complete Workflows}
+
+\section{Create A New Production Case}
+
+\begin{enumerate}
+  \item Open the app in Chrome or Edge.
+  \item Confirm the compatibility panel is acceptable for production use.
+  \item Select the approved local workspace folder.
+  \item Enter reviewer ID.
+  \item Enter reviewer display name.
+  \item Enter official PBGC case number.
+  \item Create the production case.
+  \item Review the case summary.
+  \item Confirm the case purpose says Production.
+\end{enumerate}
+
+If there is a collision, confirm the existing case is the same intended case. Choose Resume Existing if continuing that case. Choose a non-production purpose only for test, training, or duplicate investigation.
+
+\section{Create A Training Or Test Case}
+
+\begin{enumerate}
+  \item Open the app.
+  \item Select a non-production workspace.
+  \item Enter reviewer information.
+  \item Choose Test or Training.
+  \item Enter a clear rationale.
+  \item Create the case.
+  \item Confirm the case summary shows the correct purpose.
+\end{enumerate}
+
+Example rationale: \texttt{Synthetic training case for reviewer onboarding. No real participant data used.}
+
+\section{Intake A Folder Of Evidence}
+
+\begin{enumerate}
+  \item Confirm the correct case is active.
+  \item Choose Select Folder.
+  \item Select the submitted package root folder.
+  \item Wait for the app to discover files.
+  \item Watch inventory status updates.
+  \item Leave the app open during large intake.
+  \item Use Stop Intake if you must pause safely.
+  \item Review completed, partial, interrupted, or blocked status.
+\end{enumerate}
+
+\section{Resume After Interruption}
+
+\begin{enumerate}
+  \item Reopen the app.
+  \item Select the same workspace folder.
+  \item Resume the same case.
+  \item Select the same package if prompted.
+  \item The app compares the new selection with the prior snapshot.
+  \item If unchanged, the app reuses prior work.
+  \item If changed, the app records a linked divergence.
+\end{enumerate}
+
+\section{Review Safety-Blocked Files}
+
+\begin{enumerate}
+  \item Open Quarantine Queue.
+  \item Start with the highest-risk item.
+  \item Read block reason and evidence required.
+  \item Enter reviewer name and rationale.
+  \item Choose release, inherit, quarantine, reject, or revoke.
+  \item Confirm irreversible actions.
+  \item Repeat until the queue is empty or every blocked item has a deliberate decision.
+\end{enumerate}
+
+\section{Export The Manifest}
+
+\begin{enumerate}
+  \item Open Manifest Export.
+  \item Review artifact count.
+  \item Review validation count.
+  \item Review unresolved count.
+  \item Read any safety review note.
+  \item Review the manifest fingerprint.
+  \item Review lineage details if needed.
+  \item Export local manifest.
+  \item Store the exported file under office procedure.
+\end{enumerate}
+
+\chapter{Examples}
+
+\section{Happy Path With Synthetic Files}
+
+Scenario: a test reviewer processes a synthetic package with a plan document, population CSV, and support PDF.
+
+Steps:
+
+\begin{enumerate}
+  \item Open the app.
+  \item Select workspace \texttt{C:\textbackslash PBGC-Test-Workspace}.
+  \item Create test case \texttt{PBGC-2026-SYNTH-001}.
+  \item Select folder \texttt{SyntheticPackage001}.
+  \item Wait for intake to finish.
+  \item Confirm 3 artifacts appear in inventory.
+  \item Confirm no quarantine queue appears.
+  \item Review classification proposals.
+  \item Approve synthetic plan document and population file classifications.
+  \item Export manifest.
+\end{enumerate}
+
+Expected result: intake completes, the manifest shows 3 artifacts, no unresolved safety block remains, and the manifest fingerprint is visible.
+
+\section{Macro Workbook Is Blocked}
+
+Scenario: a synthetic workbook contains macro-enabled parts.
+
+Steps:
+
+\begin{enumerate}
+  \item Intake the package.
+  \item Open Quarantine Queue.
+  \item Review the macro finding.
+  \item Enter rationale: \texttt{Macro-enabled workbook reviewed for passive inspection only. Macros not executed.}
+  \item Choose Release if office procedure allows passive inspection, or Permanently Quarantine if not allowed.
+  \item Confirm status update.
+\end{enumerate}
+
+Expected result: the macro finding remains recorded, the human decision is recorded with rationale, and downstream use follows the human decision.
+
+\section{Duplicate Case Number}
+
+Scenario: a reviewer enters a case number that already exists.
+
+Steps:
+
+\begin{enumerate}
+  \item Enter the official PBGC case number.
+  \item Create production case.
+  \item Review the collision message.
+  \item Choose Resume Existing if it is the same case.
+  \item Enter rationale if prompted.
+\end{enumerate}
+
+Expected result: no duplicate production case is created, the existing case is resumed, and the decision history records the collision decision.
+
+\section{Population File Has Missing Data}
+
+Scenario: a CSV has blank and malformed values.
+
+Steps:
+
+\begin{enumerate}
+  \item Intake package.
+  \item Open Population Review.
+  \item Review observed fields and structural findings.
+  \item Note missing, blank, malformed, formula-like, and literal-zero values separately.
+  \item Reject or leave unresolved if required values are missing.
+  \item Do not treat blanks as zero.
+\end{enumerate}
+
+Expected result: missing data is not invented, review decision records the issue, and downstream use remains blocked if required facts are unresolved.
+
+\chapter{Troubleshooting}
+
+\section{Browser Says Limited Or Incompatible}
+
+Use Chrome or Edge. If direct file mode is blocked, use the approved static-origin launcher. Contact IT if File System Access is disabled by policy.
+
+\section{Workspace Access Is Denied}
+
+Re-select the workspace, confirm write permission, avoid protected system folders, and avoid unauthorized sync folders.
+
+\section{Intake Is Slow}
+
+Keep the browser open. Use Stop Intake if you need to pause. Resume later from the same workspace.
+
+\section{A File Is Blocked}
+
+Do not bypass the block. Open the quarantine queue, review the reason, record a human decision, and export a new manifest after the decision.
+
+\section{Manifest Counts Look Wrong}
+
+Check whether intake completed, whether duplicates were found, whether archive members were extracted, whether files failed, and whether the correct case and workspace are active.
+
+\chapter{Supervisor Checklist}
+
+Before relying on exported manifest evidence, confirm:
+
+\begin{itemize}
+  \item Correct case ID.
+  \item Approved workspace.
+  \item Intake completion or explained partial state.
+  \item Quarantine decisions with rationale.
+  \item Reviewed classification proposals needed for downstream use.
+  \item Reviewed population candidates needed for downstream use.
+  \item Known unresolved items.
+  \item Recorded manifest hash.
+  \item No real PII in Git, docs, screenshots, logs, or examples.
+\end{itemize}
+
+\chapter{What This Manual Does Not Claim}
+
+This manual does not claim:
+
+\begin{itemize}
+  \item That real office data has already been tested.
+  \item That the SC-010 usability study is complete.
+  \item That external tools such as Excel, ValTool, Runtime, ATPBGC, or BCV were executed.
+  \item That the browser can certify files are malware-free.
+  \item That missing participant data can be inferred or replaced with zero.
+\end{itemize}
+
+Those actions require separate execution, evidence, or human review.
+
+\part{Technical Appendix}
+
+\chapter{Technical Terms In Plain Language}
+
+\section{Workspace}
+
+A workspace is the local folder where the app stores case files, case records, preserved objects, reviews, and exports. Do not manually edit workspace records unless a documented recovery procedure says to do so.
+
+\section{Case Identity}
+
+A case has an internal case UUID and may also have an official PBGC case number. The internal UUID is app identity. The authoritative case ID is the official production identifier.
+
+\section{SHA-256}
+
+SHA-256 is a fingerprint for exact file content. If two files have the same SHA-256 value, they have the same exact bytes. If one byte changes, the SHA-256 changes.
+
+\section{Artifact}
+
+An artifact is a file or extracted member the app tracks. Common roles are submitted file, submitted container, and extracted member.
+
+\section{Snapshot}
+
+A snapshot records what files were selected during an intake attempt. It lets the app detect unchanged resumes and changed package selections.
+
+\section{Manifest}
+
+A manifest is the exported machine-readable record of artifacts, review decisions, validation results, lineage, and deterministic hashes.
+
+\section{Lineage}
+
+Lineage is a trace from an output or decision back to source files, locations, and decision history.
+
+\section{Quarantine States}
+
+Automated screening can create provisional blocking states. Final release, final quarantine, rejection, revocation, or supersession require typed human decisions.
+
+\section{Proposal vs Decision}
+
+A proposal is a system suggestion. A decision is a human action. Proposals are not final approvals.
+
+\section{Unresolved Item}
+
+An unresolved item is a question or conflict that must be reviewed before affected downstream use.
+
+\section{Population Data Values}
+
+Missing, blank, malformed, formula-like, and literal-zero values are different. The app must not silently correct them or replace missing values with zero.
+
+\section{I/O/B Classification}
+
+I/O/B describes how workbook cells or fields are used. I means input. O means output. B means both. N means neither. P means parameter or policy-related.
+
+\section{Named Range}
+
+A named range is a workbook name that points to a cell or range. Names must resolve and be unique within their required scope.
+
+\section{Formula Dependency}
+
+A formula dependency means one formula uses another cell, formula, or named range. Circular dependencies block validation.
+
+\section{Validation}
+
+Validation checks whether a workbook or record is structurally usable and consistent. Errors block approval. Warnings are recorded.
+
+\section{Reconciliation}
+
+Reconciliation compares app results with an independent source such as an oracle or prior validated run. It should run after validation passes.
+
+\section{Tolerance}
+
+Tolerance is the allowed difference between expected and actual results. It may be absolute, relative, or cell-specific.
+
+\section{Oracle}
+
+An oracle is an independent reference result used for comparison. Do not claim external oracle execution unless it actually happened and was recorded.
+
+\section{Deterministic Hash}
+
+A deterministic hash is a fingerprint of governed content that should be identical every time the same content is processed under the same rules.
+
+\chapter{Troubleshooting Terms}
+
+\begin{longtable}{L{0.28\textwidth}L{0.31\textwidth}L{0.31\textwidth}}
+\toprule
+\textbf{Message Or Term} & \textbf{Usually Means} & \textbf{What To Do} \\
+\midrule
+Browser limited & Required browser feature is missing. & Use Chrome or Edge, or approved static-origin launcher. \\
+Workspace denied & Browser cannot write to folder. & Re-select folder or choose one with write permission. \\
+Snapshot changed & Selected package differs from prior attempt. & Confirm change is expected and process as linked divergence. \\
+Provisional block & Automated finding requires review. & Open quarantine queue and record decision. \\
+Oracle unavailable & Reference result was not available. & Add or import oracle evidence, or record blocker. \\
+Missing data & Required value is absent. & Do not impute. Route to review or correction. \\
+Circular dependency & Formula references loop back on itself. & Fix build specification or formula source. \\
+Named range missing & Formula references unresolved name. & Fix named range or formula reference. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Manual Testing And SC-010}
+
+Synthetic automated tests help confirm functionality, but they do not complete the SC-010 usability study.
+
+SC-010 requires:
+
+\begin{itemize}
+  \item At least 20 authorized caseworkers or reviewers.
+  \item First-attempt completion of required tasks.
+  \item No task-specific coaching after the attempt begins.
+  \item At least 19 successful participants out of 20.
+  \item Anonymized retained evidence.
+\end{itemize}
+
+Until that study is performed, do not mark T124 complete.
