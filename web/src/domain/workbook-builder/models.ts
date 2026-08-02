@@ -11,6 +11,7 @@ export interface WorkbookGenerationInput {
   readonly populationProfile: PopulationDecisionProjection;
   readonly workbookProfileContentSha256: Sha256;
   readonly generatorVersion: string;
+  readonly populationData?: ReadonlyMap<string, ReadonlyMap<string, readonly unknown[]>>;
 }
 
 export interface V1Workbook {

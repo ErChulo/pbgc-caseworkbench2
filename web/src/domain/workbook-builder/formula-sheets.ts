@@ -1,5 +1,7 @@
 import type { FormulaDefinitionV2, CellMapping, ExecutionOrder } from "../build-spec/models";
 import type { FormulaCell, WorkbookCell } from "./models";
+import type { PopulationDataResolver } from "./population-data-resolver";
+import { resolveCellValue } from "./population-data-resolver";
 
 export interface FormulaSheetInput {
   readonly formulas: readonly FormulaDefinitionV2[];
@@ -93,8 +95,10 @@ function computeLevel(
 
 export function populateDataCells(
   cellMappings: readonly CellMapping[],
+  resolver?: PopulationDataResolver,
 ): ReadonlyMap<string, readonly WorkbookCell[]> {
   const cellsByTab = new Map<string, WorkbookCell[]>();
+  const rowIndexes = new Map<string, number>();
 
   for (const mapping of cellMappings) {
     const existing = cellsByTab.get(mapping.tabName) ?? [];
@@ -107,11 +111,19 @@ export function populateDataCells(
             ? "output"
             : "blank";
 
+    let value: unknown = null;
+    if (resolver && mapping.dataSource) {
+      const key = `${mapping.dataSource.sourceTab}::${mapping.dataSource.sourceField}`;
+      const rowIndex = rowIndexes.get(key) ?? 0;
+      value = resolveCellValue(resolver, mapping.dataSource, rowIndex);
+      rowIndexes.set(key, rowIndex + 1);
+    }
+
     existing.push({
       address: mapping.cellAddress,
       kind,
       formulaText: null,
-      value: null,
+      value,
       dataSource: mapping.dataSource
         ? {
             sourceTab: mapping.dataSource.sourceTab,

@@ -24,6 +24,10 @@ import {
   populateDataCells,
   mergeSheetCells,
 } from "./formula-sheets";
+import {
+  createPopulationDataResolver,
+  type PopulationDataResolver,
+} from "./population-data-resolver";
 
 export async function buildWorkbook(
   input: WorkbookGenerationInput,
@@ -87,7 +91,12 @@ export async function buildWorkbook(
     formulas: input.buildSpec.formulas,
     executionOrder: input.buildSpec.executionOrder,
   });
-  const dataCells = populateDataCells(input.buildSpec.cellMappings);
+
+  let resolver: PopulationDataResolver | undefined;
+  if (input.populationData) {
+    resolver = createPopulationDataResolver(input.populationData);
+  }
+  const dataCells = populateDataCells(input.buildSpec.cellMappings, resolver);
   const allCells = mergeSheetCells(formulaResult.cellsByTab, dataCells);
 
   const sheets: WorkbookSheet[] = [...allCells.entries()]
