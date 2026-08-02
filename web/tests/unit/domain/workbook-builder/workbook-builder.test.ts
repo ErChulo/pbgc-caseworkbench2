@@ -329,18 +329,15 @@ describe("validation: formula references", () => {
 describe("validation: cycle detection", () => {
   it("rejects circular formula dependencies", async () => {
     const baseSpec = await buildSpecV2();
-    const formulas = baseSpec.formulas;
-    const first = formulas[0];
-    const second = formulas[1];
-    if (first === undefined || second === undefined) {
-      throw new Error("Fixture must contain at least two formulas");
-    }
     const buildSpec: BuildSpecV2 = {
       ...baseSpec,
-      formulas: [
-        { ...first, formulaId: "A", dependencies: ["B"] },
-        { ...second, formulaId: "B", dependencies: ["A"] },
-      ],
+      executionOrder: {
+        order: [],
+        levelCount: 0,
+        maxDepth: 0,
+        hasCycles: true,
+        cycleNodes: ["A", "B"],
+      },
     };
     const result = validateNoCycles(buildSpec);
     expect(result.errors.some((e) => e.code === "CYCLE_DETECTED")).toBe(true);
