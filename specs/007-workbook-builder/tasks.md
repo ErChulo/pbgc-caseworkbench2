@@ -33,13 +33,11 @@
 
 ## Phase 5: Data Sheet and Population Mapping
 
-- [ ] T018 Implement data sheet generation
-- [ ] T019 Implement I cell population from BuildSpec mappings
-- [ ] T020 Implement B cell dual mapping (input + formula)
-- [ ] T021 Validate population data sources are accessible and complete
-- [ ] T022 Test data sheet generation and population mapping
-
-> **Note**: T018-T022 are deferred to the runtime population phase (Features 001/003). The workbook generator produces structural metadata and formulas; population data is injected at runtime.
+- [x] T018 Implement data sheet generation
+- [x] T019 Implement I cell population from BuildSpec mappings
+- [x] T020 Implement B cell dual mapping (input + formula)
+- [x] T021 Validate population data sources are accessible and complete
+- [x] T022 Test data sheet generation and population mapping
 
 ## Phase 6: Validation Engine
 
@@ -67,9 +65,9 @@
 - [x] T038 Verify deterministic payload and byte-equivalence
 - [x] T039 Update Feature 007 documentation and AGENTS.md SPECKIT marker
 
-**Status**: Phases 1,2,4,7 complete. Support sheets (T010-T013), validation engine (T026-T029), quality gates (T034-T039) all complete. Data sheet generation (T018-T022) deferred to runtime population phase.
+**Status**: All phases complete. Workbook builder generates per-tab sheets with formula cells, input cells (populated from population data via resolver), output cells, and merged B cells. Validation covers BuildSpec, population profile, data sources, formula references, and cycle detection.
 
-Feature 007 estimated maturity: Core workbook builder complete (support sheets, formula generation, XLSX serialization, validation). Data sheet population deferred to runtime.
+Feature 007 estimated maturity: Complete. Workbook builder supports full data sheet generation with population data resolution.
 
 ## Dependencies
 
