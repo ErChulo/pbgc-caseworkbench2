@@ -11,7 +11,7 @@ test("reviews synthetic evidence through catalog, candidates, unresolved items, 
     reviewStage.getByRole("heading", { name: "Evidence and plan-rule review" }),
   ).toBeVisible();
   await expect(
-    reviewStage.getByText("Typed synthetic demo data only"),
+    reviewStage.getByText("Typed synthetic demo candidates"),
   ).toBeVisible();
 
   await reviewStage
@@ -81,7 +81,7 @@ test("reviews synthetic evidence through catalog, candidates, unresolved items, 
     .click();
   await expect(
     reviewStage.getByText(/Governed validation passed/u),
-  ).toContainText("not persisted");
+  ).toContainText("Select a workspace and active case to persist rule records");
   await page.reload();
   await reviewStage.getByRole("button", { name: "Unresolved items" }).click();
   await expect(reviewStage.getByText("Status: Open")).toBeVisible();

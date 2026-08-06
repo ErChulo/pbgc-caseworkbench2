@@ -6,8 +6,41 @@ import {
   saveCaseWorkspace,
 } from "../../adapters/filesystem/case-workspace";
 import { canonicalize } from "../../domain/manifests/canonical-json";
-import { createPackageSnapshot } from "../../domain/attempts/snapshot";
+import { preserveContent } from "../../adapters/filesystem/content-store";
+import {
+  createPackageSnapshot,
+  compareSnapshots,
+} from "../../domain/attempts/snapshot";
 import { hashChunkReader } from "../../workers/hash.worker";
+import { screenBinaryRisk } from "../../adapters/screening/binary-risk";
+import { screenSensitiveText } from "../../adapters/screening/sensitive-data";
+import { inspectPassive } from "../../adapters/parsers/passive-inspection";
+import { proposeClassifications } from "../../domain/classification/classifier";
+import { proposeNearDuplicate } from "../../domain/classification/near-duplicates";
+import { createRelationshipProposal } from "../../domain/classification/relationship-service";
+import { extractDateCandidates } from "../../domain/classification/date-candidates";
+import { adaptTabularExtraction } from "../../domain/population/tabular-adapter";
+import {
+  adaptWorkbookExtraction,
+  workbookProfileContentHash,
+} from "../../domain/population/workbook-adapter";
+import {
+  detectTabularPopulation,
+  detectWorkbookPopulation,
+} from "../../domain/population/population-detector";
+import { fileReader } from "../utilities/file-readers";
+import { replaceItem } from "../utilities/replace-item";
+import type { ArtifactInventoryItem } from "../../components/inventory/ArtifactInventory";
+import type { PackageIntakeResult } from "../../components/case-intake/PackageIntake";
+import type {
+  PackageSnapshot,
+  SnapshotEntry,
+} from "../../domain/attempts/models";
+import type {
+  ArtifactRecord,
+  ReceiptRecord,
+} from "../../domain/artifacts/models";
+import { reconcileInventory } from "../../domain/manifests/reconciliation";
 import type { CaseRecord, WorkspaceCatalog } from "../../domain/case/case";
 import { caseIndexEntry } from "../../domain/case/case";
 import {
@@ -23,6 +56,7 @@ import {
   parseUtcTimestamp,
   parseUuid,
   parseSha256,
+  type Sha256,
   type Uuid,
 } from "../../domain/shared/types";
 import type { QuarantineDecision } from "../../domain/quarantine/models";
@@ -82,7 +116,7 @@ import {
 
 interface InventoryCheckpointReference {
   readonly attemptId: Uuid;
-  readonly snapshot: Awaited<ReturnType<typeof createPackageSnapshot>>;
+  readonly snapshot: PackageSnapshot;
 }
 
 type EvidenceReviewView = "catalog" | "candidates" | "rules" | "unresolved";
@@ -162,6 +196,7 @@ export interface CaseOrchestrator {
   readonly setSharedReviewer: (value: string) => void;
   readonly setSharedRationale: (value: string) => void;
   readonly setEvidenceReviewView: (view: EvidenceReviewView) => void;
+  readonly setManifestSummary: (summary: ManifestExportSummary | null) => void;
   readonly selectWorkspace: () => Promise<void>;
   readonly createProduction: (input: {
     readonly authoritativeCaseId: string;
@@ -218,9 +253,14 @@ export interface CaseOrchestrator {
   readonly linkCaseOutputArtifact: (
     draft: CaseOutputArtifactLinkDraft,
   ) => Promise<void>;
-  readonly exportFinalCaseworkOutputPackage: () => void;
+  readonly exportFinalCaseworkOutputPackage: () => Promise<void>;
   readonly exportCurrentManifest: () => Promise<void>;
   readonly generateDraftV1Summary: (file: File) => Promise<void>;
+  readonly processPackage: (
+    files: readonly File[],
+    signal: AbortSignal,
+    update: (items: readonly ArtifactInventoryItem[]) => void,
+  ) => Promise<PackageIntakeResult>;
   readonly setError: (error: string | null) => void;
   readonly setView: (view: unknown) => void;
   readonly view: unknown;
@@ -241,9 +281,7 @@ export function useCaseOrchestrator(
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [activeCase, setActiveCase] = useState<CaseRecord | null>(null);
-  const priorSnapshot = useRef<ReturnType<typeof createPackageSnapshot> | null>(
-    null,
-  );
+  const priorSnapshot = useRef<PackageSnapshot | null>(null);
   const inventoryCheckpoints = useRef(
     new Map<string, InventoryCheckpointReference>(),
   );
@@ -271,7 +309,8 @@ export function useCaseOrchestrator(
   const [populationItems, setPopulationItems] = useState<
     readonly PopulationReviewItem[]
   >([]);
-  const [manifestSummary] = useState<ManifestExportSummary | null>(null);
+  const [manifestSummary, setManifestSummary] =
+    useState<ManifestExportSummary | null>(null);
   const [sharedReviewer, setSharedReviewer] = useState("");
   const [sharedRationale, setSharedRationale] = useState("");
   const [evidenceReviewView, setEvidenceReviewView] =
@@ -1232,8 +1271,502 @@ export function useCaseOrchestrator(
     if (!saved.ok) throw new Error("Local manifest export failed.");
   };
 
-  const exportFinalCaseworkOutputPackage = () => {
-    setCaseOutputExportMessage("Export not yet implemented in this phase.");
+  const processPackage = async (
+    files: readonly File[],
+    signal: AbortSignal,
+    update: (items: readonly ArtifactInventoryItem[]) => void,
+  ): Promise<PackageIntakeResult> => {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null || activeCase === null) {
+      throw new Error("Controlled workspace is unavailable.");
+    }
+    let items: ArtifactInventoryItem[] = files
+      .map((file, index) => ({
+        id: `${String(index)}:${file.name}`,
+        path: file.webkitRelativePath || file.name,
+        sizeBytes: file.size,
+        sha256: null,
+        status: "queued" as const,
+        message: "Awaiting deterministic hash.",
+      }))
+      .sort((left, right) => left.path.localeCompare(right.path));
+    const fileByItemId = new Map(
+      files.map((file, index) => [`${String(index)}:${file.name}`, file]),
+    );
+    update(items);
+    const entries: SnapshotEntry[] = [];
+    const seenHashes = new Set<string>();
+    const comparableArtifacts: {
+      readonly sha256: string;
+      readonly text: string;
+      readonly label: string;
+    }[] = [];
+    let failures = 0;
+    for (const item of items) {
+      if (signal.aborted) {
+        items = items.map((candidate) =>
+          candidate.status === "queued" || candidate.status === "hashing"
+            ? {
+                ...candidate,
+                status: "interrupted",
+                message: "Work stopped at a durable boundary.",
+              }
+            : candidate,
+        );
+        update(items);
+        return {
+          items,
+          snapshotId: null,
+          resumeKind: "first",
+          packageStatus: "interrupted",
+        };
+      }
+      const file = fileByItemId.get(item.id);
+      if (!file) continue;
+      items = replaceItem(items, item.id, {
+        status: "hashing",
+        message: "Reading fixed-size local chunks.",
+      });
+      update(items);
+      const reader = fileReader(file);
+      const hashed = await hashChunkReader(reader, { signal });
+      if (!hashed.ok) {
+        items = replaceItem(items, item.id, {
+          status:
+            hashed.error.code === "HASH_CANCELLED" ? "interrupted" : "failed",
+          message: hashed.error.safeMessage,
+        });
+        update(items);
+        if (hashed.error.code === "HASH_CANCELLED") {
+          return {
+            items,
+            snapshotId: null,
+            resumeKind: "first",
+            packageStatus: "interrupted",
+          };
+        }
+        failures += 1;
+        continue;
+      }
+      const preserved = await preserveContent(
+        activeWorkspace,
+        fileReader(file),
+        hashed.value.sha256,
+        dependencies.clock,
+      );
+      if (!preserved.ok) {
+        failures += 1;
+        items = replaceItem(items, item.id, {
+          status: "failed",
+          sha256: hashed.value.sha256,
+          message: preserved.error.safeMessage,
+        });
+        update(items);
+        continue;
+      }
+      const duplicate = seenHashes.has(hashed.value.sha256);
+      seenHashes.add(hashed.value.sha256);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const binaryRisk = await screenBinaryRisk(
+        bytes,
+        hashed.value.sha256,
+        file.type || null,
+        file.name,
+      );
+      const isPassiveText =
+        file.type.startsWith("text/") ||
+        /\.(?:csv|json|tsv|txt)$/iu.test(file.name);
+      const sensitiveRisk = isPassiveText
+        ? await screenSensitiveText(
+            new TextDecoder("utf-8", { fatal: false }).decode(bytes),
+            hashed.value.sha256,
+            {
+              authorizedRealPii: false,
+              expectedFields: [],
+              maximumSensitiveMatches: 8,
+            },
+          )
+        : null;
+      const initialBlockingFindings = [
+        ...binaryRisk.findings,
+        ...(sensitiveRisk?.findings ?? []),
+      ].filter((finding) => finding.blocksDownstream);
+      const passive =
+        initialBlockingFindings.length === 0
+          ? inspectPassive(file.name, bytes)
+          : null;
+      const passiveBlocked =
+        passive !== null &&
+        (passive.status !== "success" || passive.riskIndicators.length > 0);
+      const blockingFindings = [
+        ...initialBlockingFindings,
+        ...(passiveBlocked
+          ? [
+              {
+                category: passive.riskIndicators.join(", ") || passive.status,
+                blocksDownstream: true,
+              },
+            ]
+          : []),
+      ];
+      if (blockingFindings.length === 0 && passive?.status === "success") {
+        const workbookProfile =
+          passive.parserId === "workbook-passive"
+            ? adaptWorkbookExtraction(passive)
+            : null;
+        const population =
+          workbookProfile !== null
+            ? await detectWorkbookPopulation(
+                hashed.value.sha256,
+                workbookProfile,
+                "unknown",
+              )
+            : passive.mediaType === "text/csv" ||
+                passive.mediaType === "text/tab-separated-values" ||
+                passive.mediaType === "application/json" ||
+                passive.mediaType.startsWith("text/")
+              ? await detectTabularPopulation(
+                  hashed.value.sha256,
+                  adaptTabularExtraction(passive),
+                  "unknown",
+                )
+              : null;
+        if (population !== null) {
+          const workbookProfileContentSha256 =
+            workbookProfile === null
+              ? population.candidate.candidateKey
+              : await workbookProfileContentHash(workbookProfile, []);
+          setPopulationItems((current) => [
+            ...current.filter(
+              (candidate) =>
+                candidate.candidate.artifactSha256 !== hashed.value.sha256,
+            ),
+            {
+              displayName: item.path,
+              candidate: population.candidate,
+              workbookProfileContentSha256,
+              projection: {
+                status: "provisional",
+                effectiveDecisionId: null,
+                effectiveWorkbookProfileContentSha256: null,
+                provenance: [],
+              },
+              structuralFinding:
+                population.candidate.candidateStatus === "proposed"
+                  ? "Likely population structure detected; governed use remains blocked pending human review."
+                  : "Structure is ambiguous or incomplete; route to unresolved review.",
+            },
+          ]);
+        }
+        const proposals = await proposeClassifications({
+          artifactSha256: hashed.value.sha256,
+          filename: item.path,
+          mediaType: file.type || null,
+          text: passive.text,
+        });
+        setClassificationItems((current) => [
+          ...current.filter(
+            (candidate) =>
+              candidate.proposal.artifactSha256 !== hashed.value.sha256,
+          ),
+          ...proposals.map((proposal) => ({
+            displayName: item.path,
+            proposal,
+            effectiveStatus: "provisional" as const,
+            reviewer: null,
+            rationale: null,
+            provenanceCount: 0,
+          })),
+        ]);
+        const dateCandidates = await extractDateCandidates(
+          hashed.value.sha256,
+          passive.text,
+        );
+        setDateCandidateItems((current) => [
+          ...current.filter(
+            (candidate) =>
+              candidate.candidate.artifactSha256 !== hashed.value.sha256,
+          ),
+          ...dateCandidates.map((candidate) => ({
+            displayName: item.path,
+            candidate,
+            selected: false,
+            reviewer: null,
+          })),
+        ]);
+        for (const prior of comparableArtifacts) {
+          const relationship =
+            prior.sha256 === hashed.value.sha256
+              ? await createRelationshipProposal({
+                  fromSha256: prior.sha256 as Sha256,
+                  toSha256: hashed.value.sha256,
+                  relationshipType: "exact-duplicate",
+                  status: "proposed",
+                  confidence: 1,
+                  supportingEvidence: [],
+                  ruleSetVersion: "feature-009-classification-v1",
+                })
+              : await proposeNearDuplicate(
+                  prior.sha256 as Sha256,
+                  hashed.value.sha256,
+                  prior.text,
+                  passive.text,
+                  0.35,
+                );
+          if (relationship) {
+            setRelationshipItems((current) => [
+              ...current.filter(
+                (candidate) =>
+                  candidate.relationship.relationshipKey !==
+                  relationship.relationshipKey,
+              ),
+              {
+                relationship,
+                fromLabel: prior.label,
+                toLabel: item.path,
+                effectiveStatus: "provisional",
+                rationale: null,
+                provenanceCount: 0,
+              },
+            ]);
+          }
+        }
+        comparableArtifacts.push({
+          sha256: hashed.value.sha256,
+          text: passive.text,
+          label: item.path,
+        });
+      }
+      if (blockingFindings.length > 0) {
+        setQuarantineItems((current) => {
+          const next: QuarantineQueueItem = {
+            artifactSha256: hashed.value.sha256,
+            displayName: item.path,
+            accountingStatus: "pending-human-disposition",
+            provisionalState: "provisional-safety-block",
+            findingSummary: blockingFindings
+              .map((finding) => finding.category)
+              .join(", "),
+            evidenceRequired:
+              "An authorized reviewer must check the exact files and findings.",
+            nextAction:
+              "Release for use, permanently quarantine, or reject with a reason.",
+            effectiveHumanStatus: "none",
+            reviewer: null,
+            rationale: null,
+            inheritanceAvailable:
+              quarantineHistory.current.get(hashed.value.sha256)?.at(-1)
+                ?.resultingStatus === "released",
+          };
+          return [
+            ...current.filter(
+              (candidate) => candidate.artifactSha256 !== next.artifactSha256,
+            ),
+            next,
+          ];
+        });
+      }
+      entries.push({
+        observedRelativePath: item.path,
+        normalizedDisplayPath: item.path.normalize("NFC"),
+        sha256: hashed.value.sha256,
+        sizeBytes: file.size,
+        declaredMediaType: file.type || null,
+        lastModifiedObserved: null,
+      });
+      items = replaceItem(items, item.id, {
+        status:
+          blockingFindings.length > 0
+            ? "provisional-blocked"
+            : duplicate
+              ? "duplicate"
+              : "preserved",
+        sha256: hashed.value.sha256,
+        message:
+          blockingFindings.length > 0
+            ? "Safety review needed. An authorized reviewer must decide before use."
+            : duplicate
+              ? "Same content as another file. Kept separately; no approval given."
+              : "File preserved. Downstream use blocked until all reviews complete.",
+      });
+      update(items);
+    }
+    const snapshot = await createPackageSnapshot(entries, dependencies);
+    const difference =
+      priorSnapshot.current === null
+        ? null
+        : compareSnapshots(priorSnapshot.current, snapshot);
+    const resumeKind =
+      difference === null
+        ? "first"
+        : difference === "unchanged"
+          ? "unchanged-resume"
+          : "linked-divergence";
+    const existingCheckpoint = inventoryCheckpoints.current.get(
+      snapshot.snapshotId,
+    );
+    priorSnapshot.current = snapshot;
+    await activeWorkspace.createDirectory(
+      `cases/${activeCase.caseId}/snapshots`,
+    );
+    const snapshotBytes = new TextEncoder().encode(
+      `${canonicalize(snapshot)}\n`,
+    );
+    const snapshotPath = `cases/${activeCase.caseId}/snapshots/${snapshot.snapshotId}.json`;
+    const snapshotStored = await activeWorkspace.stat(snapshotPath);
+    if (!snapshotStored.ok) {
+      const saved = await activeWorkspace.createImmutable(
+        snapshotPath,
+        bytesReader(snapshotBytes),
+      );
+      if (!saved.ok) throw new Error("Snapshot could not be preserved.");
+    }
+    if (existingCheckpoint === undefined) {
+      const receipts: ReceiptRecord[] = [];
+      const artifacts: ArtifactRecord[] = [];
+      const attemptId = dependencies.uuid.generate();
+      for (const entry of entries) {
+        const receiptId = dependencies.uuid.generate();
+        receipts.push({
+          receiptId,
+          attemptId,
+          caseId: activeCase.caseId,
+          sha256: entry.sha256,
+          originalFilename:
+            entry.observedRelativePath.split("/").at(-1) ??
+            entry.observedRelativePath,
+          observedRelativePath: entry.observedRelativePath,
+          submittedBy: null,
+          submittedAt: null,
+          sourceLocation: "user-selected-local-package",
+          transferContext: null,
+          declaredDescription: null,
+          parentArtifactId: null,
+        });
+        artifacts.push({
+          artifactId: dependencies.uuid.generate(),
+          receiptId,
+          sha256: entry.sha256,
+          attemptId,
+          caseId: activeCase.caseId,
+          artifactRole: "submitted-file",
+          signatureMediaType: null,
+          processingStatus: "preserved",
+          downstreamEligibility: "blocked",
+          statusHistory: Object.freeze([]),
+        });
+      }
+      const seenReceiptHashes = new Set<string>();
+      const reconciliation = reconcileInventory(
+        artifacts.map((artifact) => artifact.artifactId),
+        artifacts.map((artifact) => ({
+          recordId: artifact.artifactId,
+          category: "source-artifact",
+        })),
+        artifacts.map((artifact) => {
+          const isDup = seenReceiptHashes.has(artifact.sha256);
+          seenReceiptHashes.add(artifact.sha256);
+          return {
+            recordId: artifact.artifactId,
+            category: isDup
+              ? ("duplicate" as const)
+              : ("pending-human-disposition" as const),
+          };
+        }),
+      );
+      const checkpoint = Object.freeze({
+        attemptId,
+        priorAttemptId:
+          resumeKind === "linked-divergence"
+            ? (lastCheckpoint.current?.attemptId ?? null)
+            : null,
+        divergenceReason:
+          resumeKind === "linked-divergence" ? difference : null,
+        snapshot,
+        receipts: Object.freeze(receipts),
+        artifacts: Object.freeze(artifacts),
+        reconciliation,
+        downstreamBlocked: true,
+      });
+      inventoryCheckpoints.current.set(snapshot.snapshotId, checkpoint);
+      lastCheckpoint.current = checkpoint;
+      await activeWorkspace.createDirectory(
+        `cases/${activeCase.caseId}/manifests`,
+      );
+      const manifestBytes = new TextEncoder().encode(
+        `${canonicalize(checkpoint)}\n`,
+      );
+      const saved = await activeWorkspace.createImmutable(
+        `cases/${activeCase.caseId}/manifests/${snapshot.snapshotId}.json`,
+        bytesReader(manifestBytes),
+      );
+      if (!saved.ok)
+        throw new Error("Inventory checkpoint could not be preserved.");
+    } else {
+      lastCheckpoint.current = existingCheckpoint;
+    }
+    setManifestSummary({
+      artifactCount: entries.length,
+      validationCount: entries.length,
+      unresolvedCount: items.filter(
+        (item) =>
+          item.status === "provisional-blocked" || item.status === "failed",
+      ).length,
+      accountingStatus:
+        failures === 0
+          ? "Awaiting human review"
+          : "Partial — some files failed",
+      provisionalBlockReason:
+        entries.length === 0
+          ? "No evidence files were available for processing."
+          : "Evidence is pending until all required reviews are complete.",
+      requiredReview:
+        "Review quarantine, classification, relationship, and population queues.",
+      nextAction: "Complete all reviews, then export the final manifest.",
+      deterministicManifestHash: snapshot.snapshotId,
+      lineage: entries.map((entry, index) => ({
+        nodeId: `artifact-${String(index + 1)}`,
+        label: entry.observedRelativePath,
+        sourceHash: entry.sha256,
+        sourceLocator: entry.observedRelativePath,
+        status: "provisional",
+      })),
+    });
+    return {
+      items,
+      snapshotId: snapshot.snapshotId,
+      resumeKind,
+      packageStatus: failures === 0 ? "completed" : "partial",
+    };
+  };
+
+  const exportFinalCaseworkOutputPackage = async (): Promise<void> => {
+    const activeWorkspace = workspace.current;
+    if (!activeWorkspace || !activeCase) {
+      throw new Error("No active local case is available for export.");
+    }
+    const { createFinalCaseworkOutputPackage: createPackage } =
+      await import("../../domain/case-output/package-builder");
+    const outputInput = createFinalOutputInput({
+      caseRecord: activeCase,
+      manifestSummary,
+      previewRules,
+      populationItems,
+      caseOutputArtifacts,
+      unresolvedItems: evidenceUnresolvedItems,
+      createdAt: dependencies.clock.now(),
+      createdBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
+    });
+    const outputPackage = await createPackage(outputInput);
+    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/exports`);
+    const saved = await activeWorkspace.writeAtomic(
+      `cases/${activeCase.caseId}/exports/final-casework-output-package.json`,
+      new TextEncoder().encode(`${canonicalize(outputPackage)}\n`),
+    );
+    if (!saved.ok) throw new Error("Final output package export failed.");
+    setCaseOutputExportMessage(
+      `Final output package exported with status ${outputPackage.deterministicPayload.packageStatus} and hash ${outputPackage.contentSha256}.`,
+    );
   };
 
   const finalOutputInput: FinalCaseworkOutputInput | null = activeCase
@@ -1293,8 +1826,10 @@ export function useCaseOrchestrator(
     exportFinalCaseworkOutputPackage,
     exportCurrentManifest,
     generateDraftV1Summary,
+    processPackage,
     setError,
     setView,
+    setManifestSummary,
     view,
   };
 }

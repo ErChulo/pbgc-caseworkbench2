@@ -34,6 +34,7 @@ export function StageNavigation({
                 type="button"
                 className="stage-nav-button"
                 disabled={!isClickable}
+                tabIndex={-1}
                 aria-current={isActive ? "step" : undefined}
                 onClick={() => {
                   if (isClickable) onStageSelect(stage.stageKey);

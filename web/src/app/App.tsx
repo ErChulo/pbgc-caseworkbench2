@@ -17,6 +17,10 @@ import { PlanRuleAuthor } from "../components/evidence/PlanRuleAuthor";
 import { UnresolvedItemQueue } from "../components/evidence/UnresolvedItemQueue";
 import { CaseOutputPackagePanel } from "../components/case-output/CaseOutputPackagePanel";
 import { DraftV1SummaryPanel } from "../components/draft-v1-summary/DraftV1SummaryPanel";
+import {
+  StageNavigation,
+  type StageDefinition,
+} from "../components/shell/StageNavigation";
 import { evidenceReviewDemo } from "../components/evidence/demo-evidence";
 import { buildFinalCaseworkOutputPayload } from "../domain/case-output/package-builder";
 import { useCaseOrchestrator } from "./orchestrator/case-orchestrator";
@@ -33,6 +37,39 @@ const EVIDENCE_REVIEW_ROUTES: readonly [EvidenceReviewView, string][] = [
 const DEMO_PROVISION_CANDIDATES = evidenceReviewDemo.candidates.map(
   (item) => item.candidate,
 );
+
+const CASWORK_STAGES: readonly StageDefinition[] = [
+  {
+    stageKey: "intake",
+    label: "Case intake",
+    description: "Create or resume a governed case",
+    status: "active",
+  },
+  {
+    stageKey: "evidence",
+    label: "Evidence review",
+    description: "Catalog, candidates, and plan rules",
+    status: "locked",
+  },
+  {
+    stageKey: "population",
+    label: "Population",
+    description: "Approve population profile",
+    status: "locked",
+  },
+  {
+    stageKey: "architecture",
+    label: "Architecture",
+    description: "Select scenarios and tabs",
+    status: "locked",
+  },
+  {
+    stageKey: "output",
+    label: "Output",
+    description: "Export final package",
+    status: "locked",
+  },
+];
 
 export function App({
   evidenceGovernanceDependencies,
@@ -110,6 +147,12 @@ export function App({
           <FeasibilityStatus />
         </section>
         <HelpPanel />
+        <StageNavigation
+          stages={CASWORK_STAGES}
+          activeStage="intake"
+          // eslint-disable-next-line @typescript-eslint/no-empty-function
+          onStageSelect={() => {}}
+        />
         <CaseCreation
           workspaceReady={orchestrator.workspaceReady}
           workspaceLabel={orchestrator.workspaceLabel}
@@ -133,15 +176,9 @@ export function App({
           enabled={
             orchestrator.workspaceReady && orchestrator.activeCase !== null
           }
-          onProcess={async () => {
-            await Promise.resolve();
-            return {
-              items: [],
-              snapshotId: null,
-              resumeKind: "first",
-              packageStatus: "interrupted",
-            };
-          }}
+          onProcess={(files, signal, update) =>
+            orchestrator.processPackage(files, signal, update)
+          }
         />
         <DraftV1SummaryPanel
           enabled={
@@ -294,7 +331,7 @@ export function App({
           }}
           onExport={async () => {
             await Promise.resolve();
-            orchestrator.exportFinalCaseworkOutputPackage();
+            void orchestrator.exportFinalCaseworkOutputPackage();
           }}
         />
       </main>
