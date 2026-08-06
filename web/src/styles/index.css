@@ -1136,3 +1136,183 @@ textarea {
     flex: 1 1 10rem;
   }
 }
+
+/* Stage navigation */
+.stage-nav {
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.stage-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-nav-item {
+  position: relative;
+}
+
+.stage-nav-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--color-text);
+  transition: background-color 0.15s ease;
+}
+
+.stage-nav-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.stage-nav-button:not(:disabled):hover {
+  background: var(--color-surface-alt);
+}
+
+.stage-nav-item-active .stage-nav-button {
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-border);
+}
+
+.stage-nav-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-muted-text);
+  flex-shrink: 0;
+}
+
+.stage-nav-item-complete .stage-nav-index {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+}
+
+.stage-nav-item-active .stage-nav-index {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.stage-nav-item-blocked .stage-nav-index {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
+.stage-nav-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.stage-nav-label {
+  font-weight: 650;
+  font-size: 0.9rem;
+}
+
+.stage-nav-description {
+  font-size: 0.78rem;
+  color: var(--color-muted-text);
+}
+
+.stage-nav-status {
+  font-size: 1rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.stage-nav-item-complete .stage-nav-status {
+  color: var(--color-primary);
+}
+
+.stage-nav-item-blocked .stage-nav-status {
+  color: var(--color-warning-text);
+}
+
+/* Improved visual hierarchy for sections */
+.section-divider {
+  margin-block: var(--space-4);
+  border: none;
+  border-top: 2px solid var(--color-border);
+}
+
+.stage-section {
+  padding-block: var(--space-3);
+}
+
+.stage-section + .stage-section {
+  border-top: 1px solid var(--color-border);
+}
+
+/* Compact density mode for review panels */
+.review-panel {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.review-panel .panel-heading {
+  margin-block-end: 0;
+}
+
+/* Progress bar for multi-step flows */
+.progress-bar {
+  height: 0.5rem;
+  background: var(--color-surface-alt);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Responsive adjustments */
+@media (min-width: 48rem) {
+  .stage-nav-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .stage-nav-item {
+    flex: 1 1 calc(50% - 0.25rem);
+  }
+}
+
+@media (min-width: 64rem) {
+  .stage-nav-item {
+    flex: 1 1 auto;
+  }
+
+  .stage-nav-button {
+    flex-direction: column;
+    text-align: center;
+  }
+}
