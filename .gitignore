@@ -16,8 +16,6 @@ htmlcov/
 *.log
 node_modules/
 *.tsbuildinfo
-dist/
-build/
 coverage/
 playwright-report/
 test-results/
