@@ -78,8 +78,8 @@ describe("Feature 007 workbook builder integration", () => {
     if (!result.ok) throw new Error("workbook build failed");
 
     const spec = buildXLSXSpec(result.workbook);
-    const buffer = await writeXLSXBuffer(spec);
-    expect(buffer.slice(0, 4).toString("hex")).toBe("504b0304");
+    const buffer = writeXLSXBuffer(spec);
+    expect(buffer.subarray(0, 4).toString("hex")).toBe("504b0304");
     expect(buffer.length).toBeGreaterThan(100);
   });
 

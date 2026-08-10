@@ -51,10 +51,10 @@ describe("XLSX serialization", () => {
     if (!result.ok) throw new Error("workbook build failed");
 
     const spec = buildXLSXSpec(result.workbook);
-    const buffer = await writeXLSXBuffer(spec);
+    const buffer = writeXLSXBuffer(spec);
     expect(buffer).toBeInstanceOf(Buffer);
     expect(buffer.length).toBeGreaterThan(0);
-    const magic = buffer.slice(0, 4).toString("hex");
+    const magic = buffer.subarray(0, 4).toString("hex");
     expect(magic).toBe("504b0304");
   });
 
@@ -72,8 +72,8 @@ describe("XLSX serialization", () => {
 
     const spec1 = buildXLSXSpec(first.workbook);
     const spec2 = buildXLSXSpec(second.workbook);
-    const bytes1 = await writeXLSXBytes(spec1);
-    const bytes2 = await writeXLSXBytes(spec2);
+    const bytes1 = writeXLSXBytes(spec1);
+    const bytes2 = writeXLSXBytes(spec2);
     expect(bytes1).toEqual(bytes2);
   });
 

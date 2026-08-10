@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { hashTyped } from "../manifests/canonical-json";
 import type { Sha256 } from "../shared/types";
 import type { V1Workbook } from "./models";
@@ -149,46 +149,44 @@ function extractSheetName(cellAddress: string): string | null {
   return match?.[1] ?? null;
 }
 
-export async function writeXLSXBuffer(spec: XLSXWorkbookSpec): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = "PBGC CaseWorkBench";
-  workbook.created = new Date(0);
-  workbook.modified = new Date(0);
-  workbook.lastPrinted = new Date(0);
+export function writeXLSXBuffer(spec: XLSXWorkbookSpec): Buffer {
+  const workbook = XLSX.utils.book_new();
+  workbook.Props = {
+    Author: "PBGC CaseWorkBench",
+    CreatedDate: new Date(0),
+  };
 
   for (const sheet of spec.sheets) {
-    const ws = workbook.addWorksheet(sheet.name, {
-      state: sheet.hidden ? "hidden" : "visible",
-    });
-    for (let rowIndex = 0; rowIndex < sheet.rows.length; rowIndex++) {
-      const row = sheet.rows[rowIndex];
-      if (row === undefined) continue;
-      const excelRow = ws.getRow(rowIndex + 1);
-      for (let colIndex = 0; colIndex < row.length; colIndex++) {
-        const value = row[colIndex];
-        excelRow.getCell(colIndex + 1).value = value ?? undefined;
-      }
-      excelRow.commit();
+    const ws = XLSX.utils.aoa_to_sheet(sheet.rows as never[][]);
+    XLSX.utils.book_append_sheet(workbook, ws, sheet.name);
+    if (sheet.hidden) {
+      (ws as Record<string, unknown>)["!hidden"] = true;
     }
   }
 
   for (const nr of spec.namedRanges) {
-    workbook.definedNames.add(nr.name, nr.reference);
+    workbook.Workbook ??= {};
+    workbook.Workbook.Names ??= [];
+    workbook.Workbook.Names.push({
+      Name: nr.name,
+      Ref: `${nr.sheetName ? `'${nr.sheetName}'` : ""}!${nr.reference}`,
+      Sheet: nr.scope === "sheet" && nr.sheetName ? workbook.SheetNames.indexOf(nr.sheetName) : undefined,
+    });
   }
 
-  const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
+  const buffer = XLSX.write(workbook, { type: "buffer" }) as Buffer;
+  return buffer;
 }
 
-export async function writeXLSXBytes(
+export function writeXLSXBytes(
   spec: XLSXWorkbookSpec,
-): Promise<Uint8Array> {
-  const buffer = await writeXLSXBuffer(spec);
+): Uint8Array {
+  const buffer = writeXLSXBuffer(spec);
   return new Uint8Array(buffer);
 }
 
 export async function computeXLSXHash(spec: XLSXWorkbookSpec): Promise<Sha256> {
-  const bytes = await writeXLSXBytes(spec);
+  const bytes = writeXLSXBytes(spec);
   return (await hashTyped(
     { xlsx: Array.from(bytes) },
     { typeName: "XLSXPayload" },

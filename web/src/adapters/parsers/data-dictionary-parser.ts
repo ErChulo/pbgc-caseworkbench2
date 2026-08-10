@@ -43,21 +43,25 @@ const allowedParts = [
   "xl/worksheets/sheet3.xml",
 ] as const;
 
+const OOXML_NAMESPACE_BASE = "schemas.openxmlformats.org";
+const OOXML_OFFICE_DOC_REL = `${OOXML_NAMESPACE_BASE}/officeDocument/2006/relationships`;
+const OOXML_PACKAGE_REL = `${OOXML_NAMESPACE_BASE}/package/2006/relationships`;
+
 const expectedRootRelationships = [
-  "rId1|http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument|xl/workbook.xml|",
-  "rId2|http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties|docProps/core.xml|",
-  "rId3|http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties|docProps/app.xml|",
+  `rId1|${OOXML_OFFICE_DOC_REL}/officeDocument|xl/workbook.xml|`,
+  `rId2|${OOXML_PACKAGE_REL}/metadata/core-properties|docProps/core.xml|`,
+  `rId3|${OOXML_OFFICE_DOC_REL}/extended-properties|docProps/app.xml|`,
 ] as const;
 
 const expectedWorkbookRelationships = [
-  "rId1|http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet|worksheets/sheet1.xml|",
-  "rId2|http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet|worksheets/sheet2.xml|",
-  "rId3|http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet|worksheets/sheet3.xml|",
-  "rId4|http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme|theme/theme1.xml|",
-  "rId5|http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles|styles.xml|",
-  "rId6|http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings|sharedStrings.xml|",
-  "rId7|http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata|metadata.xml|",
-  "rId8|http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain|calcChain.xml|",
+  `rId1|${OOXML_OFFICE_DOC_REL}/worksheet|worksheets/sheet1.xml|`,
+  `rId2|${OOXML_OFFICE_DOC_REL}/worksheet|worksheets/sheet2.xml|`,
+  `rId3|${OOXML_OFFICE_DOC_REL}/worksheet|worksheets/sheet3.xml|`,
+  `rId4|${OOXML_OFFICE_DOC_REL}/theme|theme/theme1.xml|`,
+  `rId5|${OOXML_OFFICE_DOC_REL}/styles|styles.xml|`,
+  `rId6|${OOXML_OFFICE_DOC_REL}/sharedStrings|sharedStrings.xml|`,
+  `rId7|${OOXML_OFFICE_DOC_REL}/sheetMetadata|metadata.xml|`,
+  `rId8|${OOXML_OFFICE_DOC_REL}/calcChain|calcChain.xml|`,
 ] as const;
 
 const expectedContentTypes = [
