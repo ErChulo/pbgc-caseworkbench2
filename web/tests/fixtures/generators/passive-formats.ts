@@ -80,7 +80,10 @@ export const pdfFixture = () =>
   );
 
 export function pdfJsFixture(text = "Hello local PDF"): Uint8Array {
-  const escapedText = text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+  const escapedText = text
+    .replaceAll("\\", "\\\\")
+    .replaceAll("(", "\\(")
+    .replaceAll(")", "\\)");
   const stream = `BT /F1 12 Tf 72 72 Td (${escapedText}) Tj ET`;
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",

@@ -23,7 +23,11 @@ export async function openLocalPdf(
     pageCount: document.numPages,
     async extractMachineText(): Promise<string> {
       const pages: string[] = [];
-      for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      for (
+        let pageNumber = 1;
+        pageNumber <= document.numPages;
+        pageNumber += 1
+      ) {
         const page = await document.getPage(pageNumber);
         const content = await page.getTextContent({
           includeMarkedContent: false,

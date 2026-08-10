@@ -56,8 +56,7 @@ describe("evidence extraction persistence", () => {
       }).ok,
     ).toBe(true);
     expect(
-      parseEvidenceExtractionPointer({ extractionContentSha256: "invalid" })
-        .ok,
+      parseEvidenceExtractionPointer({ extractionContentSha256: "invalid" }).ok,
     ).toBe(false);
   });
 });

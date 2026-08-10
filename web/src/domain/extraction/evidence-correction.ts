@@ -128,9 +128,7 @@ function asSha256(value: string): Sha256 {
   return parsed.value;
 }
 
-function invalid(
-  message: string,
-): Result<never, EvidenceCorrectionError> {
+function invalid(message: string): Result<never, EvidenceCorrectionError> {
   return {
     ok: false,
     error: { code: "INVALID_EVIDENCE_CORRECTION", message },

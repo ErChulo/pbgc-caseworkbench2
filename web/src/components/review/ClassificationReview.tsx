@@ -236,9 +236,7 @@ export function ClassificationReview({
   );
 }
 
-function classificationScope(
-  proposal: ClassificationProposal,
-): string {
+function classificationScope(proposal: ClassificationProposal): string {
   const locators = [
     ...new Set(
       proposal.supportingEvidence

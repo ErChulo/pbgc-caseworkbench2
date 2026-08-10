@@ -148,7 +148,9 @@ function isExtractionStatus(
 }
 
 function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === "string");
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -161,9 +163,7 @@ function asSha256(value: string): Sha256 {
   return parsed.value;
 }
 
-function invalid(
-  message: string,
-): Result<never, EvidenceExtractionError> {
+function invalid(message: string): Result<never, EvidenceExtractionError> {
   return {
     ok: false,
     error: { code: "INVALID_EVIDENCE_EXTRACTION", message },

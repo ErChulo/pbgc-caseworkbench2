@@ -6,10 +6,7 @@ import {
   parseCaseReviewPointer,
   parseCaseReviewSnapshot,
 } from "../../../../src/app/orchestrator/case-review-persistence";
-import {
-  parseSha256,
-  parseUuid,
-} from "../../../../src/domain/shared/types";
+import { parseSha256, parseUuid } from "../../../../src/domain/shared/types";
 
 const caseId = parseUuid("11111111-2222-4333-8aaa-bbbbccccdddd");
 const evidenceSnapshotId = parseSha256("a".repeat(64));

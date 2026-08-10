@@ -170,7 +170,10 @@ export function writeXLSXBuffer(spec: XLSXWorkbookSpec): Buffer {
     workbook.Workbook.Names.push({
       Name: nr.name,
       Ref: `${nr.sheetName ? `'${nr.sheetName}'` : ""}!${nr.reference}`,
-      Sheet: nr.scope === "sheet" && nr.sheetName ? workbook.SheetNames.indexOf(nr.sheetName) : undefined,
+      Sheet:
+        nr.scope === "sheet" && nr.sheetName
+          ? workbook.SheetNames.indexOf(nr.sheetName)
+          : undefined,
     });
   }
 
@@ -178,9 +181,7 @@ export function writeXLSXBuffer(spec: XLSXWorkbookSpec): Buffer {
   return buffer;
 }
 
-export function writeXLSXBytes(
-  spec: XLSXWorkbookSpec,
-): Uint8Array {
+export function writeXLSXBytes(spec: XLSXWorkbookSpec): Uint8Array {
   const buffer = writeXLSXBuffer(spec);
   return new Uint8Array(buffer);
 }

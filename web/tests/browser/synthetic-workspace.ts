@@ -5,8 +5,9 @@ export async function installSyntheticWorkspace(page: Page) {
   await page.addInitScript(() => {
     const files = new Map<string, Uint8Array>();
     const directories = new Map<string, FileSystemDirectoryHandle>();
-    (globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> })
-      .__syntheticFiles = files;
+    (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles = files;
     const makeDirectory = (prefix: string): FileSystemDirectoryHandle => {
       const cached = directories.get(prefix);
       if (cached) return cached;
