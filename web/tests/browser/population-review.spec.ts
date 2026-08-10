@@ -10,9 +10,10 @@ test("profiles a synthetic population locally and records a separate human decis
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-POPULATION");
   await page.getByRole("button", { name: "Create production case" }).click();
-  await page.getByLabel("Select individual files").setInputFiles({
+  await page.getByLabel("Add evidence files").setInputFiles({
     name: "synthetic-population.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(
@@ -49,6 +50,17 @@ test("profiles a synthetic population locally and records a separate human decis
   ).toBeVisible();
   await expect(
     populationCandidate.getByText("Needs investigation", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
+  await page
+    .getByRole("button", { name: "Open PBGC-SYNTHETIC-POPULATION" })
+    .click();
+  await expect(
+    page.getByText("Evidence restored from this case's persisted manifest."),
+  ).toBeVisible();
+  await expect(
+    populationCandidate.getByText("Approved", { exact: true }),
   ).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });

@@ -277,14 +277,35 @@ function extractSegments(output: PassiveExtraction): readonly Segment[] {
   const segments =
     output.parserId === "pdf-passive"
       ? pdfSegments(output.rawValues)
-      : output.parserId === "json-passive"
-        ? jsonSegments(output.rawValues[0])
-        : output.parserId === "workbook-passive"
-          ? workbookSegments(output.rawValues)
-          : output.parserId === "delimited-passive"
-            ? delimitedSegments(output.rawValues)
-            : textSegments(output.text, output.mediaType);
+      : output.parserId === "pdfjs-machine-text"
+        ? pdfMachineTextSegments(output.text)
+        : output.parserId === "json-passive"
+          ? jsonSegments(output.rawValues[0])
+          : output.parserId === "workbook-passive"
+            ? workbookSegments(output.rawValues)
+            : output.parserId === "delimited-passive"
+              ? delimitedSegments(output.rawValues)
+              : textSegments(output.text, output.mediaType);
   return segments.flatMap(splitFormulaAndExample);
+}
+
+function pdfMachineTextSegments(text: string): readonly Segment[] {
+  return [
+    ...text.matchAll(/^\[Page (\d+)\]\n([\s\S]*?)(?=\n\n\[Page \d+\]\n|$)/gmu),
+  ].flatMap((match) => {
+    const pageNumber = Number(match[1]);
+    const pageText = (match[2] ?? "").trim();
+    return Number.isSafeInteger(pageNumber) && pageNumber > 0 && pageText !== ""
+      ? [
+          {
+            locator: `pdf:page=${String(pageNumber)}:offset=0:endOffset=${String(pageText.length)}`,
+            text: pageText,
+            provisionIdentifier: `pdf-page-${String(pageNumber)}-offset-0`,
+            kind: detectSegmentKind(pageText),
+          } as const,
+        ]
+      : [];
+  });
 }
 
 function pdfSegments(values: readonly unknown[]): readonly Segment[] {

@@ -1,8 +1,10 @@
 # PBGC Case Workbench 2 --- Product Workflow Specification
 
-**Status:** Proposed product/workflow baseline for human review\
-**Purpose:** Consolidate the user-approved operating model before
-further implementation\
+**Status:** Ratified\
+**Approval date:** 2026-08-07\
+**Approving authority:** Repository owner\
+**Purpose:** Consolidate the human-approved operating model for
+implementation\
 **Primary objective:** Construct an auditable, deterministic,
 case-specific V1 calculation engine\
 **Implementation status:** No code changes authorized by this document
@@ -275,23 +277,51 @@ Rules:
 -   user-defined fields must remain distinguishable from official
     dictionary fields.
 
+The approved Data Dictionary Complete artifact and field identity are governed
+by ADR 011. Official identities use the exact pair `(TABLE_NAME, FIELD_NAME)`
+and bind to artifact SHA-256
+`d7b7c63a432ecc0e7e9e1371a65effeae552b13d8a53a952752bd206ee79bc96`.
+The workbook is approved for passive field-metadata parsing only; macros,
+formulas, links, and external content are never executed.
+
 ## 8. Population data --- bounded role
 
 ### 8.1 Purpose
 
-Population data is **not the primary product objective**.
+The primary product objective is construction of the V1 calculation engine.
 
-The primary objective is construction of the V1 calculation engine.
+Construction of the V1 engine is population-driven. The actual approved population helps determine what must be programmed:
 
-The V1 engine shall be definable from:
+"Population characteristics" includes, at minimum:
+
+-   the actual census schema and fields available to the case;
+-   mappings of those fields to Data Dictionary Complete;
+-   locally derived summaries useful for determining applicable scenarios, such as counts by RETSTAT/ID combinations; and
+-   actual participant-level values when useful for deterministic local validation, scenario determination, testing, or execution.
+
+Real participant-level values may be processed inside Case Workbench because production processing is local and zero-network. Real participant-level PII must never be transmitted to an external LLM, cloud API, telemetry service, or other external system. Construction of the V1 engine must not require external transmission of participant-level values.
+
+The V1 engine remains definable from:
 
 -   governed Plan Summary / plan attributes;
 -   deterministic plan rules;
--   Data Dictionary Complete field definitions;
--   optionally, knowledge of which population fields are available.
+-   Data Dictionary Complete field definitions; and
+-   the actual approved population schema, fields, and locally derived characteristics available to the case.
 
-The engine shall not require actual real-participant values merely to
-determine its formulas or architecture.
+Data Dictionary Complete remains the governing field universe of discourse.
+
+Population-driven design distinguishes:
+
+  actual approved population
+      -> schema / available fields
+      -> locally derived population characteristics and summaries
+      -> applicable V1 scenarios, fields, formulas, tabs, and validations
+
+while:
+
+  real participant PII
+      -> may be processed locally
+      -> must not leave the zero-network trust boundary
 
 Conceptually:
 
@@ -299,8 +329,7 @@ Conceptually:
 V1 rule: Benefit(p) = F(DOB(p), DOH(p), COMP(p), ...)
 ```
 
-The engine needs the field semantics and plan rules; it does not need a
-real participant's DOB or compensation to define `F`.
+The engine needs the field semantics, plan rules, and the population schema and characteristics available to the case, including real participant-level values processed locally.
 
 ### 8.2 Population import
 
@@ -422,25 +451,21 @@ The following remain non-negotiable:
 ## 12. Relationship to the existing constitution
 
 This specification is subordinate to the ratified repository
-constitution until the constitution is formally amended.
+constitution.
 
-A material conflict has been identified that must be resolved before
-implementation proceeds:
+PRODUCT-WORKFLOW.md is consistent with Constitution §6 (Population-driven
+design and missing data):
 
-The existing scaffold constitution states that V1 design is
-**population-driven using actual redacted population characteristics**
-and that the population determines which scenarios/tabs must be
-programmed. The product decisions consolidated here narrow that role:
-the primary V1 engine is to be constructed from governed plan rules and
-Data Dictionary Complete fields, with population field availability
-optional and real participant values not required to define the engine.
+-   plan evidence defines what benefits may exist;
+-   the actual approved population determines what must be programmed for
+    the case;
+-   population characteristics may be derived locally from the schema and
+    actual population (see §8.1);
+-   participant-level PII remains local to the user's device under the
+    zero-network trust boundary (see §4.3 and §8.1);
+-   no constitution amendment is required for this clarification.
 
-Because the constitution is the highest repository-local authority, this
-specification **does not silently override that provision**.
-
-**Required governance action:** review and amend/ratify the constitution
-so the intended role of population data is unambiguous before
-implementation changes based on this specification.
+This specification does not override any constitutional provision.
 
 ## 13. Explicitly deferred / not decided here
 
@@ -463,5 +488,7 @@ This document is intended to answer the operational question:
 > What is Case Workbench 2 supposed to do for the case actuary?
 
 Implementation should not resume merely because this draft exists. The
-product workflow and the identified constitution conflict must first be
-reviewed and ratified through the project's governance process.
+product workflow must first be reviewed and ratified through the project's
+governance process, with any remaining legitimate architecture/governance
+gates identified in this document satisfied before implementation
+proceeds.

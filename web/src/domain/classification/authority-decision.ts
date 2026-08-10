@@ -1,4 +1,5 @@
 import { hashTyped } from "../manifests/canonical-json";
+import { isValidSourceRole } from "../evidence/source-roles";
 import {
   parseSha256,
   type Result,
@@ -63,12 +64,12 @@ export async function replayAuthorityDecisions(
 ): Promise<Result<AuthorityProjection, ClassificationReplayError>> {
   if (
     proposal.dimension !== "source-role" ||
-    proposal.proposedValue !== "authority-candidate" ||
+    !isValidSourceRole(proposal.proposedValue) ||
     !proposal.authorityCandidate
   )
     return fail(
       "INVALID_PROPOSAL",
-      "Authority requires a source-role authority candidate.",
+      "Authority requires an eligible official source-role proposal.",
     );
   const classification = await replayClassificationApprovals(
     proposal,

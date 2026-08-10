@@ -8,8 +8,10 @@ import {
 
 export function EvidenceCatalogReview({
   catalog,
+  syntheticDemo = true,
 }: {
   readonly catalog: EvidenceCatalog;
+  readonly syntheticDemo?: boolean;
 }) {
   const [sourceRole, setSourceRole] = useState<SourceRole | "all">("all");
   const artifacts = [...catalog.caseEvidence, ...catalog.referenceOnly].filter(
@@ -26,7 +28,11 @@ export function EvidenceCatalogReview({
           <p className="section-label">Governed evidence</p>
           <h2 id="evidence-catalog-title">Evidence catalog review</h2>
         </div>
-        <span className="status-chip">Synthetic demo catalog</span>
+        <span className="status-chip">
+          {syntheticDemo
+            ? "Synthetic demo catalog"
+            : "Current governed catalog"}
+        </span>
       </div>
       <p>
         Review hash-anchored case and reference evidence. Quarantined artifacts

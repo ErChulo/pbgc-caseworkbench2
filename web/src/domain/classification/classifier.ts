@@ -11,6 +11,8 @@ export interface ClassificationInput {
   readonly filename: string;
   readonly mediaType: string | null;
   readonly text: string;
+  readonly textLocator?: string;
+  readonly analysisSourceLocator?: string;
 }
 
 interface Rule {
@@ -46,30 +48,80 @@ const rules: readonly Rule[] = [
     patterns: [/\bactuarial (?:valuation|report)\b/iu],
   },
   {
-    value: "authority-candidate",
+    value: "executed-plan-document",
     dimension: "source-role",
-    patterns: [/\bexecuted\b/iu, /\badopted\b/iu, /\bsigned\b/iu],
+    patterns: [
+      /\bexecuted\b[^\n]{0,80}\b(?:plan document|defined benefit plan)\b/iu,
+      /\b(?:plan document|defined benefit plan)\b[^\n]{0,80}\b(?:executed|signed)\b/iu,
+    ],
   },
   {
-    value: "historical",
+    value: "amendment",
     dimension: "source-role",
-    patterns: [/\bhistorical\b/iu, /\bsuperseded\b/iu],
+    patterns: [/\bamendment\b/iu, /\bhereby amended\b/iu],
   },
   {
-    value: "training",
+    value: "collective-bargaining-agreement",
+    dimension: "source-role",
+    patterns: [/\bcollective bargaining\b/iu, /\bcba\b/iu],
+  },
+  {
+    value: "notice",
+    dimension: "source-role",
+    patterns: [/\bnotice\b/iu],
+  },
+  {
+    value: "actuarial-report",
+    dimension: "source-role",
+    patterns: [/\bactuarial (?:valuation|report)\b/iu],
+  },
+  {
+    value: "formal-determination",
+    dimension: "source-role",
+    patterns: [
+      /\bformal (?:legal|pbgc|actuarial) determination\b/iu,
+      /\bdetermination letter\b/iu,
+    ],
+  },
+  {
+    value: "approved-plan-summary",
+    dimension: "source-role",
+    patterns: [/\bapproved plan summary\b/iu, /\bsummary plan description\b/iu],
+  },
+  {
+    value: "certified-case-report",
+    dimension: "source-role",
+    patterns: [/\bcertified case report\b/iu],
+  },
+  {
+    value: "supporting-administrative-report",
+    dimension: "source-role",
+    patterns: [/\bsupporting administrative report\b/iu],
+  },
+  {
+    value: "approved-historical-calculation-artifact",
+    dimension: "source-role",
+    patterns: [/\bapproved historical calculation artifact\b/iu],
+  },
+  {
+    value: "regulation",
+    dimension: "source-role",
+    patterns: [/\bregulation\b/iu, /\bcode of federal regulations\b/iu],
+  },
+  {
+    value: "training-reference",
     dimension: "source-role",
     patterns: [/\btraining\b/iu, /\btutorial\b/iu],
-  },
-  {
-    value: "illustrative",
-    dimension: "source-role",
-    patterns: [/\bsample\b/iu, /\billustrative\b/iu, /\bexample\b/iu],
   },
 ];
 
 export async function proposeClassifications(
   input: ClassificationInput,
 ): Promise<readonly ClassificationProposal[]> {
+  const analysisTextSha256 = await hashTyped(
+    { text: input.text },
+    { typeName: "ClassificationAnalysisText" },
+  );
   const corpus =
     `${input.filename}\n${input.mediaType ?? ""}\n${input.text}`.normalize(
       "NFC",
@@ -82,12 +134,18 @@ export async function proposeClassifications(
       {
         evidenceType: "text",
         value: matches.map((pattern) => pattern.source).join(" | "),
-        sourceLocator: "passive-text",
+        sourceLocator: input.textLocator ?? "passive-text",
       },
       {
         evidenceType: "filename",
         value: input.filename.normalize("NFC"),
         sourceLocator: "submitted-filename",
+      },
+      {
+        evidenceType: "metadata",
+        value: analysisTextSha256,
+        sourceLocator:
+          input.analysisSourceLocator ?? "analysis-text-content-sha256",
       },
     ];
     const deterministic = {
@@ -95,7 +153,10 @@ export async function proposeClassifications(
       dimension: rule.dimension,
       proposedValue: rule.value,
       status: "proposed",
-      authorityCandidate: rule.value === "authority-candidate",
+      authorityCandidate:
+        rule.dimension === "source-role" &&
+        rule.value !== "regulation" &&
+        rule.value !== "training-reference",
       confidence: Math.min(0.99, 0.55 + matches.length * 0.15),
       supportingEvidence: evidence,
       classifierId: "feature-009-deterministic-classifier",
@@ -109,10 +170,25 @@ export async function proposeClassifications(
   }
   if (proposals.length === 0) {
     const evidence: ClassificationEvidence[] = [
+      ...(input.textLocator === undefined
+        ? []
+        : [
+            {
+              evidenceType: "text" as const,
+              value: "No deterministic classification rule matched this scope.",
+              sourceLocator: input.textLocator,
+            },
+          ]),
       {
         evidenceType: "filename",
         value: input.filename.normalize("NFC"),
         sourceLocator: "submitted-filename",
+      },
+      {
+        evidenceType: "metadata",
+        value: analysisTextSha256,
+        sourceLocator:
+          input.analysisSourceLocator ?? "analysis-text-content-sha256",
       },
     ];
     const deterministic = {

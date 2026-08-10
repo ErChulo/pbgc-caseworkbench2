@@ -43,15 +43,18 @@ async function root(): Promise<string> {
   return path;
 }
 
-async function catalog() {
+async function catalog(
+  artifactHashCharacter = "a",
+  catalogId = "00000000-0000-4000-8000-000000000001",
+) {
   const result = await buildEvidenceCatalog({
-    catalogId: "00000000-0000-4000-8000-000000000001",
+    catalogId,
     caseId,
     builtAt: "2026-07-28T12:00:00.000Z",
     caseEvidence: [
       {
         artifactId: "00000000-0000-4000-8000-000000000003",
-        sha256: "a".repeat(64),
+        sha256: artifactHashCharacter.repeat(64),
         sizeBytes: 10,
         locator: "synthetic/plan.txt",
         mediaType: "text/plain",
@@ -94,42 +97,139 @@ describe("EvidenceWorkspace", () => {
     await expect(access(join(workspaceRoot, "cases"))).rejects.toThrow();
   });
 
-  it("persists an immutable catalog atomically with owner-only permissions", async () => {
+  it("persists immutable catalog snapshots and a verified current pointer", async () => {
     const workspaceRoot = await root();
     const opened = await EvidenceWorkspace.open(workspaceRoot, caseId);
     if (!opened.ok) throw new Error(opened.error);
     const value = await catalog();
 
-    expect(await opened.value.writeCatalog(value)).toEqual({
+    expect(
+      await opened.value.writeCatalog(value, "2026-07-28T12:01:00.000Z"),
+    ).toEqual({
       ok: true,
       value: undefined,
     });
     expect((await opened.value.readCatalog()).ok).toBe(true);
-    expect((await opened.value.writeCatalog(value)).ok).toBe(false);
+    expect(
+      (await opened.value.writeCatalog(value, "2026-07-28T12:02:00.000Z")).ok,
+    ).toBe(true);
 
     const evidencePath = join(workspaceRoot, "cases", caseId, "evidence");
+    const catalogsPath = join(evidencePath, "catalogs");
+    const snapshotPath = join(
+      catalogsPath,
+      `${value.catalogContentSha256}.json`,
+    );
     expect((await stat(evidencePath)).mode & 0o777).toBe(0o700);
-    expect((await stat(join(evidencePath, "catalog.json"))).mode & 0o777).toBe(
+    expect((await stat(catalogsPath)).mode & 0o777).toBe(0o700);
+    expect((await stat(snapshotPath)).mode & 0o777).toBe(0o600);
+    expect((await stat(join(catalogsPath, "current.json"))).mode & 0o777).toBe(
       0o600,
     );
+    expect((await readFile(snapshotPath, "utf8")).endsWith("\n")).toBe(true);
     expect(
-      (await readFile(join(evidencePath, "catalog.json"), "utf8")).endsWith(
-        "\n",
-      ),
-    ).toBe(true);
+      JSON.parse(await readFile(join(catalogsPath, "current.json"), "utf8")),
+    ).toEqual({
+      catalogContentSha256: value.catalogContentSha256,
+      schemaVersion: "1.0.0",
+      writtenAt: "2026-07-28T12:02:00.000Z",
+    });
+  });
+
+  it("retains prior snapshots when the current catalog advances", async () => {
+    const workspaceRoot = await root();
+    const opened = await EvidenceWorkspace.open(workspaceRoot, caseId);
+    if (!opened.ok) throw new Error(opened.error);
+    const first = await catalog();
+    const second = await catalog("c");
+
+    expect((await opened.value.writeCatalog(first)).ok).toBe(true);
+    expect((await opened.value.writeCatalog(second)).ok).toBe(true);
+    const catalogsPath = join(opened.value.workspacePath, "catalogs");
+    await expect(
+      access(join(catalogsPath, `${first.catalogContentSha256}.json`)),
+    ).resolves.toBeUndefined();
+    await expect(
+      access(join(catalogsPath, `${second.catalogContentSha256}.json`)),
+    ).resolves.toBeUndefined();
+    const current = await opened.value.readCatalog();
+    expect(current.ok && current.value.catalogContentSha256).toBe(
+      second.catalogContentSha256,
+    );
+  });
+
+  it("rejects a catalogId change within an existing lineage", async () => {
+    const workspaceRoot = await root();
+    const opened = await EvidenceWorkspace.open(workspaceRoot, caseId);
+    if (!opened.ok) throw new Error(opened.error);
+    expect((await opened.value.writeCatalog(await catalog())).ok).toBe(true);
+    const replacement = await catalog(
+      "c",
+      "00000000-0000-4000-8000-000000000099",
+    );
+    expect(await opened.value.writeCatalog(replacement)).toMatchObject({
+      ok: false,
+      error: "Catalog lineage must preserve one stable catalogId.",
+    });
   });
 
   it("validates unknown JSON instead of casting it on read", async () => {
     const workspaceRoot = await root();
     const opened = await EvidenceWorkspace.open(workspaceRoot, caseId);
     if (!opened.ok) throw new Error(opened.error);
-    await writeFile(join(opened.value.workspacePath, "catalog.json"), "{}\n", {
+    const catalogsPath = join(opened.value.workspacePath, "catalogs");
+    await mkdir(catalogsPath, { mode: 0o700 });
+    await writeFile(join(catalogsPath, "current.json"), "{}\n", {
       mode: 0o600,
     });
     const result = await opened.value.readCatalog();
     expect(result.ok).toBe(false);
-    if (!result.ok)
-      expect(result.error).toContain("contract validation failed");
+    if (!result.ok) expect(result.error).toContain("pointer is invalid");
+  });
+
+  it("does not advance the pointer when a preexisting snapshot is invalid", async () => {
+    const workspaceRoot = await root();
+    const opened = await EvidenceWorkspace.open(workspaceRoot, caseId);
+    if (!opened.ok) throw new Error(opened.error);
+    const value = await catalog();
+    const catalogsPath = join(opened.value.workspacePath, "catalogs");
+    await mkdir(catalogsPath, { mode: 0o700 });
+    await writeFile(
+      join(catalogsPath, `${value.catalogContentSha256}.json`),
+      "{}\n",
+      { mode: 0o600 },
+    );
+
+    expect((await opened.value.writeCatalog(value)).ok).toBe(false);
+    await expect(access(join(catalogsPath, "current.json"))).rejects.toThrow();
+  });
+
+  it("fails closed when the current snapshot content is tampered", async () => {
+    const workspaceRoot = await root();
+    const opened = await EvidenceWorkspace.open(workspaceRoot, caseId);
+    if (!opened.ok) throw new Error(opened.error);
+    const value = await catalog();
+    expect((await opened.value.writeCatalog(value)).ok).toBe(true);
+    const snapshotPath = join(
+      opened.value.workspacePath,
+      "catalogs",
+      `${value.catalogContentSha256}.json`,
+    );
+    await writeFile(
+      snapshotPath,
+      `${JSON.stringify({
+        ...value,
+        caseEvidence: value.caseEvidence.map((artifact) => ({
+          ...artifact,
+          locator: "tampered/plan.txt",
+        })),
+      })}\n`,
+    );
+
+    expect(await opened.value.readCatalog()).toMatchObject({
+      ok: false,
+      error: "Stored catalog content hash is invalid.",
+    });
   });
 
   it("appends and validates governed JSONL records with owner-only atomic files", async () => {

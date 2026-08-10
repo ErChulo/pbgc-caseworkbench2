@@ -10,6 +10,7 @@ export interface QuarantineQueueItem {
   readonly accountingStatus: "pending-human-disposition";
   readonly provisionalState:
     "provisional-quarantine" | "provisional-safety-block" | "rescreen-required";
+  readonly findingIds: readonly string[];
   readonly findingSummary: string;
   readonly evidenceRequired: string;
   readonly nextAction: string;
@@ -18,15 +19,16 @@ export interface QuarantineQueueItem {
   readonly reviewer: string | null;
   readonly rationale: string | null;
   readonly inheritanceAvailable: boolean;
+  readonly eligibilityDecisionCount: number;
 }
 
 const ACTION_LABELS: Record<
   string,
   { plain: string; glossaryKey: GlossaryKey }
 > = {
-  release: { plain: "Release for use", glossaryKey: "released" },
+  release: { plain: "Release safety hold", glossaryKey: "released" },
   "inherit-release": {
-    plain: "Inherit approved status",
+    plain: "Inherit safety release",
     glossaryKey: "inheritedRelease",
   },
   "final-quarantine": {
@@ -205,12 +207,23 @@ export function QuarantineQueue({
                 <dt>Next step</dt>
                 <dd>{item.nextAction}</dd>
               </div>
+              <div>
+                <dt>Eligibility decisions</dt>
+                <dd>{item.eligibilityDecisionCount} event(s)</dd>
+              </div>
             </dl>
             {item.rationale && (
               <p>
                 <strong>Recorded rationale:</strong> {item.rationale}
               </p>
             )}
+            {item.eligibilityDecisionCount > 0 ? (
+              <p className="notice">
+                Artifact eligibility history cites this safety-decision chain. A
+                later withdrawal preserves that history but blocks current
+                governed use.
+              </p>
+            ) : null}
             <div className="decision-actions">
               {ALL_ACTIONS.map((action) => {
                 const label = ACTION_LABELS[action];

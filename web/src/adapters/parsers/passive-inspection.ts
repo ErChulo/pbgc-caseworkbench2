@@ -6,6 +6,7 @@ import { failedPassiveExtraction } from "./passive-result";
 import { parsePdfPassive } from "./pdf-parser";
 import { parsePlainText } from "./text-parser";
 import { parseWorkbookPassive } from "./workbook-parser";
+import { parseRasterImagePassive } from "./raster-image-parser";
 
 export function inspectPassive(
   filename: string,
@@ -31,6 +32,13 @@ export function inspectPassive(
       return parseOoxmlPassive(bytes, "pptx");
     case "pdf":
       return parsePdfPassive(bytes);
+    case "png":
+      return parseRasterImagePassive(bytes, "png");
+    case "jpg":
+    case "jpeg":
+      return parseRasterImagePassive(bytes, "jpeg");
+    case "gif":
+      return parseRasterImagePassive(bytes, "gif");
     default:
       return failedPassiveExtraction(
         "passive-dispatch",

@@ -134,9 +134,9 @@ This research resolves the Technical Context unknowns for Feature 001's design. 
 
 ## Decision 8: Persistence — atomic JSON/JSONL under `cases/<caseId>/evidence/`, hash-verified
 
-**Decision**: `evidence-workspace.ts` writes four new artifacts per case under `cases/<caseId>/evidence/`:
+**Decision**: `evidence-workspace.ts` writes governed artifacts per case under `cases/<caseId>/evidence/`:
 
-- `catalog.json` — the typed `EvidenceCatalog` (canonical-serialized, exactly one JSON object with trailing newline, mirroring Feature 009's `case-workspace.ts:408` `encode`).
+- `catalogs/<catalogContentSha256>.json` — immutable typed `EvidenceCatalog` snapshots, plus pointer-only `catalogs/current.json`, per ADR 010.
 - `provision-candidates.jsonl`, `rule-records.jsonl`, `unresolved-items.jsonl`, `authority-overrides.jsonl` — append-only event logs (one canonical JSON value per line, `\n`-terminated) with post-write hash verification and read-back replay exactly like Feature 009's audit log.
 
 Every write is atomic: encode canonical bytes → write to `objects/sha256/<prefix>/<hash>` create-once storage OR to the JSONL append target with content-addressed event hash, then read back, hash, and compare. Mutations to a prior event are structurally impossible; corrections append a new typed event that supersedes the prior one through the gapless replay rule.

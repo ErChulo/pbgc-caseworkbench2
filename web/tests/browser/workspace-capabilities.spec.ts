@@ -225,6 +225,7 @@ test("reopens a persisted local workspace after reload and blocks when access is
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("workspace-reviewer");
   await page.getByLabel("Reviewer display name").fill("Workspace Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-CAPABILITIES-001");
   await page.getByRole("button", { name: "Create production case" }).click();
   const firstCaseId = await page.getByTestId("current-case-id").textContent();
@@ -233,6 +234,7 @@ test("reopens a persisted local workspace after reload and blocks when access is
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("workspace-reviewer");
   await page.getByLabel("Reviewer display name").fill("Workspace Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-CAPABILITIES-001");
   await page.getByRole("button", { name: "Create production case" }).click();
 

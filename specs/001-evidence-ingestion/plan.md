@@ -18,13 +18,14 @@ The feature reuses Feature 009's deterministic primitives (canonical JSON, hashT
 
 **Storage**: The same user-selected workspace directory enforced by `web/src/adapters/filesystem/case-workspace.ts`. New artifacts persist as JSON under `cases/<caseId>/evidence/`:
 
-- `cases/<caseId>/evidence/catalog.json` — the typed EvidenceCatalog (case + reference sections)
+- `cases/<caseId>/evidence/catalogs/<catalogContentSha256>.json` — immutable typed EvidenceCatalog snapshots
+- `cases/<caseId>/evidence/catalogs/current.json` — pointer-only current catalog head
 - `cases/<caseId>/evidence/provision-candidates.jsonl` — append-only candidate events
 - `cases/<caseId>/evidence/rule-records.jsonl` — append-only plan-rule authoring events
 - `cases/<caseId>/evidence/unresolved-items.jsonl` — append-only unresolved-item events with chained resolutions
 - `cases/<caseId>/evidence/authority-overrides.jsonl` — append-only AuthorityOverride events
 
-All persistence uses the existing atomic `encode` + `createImmutable` + post-write hash-verify pattern (`web/src/adapters/filesystem/case-workspace.ts:408`, `web/src/adapters/filesystem/content-store.ts:23`). No new storage adapter is introduced.
+All persistence uses the existing atomic `encode` + `createImmutable` + post-write hash-verify pattern (`web/src/adapters/filesystem/case-workspace.ts:408`, `web/src/adapters/filesystem/content-store.ts:23`). Catalog snapshots and their pointer follow ADR 010. No new storage boundary is introduced.
 
 **Testing**: Vitest (unit/contract/integration) + Playwright (browser E2E), inherited from Feature 009. Schema validation uses `web/tools/validate-design-schemas.mjs` and `web/tools/validate-contracts.mjs`, both extended to cover the four new schemas placed under `web/src/contracts/schemas/`.
 

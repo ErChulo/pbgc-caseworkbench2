@@ -9,6 +9,7 @@ async function createSyntheticCase(page: import("@playwright/test").Page) {
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-INTAKE");
   await page.getByRole("button", { name: "Create production case" }).click();
 }
@@ -18,7 +19,7 @@ test("inventories, hashes, preserves, and resumes an unchanged synthetic selecti
   outboundRequests,
 }) => {
   await createSyntheticCase(page);
-  const picker = page.getByLabel("Select a folder");
+  const picker = page.getByLabel("Import evidence folder");
   const fixtureDirectory = path.resolve("web/tests/fixtures/browser-package");
   await picker.setInputFiles(fixtureDirectory);
   await expect(page.getByText("File inventory complete")).toBeVisible();
@@ -30,9 +31,21 @@ test("inventories, hashes, preserves, and resumes an unchanged synthetic selecti
   await expect(
     page.getByText("First snapshot of this file set created."),
   ).toBeVisible();
-  await picker.setInputFiles(fixtureDirectory);
+  const rediscover = async (file: string) => ({
+    name: `browser-package/${file}`,
+    mimeType: "text/plain",
+    buffer: await (
+      await import("node:fs/promises")
+    ).readFile(path.join(fixtureDirectory, file)),
+  });
+  const filePicker = page.getByLabel("Add evidence files");
+  const alpha = await rediscover("alpha.txt");
+  const beta = await rediscover("beta.txt");
+  await filePicker.setInputFiles([alpha, beta]);
   await expect(
-    page.getByText("Same files as before — no duplicate records created."),
+    page.getByText(
+      "Same active evidence as before — additional intake provenance preserved.",
+    ),
   ).toBeVisible();
   await expect(page.getByText("Pending review")).toBeVisible();
   expect(outboundRequests).toEqual([]);
@@ -42,7 +55,7 @@ test("records changed selection as linked divergence and preserves partial conti
   page,
 }) => {
   await createSyntheticCase(page);
-  const picker = page.getByLabel("Select individual files");
+  const picker = page.getByLabel("Add evidence files");
   await picker.setInputFiles({
     name: "alpha.txt",
     mimeType: "text/plain",
@@ -61,14 +74,19 @@ test("records changed selection as linked divergence and preserves partial conti
     page.getByText(
       "File preserved. Downstream use blocked until all reviews complete.",
     ),
-  ).toBeVisible();
+  ).toHaveCount(2);
+  await expect(
+    page
+      .getByRole("table", { name: "Provisional artifact inventory" })
+      .getByText("alpha.txt", { exact: true }),
+  ).toHaveCount(2);
 });
 
 test("interrupts large-file hashing at a safe boundary without claiming completion", async ({
   page,
 }) => {
   await createSyntheticCase(page);
-  const picker = page.getByLabel("Select individual files");
+  const picker = page.getByLabel("Add evidence files");
   const selection = picker.setInputFiles({
     name: "large-synthetic.bin",
     mimeType: "application/octet-stream",

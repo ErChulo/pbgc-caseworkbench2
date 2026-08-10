@@ -74,12 +74,56 @@ describe("T077 classification proposals and replay", () => {
       ),
     ).toBe(true);
     expect(
-      proposals.find((item) => item.proposedValue === "authority-candidate"),
+      proposals.find((item) => item.proposedValue === "executed-plan-document"),
     ).toMatchObject({
       authorityCandidate: true,
       status: "proposed",
     });
+    expect(
+      proposals
+        .filter((item) => item.dimension === "source-role")
+        .map((item) => item.proposedValue),
+    ).toEqual(["executed-plan-document"]);
     expect(Object.isFrozen(proposals[0])).toBe(true);
+  });
+
+  it("binds otherwise identical proposals to the exact analyzed text", async () => {
+    const original = await proposeClassifications(artifact);
+    const corrected = await proposeClassifications({
+      ...artifact,
+      text: `${artifact.text} Corrected locally.`,
+      analysisSourceLocator: "correction:synthetic",
+    });
+    const originalPlan = original.find(
+      (item) => item.proposedValue === "plan-document",
+    );
+    const correctedPlan = corrected.find(
+      (item) => item.proposedValue === "plan-document",
+    );
+    expect(originalPlan?.proposalKey).not.toBe(correctedPlan?.proposalKey);
+    expect(correctedPlan?.supportingEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          evidenceType: "metadata",
+          sourceLocator: "correction:synthetic",
+        }),
+      ]),
+    );
+  });
+
+  it("binds page-scoped proposals to an exact PDF page locator", async () => {
+    const proposals = await proposeClassifications({
+      ...artifact,
+      text: "Executed plan document",
+      textLocator: "pdf:page=4",
+    });
+    expect(
+      proposals.flatMap((proposal) => proposal.supportingEvidence),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sourceLocator: "pdf:page=4" }),
+      ]),
+    );
   });
 
   it("computes human approval without mutating the proposal and ignores timestamps for replay order", async () => {

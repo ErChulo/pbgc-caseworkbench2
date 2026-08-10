@@ -10,12 +10,24 @@ const renameEntryHtml = {
   enforce: "post" as const,
   generateBundle(
     _options: unknown,
-    bundle: Record<string, { fileName: string }>,
+    bundle: Record<
+      string,
+      {
+        fileName: string;
+        type: "asset" | "chunk";
+        source?: string | Uint8Array;
+      }
+    >,
   ) {
     const entry = Object.values(bundle).find(
       (item) => item.fileName === "index.html",
     );
-    if (entry) entry.fileName = "pbgc-caseworkbench.html";
+    if (entry) {
+      entry.fileName = "pbgc-caseworkbench.html";
+      if (entry.type === "asset" && typeof entry.source === "string") {
+        entry.source = entry.source.replace(/\r\n?/gu, "\n");
+      }
+    }
   },
 };
 

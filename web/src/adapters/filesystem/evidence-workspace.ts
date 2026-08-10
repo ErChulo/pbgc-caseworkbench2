@@ -36,21 +36,40 @@ import type {
 } from "../../domain/plan-rules/models";
 import {
   parseSha256,
+  parseUtcTimestamp,
   parseUuid,
   type Result,
+  type Sha256,
+  type UtcTimestamp,
   type Uuid,
 } from "../../domain/shared/types";
 
 const directoryMode = 0o700;
 const fileMode = 0o600;
+const catalogPointerSchemaVersion = "1.0.0" as const;
+const catalogDirectoryName = "catalogs";
+const catalogPointerName = "current.json";
 
 const files = {
-  catalog: "catalog.json",
   candidates: "provision-candidates.jsonl",
   rules: "rule-records.jsonl",
   unresolved: "unresolved-items.jsonl",
   overrides: "authority-overrides.jsonl",
 } as const;
+
+type EvidenceLogFile = (typeof files)[keyof typeof files];
+
+interface CatalogPointer {
+  readonly schemaVersion: typeof catalogPointerSchemaVersion;
+  readonly catalogContentSha256: Sha256;
+  readonly writtenAt: UtcTimestamp;
+}
+
+interface CatalogDirectoryIdentity {
+  readonly path: string;
+  readonly device: bigint;
+  readonly inode: bigint;
+}
 
 export class EvidenceWorkspace {
   private constructor(
@@ -97,7 +116,10 @@ export class EvidenceWorkspace {
     }
   }
 
-  async writeCatalog(catalog: EvidenceCatalog): Promise<Result<void, string>> {
+  async writeCatalog(
+    catalog: EvidenceCatalog,
+    pointerWrittenAt = new Date().toISOString(),
+  ): Promise<Result<void, string>> {
     if (catalog.caseId !== this.caseId) {
       return fail("Catalog caseId does not match the evidence workspace.");
     }
@@ -110,39 +132,86 @@ export class EvidenceWorkspace {
         "Catalog content hash does not match its deterministic payload.",
       );
     }
+    const writtenAt = parseUtcTimestamp(pointerWrittenAt);
+    if (!writtenAt.ok) {
+      return fail("Catalog pointer write timestamp is invalid.");
+    }
 
     const bytes = encodeJson(catalog);
-    const path = this.path(files.catalog);
+    let release: (() => Promise<void>) | null = null;
     try {
+      release = await acquireLock(join(this.workspacePath, ".evidence.lock"));
       await this.assertStable();
-      const created = await createImmutable(path, bytes, () =>
-        this.assertStable(),
+      const directory = await this.openCatalogDirectory(true);
+      const existing = await this.readCurrentCatalog(directory, true);
+      if (!existing.ok) return existing;
+      if (
+        existing.value !== null &&
+        existing.value.catalogId !== catalog.catalogId
+      ) {
+        return fail("Catalog lineage must preserve one stable catalogId.");
+      }
+
+      const snapshotPath = this.catalogSnapshotPath(
+        directory,
+        catalog.catalogContentSha256,
       );
-      if (!created)
-        return fail("Evidence catalog already exists and is immutable.");
-      if (!(await bytesMatch(path, bytes))) {
+      const created = await createImmutable(snapshotPath, bytes, () =>
+        this.assertCatalogDirectoryStable(directory),
+      );
+      if (created && !(await bytesMatch(snapshotPath, bytes))) {
         return fail("Evidence catalog failed post-write verification.");
+      }
+
+      const stored = await this.readCatalogSnapshot(
+        directory,
+        catalog.catalogContentSha256,
+      );
+      if (!stored.ok) return stored;
+      if (stored.value.catalogId !== catalog.catalogId) {
+        return fail("Catalog snapshot does not match the catalog lineage.");
+      }
+
+      const pointer: CatalogPointer = {
+        schemaVersion: catalogPointerSchemaVersion,
+        catalogContentSha256: catalog.catalogContentSha256,
+        writtenAt: writtenAt.value,
+      };
+      const pointerBytes = encodeJson(pointer);
+      const pointerPath = join(directory.path, catalogPointerName);
+      await writeAtomic(pointerPath, pointerBytes, () =>
+        this.assertCatalogDirectoryStable(directory),
+      );
+      if (!(await bytesMatch(pointerPath, pointerBytes))) {
+        return fail("Evidence catalog pointer failed post-write verification.");
+      }
+      const current = await this.readCurrentCatalog(directory);
+      if (
+        !current.ok ||
+        current.value?.catalogContentSha256 !== catalog.catalogContentSha256
+      ) {
+        return fail("Evidence catalog pointer failed verified restoration.");
       }
       return { ok: true, value: undefined };
     } catch (error) {
       return fail(`Failed to write evidence catalog: ${errorMessage(error)}`);
+    } finally {
+      await release?.();
     }
   }
 
   async readCatalog(): Promise<Result<EvidenceCatalog, string>> {
-    const parsed = await this.readJson(files.catalog);
-    if (!parsed.ok) return parsed;
-    const validation = validateContract("evidenceCatalog", parsed.value);
-    if (!validation.valid) return fail(formatValidation(validation.issues));
-    const catalog = parsed.value as EvidenceCatalog;
-    if (catalog.caseId !== this.caseId) {
-      return fail("Stored catalog belongs to a different case.");
+    try {
+      const directory = await this.openCatalogDirectory(false);
+      const current = await this.readCurrentCatalog(directory);
+      if (!current.ok) return current;
+      if (current.value === null) {
+        return fail("Current evidence catalog pointer is missing.");
+      }
+      return { ok: true, value: current.value };
+    } catch (error) {
+      return fail(`Failed to read evidence catalog: ${errorMessage(error)}`);
     }
-    const { catalogContentSha256: expected, ...content } = catalog;
-    if ((await catalogContentSha256(content)) !== expected) {
-      return fail("Stored catalog content hash is invalid.");
-    }
-    return { ok: true, value: deepFreeze(catalog) };
   }
 
   appendCandidates(
@@ -231,7 +300,7 @@ export class EvidenceWorkspace {
     return effective.ok ? overrides : effective;
   }
 
-  private path(fileName: (typeof files)[keyof typeof files]): string {
+  private path(fileName: EvidenceLogFile): string {
     const path = join(this.workspacePath, fileName);
     if (dirname(path) !== this.workspacePath) {
       throw new Error("Evidence file path escapes its workspace.");
@@ -239,21 +308,129 @@ export class EvidenceWorkspace {
     return path;
   }
 
-  private async readJson(
-    fileName: typeof files.catalog,
-  ): Promise<Result<unknown, string>> {
-    try {
-      await this.assertStable();
-      const text = (await readSecure(this.path(fileName))).toString("utf8");
-      const value: unknown = JSON.parse(text);
-      return { ok: true, value };
-    } catch (error) {
-      return fail(`Failed to read evidence JSON: ${errorMessage(error)}`);
+  private async openCatalogDirectory(
+    create: boolean,
+  ): Promise<CatalogDirectoryIdentity> {
+    await this.assertStable();
+    const path = join(this.workspacePath, catalogDirectoryName);
+    if (dirname(path) !== this.workspacePath) {
+      throw new Error("Catalog directory escapes the evidence workspace.");
+    }
+    if (create) {
+      try {
+        await mkdir(path, { mode: directoryMode });
+      } catch (error) {
+        if (!isAlreadyExists(error)) throw error;
+      }
+    }
+    const identity = await lstat(path, { bigint: true });
+    if (identity.isSymbolicLink() || !identity.isDirectory()) {
+      throw new Error("Evidence catalogs path is not a safe directory.");
+    }
+    const canonical = await realpath(path);
+    if (
+      !isWithin(this.workspacePath, canonical) ||
+      dirname(canonical) !== this.workspacePath
+    ) {
+      throw new Error("Evidence catalogs path escapes its workspace.");
+    }
+    await chmod(path, directoryMode);
+    return {
+      path,
+      device: identity.dev,
+      inode: identity.ino,
+    };
+  }
+
+  private async assertCatalogDirectoryStable(
+    directory: CatalogDirectoryIdentity,
+  ): Promise<void> {
+    await this.assertStable();
+    const identity = await lstat(directory.path, { bigint: true });
+    if (
+      identity.isSymbolicLink() ||
+      !identity.isDirectory() ||
+      identity.dev !== directory.device ||
+      identity.ino !== directory.inode
+    ) {
+      throw new Error(
+        "Evidence catalogs directory was replaced after opening.",
+      );
     }
   }
 
+  private catalogSnapshotPath(
+    directory: CatalogDirectoryIdentity,
+    catalogSha256: Sha256,
+  ): string {
+    const path = join(directory.path, `${catalogSha256}.json`);
+    if (dirname(path) !== directory.path) {
+      throw new Error("Catalog snapshot path escapes its directory.");
+    }
+    return path;
+  }
+
+  private async readCurrentCatalog(
+    directory: CatalogDirectoryIdentity,
+    missingAllowed = false,
+  ): Promise<Result<EvidenceCatalog | null, string>> {
+    let value: unknown;
+    try {
+      await this.assertCatalogDirectoryStable(directory);
+      const text = (
+        await readSecure(join(directory.path, catalogPointerName))
+      ).toString("utf8");
+      value = JSON.parse(text) as unknown;
+    } catch (error) {
+      if (missingAllowed && isNotFound(error)) {
+        return { ok: true, value: null };
+      }
+      return fail(
+        `Failed to read current evidence catalog pointer: ${errorMessage(error)}`,
+      );
+    }
+    const pointer = parseCatalogPointer(value);
+    if (!pointer.ok) return pointer;
+    return this.readCatalogSnapshot(
+      directory,
+      pointer.value.catalogContentSha256,
+    );
+  }
+
+  private async readCatalogSnapshot(
+    directory: CatalogDirectoryIdentity,
+    expectedSha256: Sha256,
+  ): Promise<Result<EvidenceCatalog, string>> {
+    let value: unknown;
+    try {
+      await this.assertCatalogDirectoryStable(directory);
+      const text = (
+        await readSecure(this.catalogSnapshotPath(directory, expectedSha256))
+      ).toString("utf8");
+      value = JSON.parse(text) as unknown;
+    } catch (error) {
+      return fail(
+        `Failed to read evidence catalog snapshot: ${errorMessage(error)}`,
+      );
+    }
+    const validation = validateContract("evidenceCatalog", value);
+    if (!validation.valid) return fail(formatValidation(validation.issues));
+    const catalog = value as EvidenceCatalog;
+    if (catalog.caseId !== this.caseId) {
+      return fail("Stored catalog belongs to a different case.");
+    }
+    if (catalog.catalogContentSha256 !== expectedSha256) {
+      return fail("Catalog pointer and snapshot content hash do not match.");
+    }
+    const { catalogContentSha256: expected, ...content } = catalog;
+    if ((await catalogContentSha256(content)) !== expected) {
+      return fail("Stored catalog content hash is invalid.");
+    }
+    return { ok: true, value: deepFreeze(catalog) };
+  }
+
   private async appendRecords(
-    fileName: Exclude<(typeof files)[keyof typeof files], typeof files.catalog>,
+    fileName: EvidenceLogFile,
     contract: string,
     records: readonly unknown[],
     preCommit?: () => Promise<Result<void, string>>,
@@ -295,7 +472,7 @@ export class EvidenceWorkspace {
   }
 
   private async readRecords<T>(
-    fileName: Exclude<(typeof files)[keyof typeof files], typeof files.catalog>,
+    fileName: EvidenceLogFile,
     contract: string,
     missingIsEmpty = false,
   ): Promise<Result<readonly T[], string>> {
@@ -450,6 +627,32 @@ async function validateRecordSet(
     }
   }
   return { ok: true, value: undefined };
+}
+
+function parseCatalogPointer(value: unknown): Result<CatalogPointer, string> {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).sort().join(",") !==
+      "catalogContentSha256,schemaVersion,writtenAt" ||
+    value.schemaVersion !== catalogPointerSchemaVersion ||
+    typeof value.catalogContentSha256 !== "string" ||
+    typeof value.writtenAt !== "string"
+  ) {
+    return fail("Current evidence catalog pointer is invalid.");
+  }
+  const catalogContentSha256 = parseSha256(value.catalogContentSha256);
+  const writtenAt = parseUtcTimestamp(value.writtenAt);
+  if (!catalogContentSha256.ok || !writtenAt.ok) {
+    return fail("Current evidence catalog pointer is invalid.");
+  }
+  return {
+    ok: true,
+    value: Object.freeze({
+      schemaVersion: catalogPointerSchemaVersion,
+      catalogContentSha256: catalogContentSha256.value,
+      writtenAt: writtenAt.value,
+    }),
+  };
 }
 
 async function secureDirectory(path: string): Promise<void> {
@@ -619,6 +822,10 @@ function isAlreadyExists(error: unknown): boolean {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function errorMessage(error: unknown): string {

@@ -1,90 +1,5 @@
-/* eslint-disable @typescript-eslint/require-await */
-import type { Page } from "@playwright/test";
-
 import { expect, test } from "./fixtures";
-
-async function installSyntheticWorkspace(page: Page) {
-  await page.addInitScript(() => {
-    const files = new Map<string, Uint8Array>();
-    const directories = new Map<string, FileSystemDirectoryHandle>();
-
-    const makeDirectory = (prefix: string): FileSystemDirectoryHandle => {
-      const cached = directories.get(prefix);
-      if (cached) return cached;
-      const handle = {
-        kind: "directory",
-        name: prefix.split("/").at(-1) ?? "synthetic-local-workspace",
-        isSameEntry: async (other: FileSystemHandle) => other === handle,
-        queryPermission: async () => "granted" as PermissionState,
-        requestPermission: async () => "granted" as PermissionState,
-        getDirectoryHandle: async (
-          name: string,
-          options?: FileSystemGetDirectoryOptions,
-        ) => {
-          const path = prefix ? `${prefix}/${name}` : name;
-          if (!options?.create && !directories.has(path)) {
-            throw new DOMException("Not found", "NotFoundError");
-          }
-          return makeDirectory(path);
-        },
-        getFileHandle: async (
-          name: string,
-          options?: FileSystemGetFileOptions,
-        ) => {
-          const path = prefix ? `${prefix}/${name}` : name;
-          if (!options?.create && !files.has(path)) {
-            throw new DOMException("Not found", "NotFoundError");
-          }
-          return {
-            kind: "file",
-            name,
-            isSameEntry: async () => false,
-            queryPermission: async () => "granted" as PermissionState,
-            requestPermission: async () => "granted" as PermissionState,
-            getFile: async () => {
-              const stored = Uint8Array.from(
-                files.get(path) ?? new Uint8Array(),
-              );
-              return new File([stored.buffer], name, {
-                type: "application/json",
-              });
-            },
-            createWritable: async () => ({
-              locked: false,
-              abort: async () => undefined,
-              close: async () => undefined,
-              getWriter: () => {
-                throw new Error("Writer access is not used by this test.");
-              },
-              seek: async () => undefined,
-              truncate: async () => undefined,
-              write: async (data: FileSystemWriteChunkType) => {
-                if (data instanceof Uint8Array) {
-                  files.set(path, Uint8Array.from(data));
-                  return;
-                }
-                if (data instanceof ArrayBuffer) {
-                  files.set(path, new Uint8Array(data));
-                  return;
-                }
-                throw new Error("Unsupported synthetic write type.");
-              },
-            }),
-          } as unknown as FileSystemFileHandle;
-        },
-        removeEntry: async () => undefined,
-        resolve: async () => null,
-      } as unknown as FileSystemDirectoryHandle;
-      directories.set(prefix, handle);
-      return handle;
-    };
-
-    Object.defineProperty(globalThis, "showDirectoryPicker", {
-      configurable: true,
-      value: async () => makeDirectory(""),
-    });
-  });
-}
+import { installSyntheticWorkspace } from "./synthetic-workspace";
 
 test("creates one production case and requires an explicit duplicate decision", async ({
   offlinePage: page,
@@ -97,18 +12,40 @@ test("creates one production case and requires an explicit duplicate decision", 
     page.getByRole("heading", { name: "Create a controlled case" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Select local workspace" }).click();
+
+  // Reviewer identity is requested once after workspace is opened
+  await expect(page.getByLabel("Reviewer identifier")).toBeVisible();
+  await expect(page.getByLabel("Reviewer display name")).toBeVisible();
+  await expect(
+    page.getByText(/local audit trail during this browser session/u),
+  ).toBeVisible();
+
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
+
+  // After identity is established, existing cases and Create New Case are visible
+  await expect(
+    page.getByRole("button", { name: "Create production case" }),
+  ).toBeVisible();
+
+  // New case form asks only for the PBGC case number
+  await expect(page.getByLabel("Reviewer identifier")).not.toBeVisible();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-001");
   await page.getByRole("button", { name: "Create production case" }).click();
 
+  // New case automatically becomes active
   const caseId = await page.getByTestId("current-case-id").textContent();
   expect(caseId).toMatch(
     /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu,
   );
-  await expect(page.getByText("Production case created")).toBeVisible();
+  await expect(page.getByTestId("active-case-authoritative-id")).toHaveText(
+    "PBGC-SYNTHETIC-001",
+  );
+  await expect(page.getByText("Active case")).toBeVisible();
 
-  await page.getByRole("button", { name: "Create another case" }).click();
+  // Return to workspace home and create a duplicate to trigger collision
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-001");
   await page.getByRole("button", { name: "Create production case" }).click();
 
@@ -125,7 +62,7 @@ test("creates one production case and requires an explicit duplicate decision", 
     .fill("Continue controlled intake in the existing synthetic case.");
   await page.getByRole("button", { name: "Resume existing case" }).click();
 
-  await expect(page.getByText("Resume decision recorded")).toBeVisible();
+  // Resumed case is active again — same internal ID, no duplicate created
   await expect(page.getByTestId("current-case-id")).toHaveText(caseId ?? "");
   expect(outboundRequests).toEqual([]);
 });
@@ -138,11 +75,12 @@ test("creates a separately designated non-production case only after human appro
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-002");
   await page.getByRole("button", { name: "Create production case" }).click();
   const productionId = await page.getByTestId("current-case-id").textContent();
 
-  await page.getByRole("button", { name: "Create another case" }).click();
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-002");
   await page.getByRole("button", { name: "Create production case" }).click();
   await page
@@ -153,11 +91,89 @@ test("creates a separately designated non-production case only after human appro
     .getByRole("button", { name: "Create approved non-production case" })
     .click();
 
-  await expect(page.getByText("Training case created")).toBeVisible();
+  await expect(page.getByTestId("active-case-authoritative-id")).toHaveText(
+    "PBGC-SYNTHETIC-002",
+  );
   await expect(page.getByTestId("current-case-id")).not.toHaveText(
     productionId ?? "",
   );
+});
+
+test("opens an existing case from the workspace case list without duplicating data", async ({
+  offlinePage: page,
+  outboundRequests,
+}) => {
+  await installSyntheticWorkspace(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Select local workspace" }).click();
+  await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
+  await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
+
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-OPEN");
+  await page.getByRole("button", { name: "Create production case" }).click();
+
+  const caseId = await page.getByTestId("current-case-id").textContent();
+  expect(caseId).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu,
+  );
+
+  // Return to workspace home — the existing case should appear in the list
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
   await expect(
-    page.getByText("Human collision decision recorded"),
+    page.getByRole("button", { name: "Open PBGC-SYNTHETIC-OPEN" }),
+  ).toBeVisible();
+
+  // Open the existing case
+  await page.getByRole("button", { name: "Open PBGC-SYNTHETIC-OPEN" }).click();
+
+  // The same internal case ID is active — no duplicate was created
+  await expect(page.getByTestId("current-case-id")).toHaveText(caseId ?? "");
+  await expect(page.getByTestId("active-case-authoritative-id")).toHaveText(
+    "PBGC-SYNTHETIC-OPEN",
+  );
+  expect(outboundRequests).toEqual([]);
+});
+
+test("displays updated evidence-intake labels and workspace-versus-source explanation", async ({
+  offlinePage: page,
+}) => {
+  await installSyntheticWorkspace(page);
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Select local workspace" }).click();
+  await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
+  await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
+  await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-EVIDENCE");
+  await page.getByRole("button", { name: "Create production case" }).click();
+
+  await expect(page.getByLabel("Add evidence files")).toBeVisible();
+  await expect(page.getByLabel("Import evidence folder")).toBeVisible();
+  await expect(
+    page.getByText(/Source evidence vs\. controlled workspace/u),
+  ).toBeVisible();
+
+  // Built-in Help is hidden from the primary workflow when a case is active
+  await expect(
+    page.getByRole("heading", { name: "Built-in help" }),
+  ).not.toBeVisible();
+  await expect(page.getByText("Keyboard shortcuts")).not.toBeVisible();
+  await expect(page.getByText("Local PII handling")).not.toBeVisible();
+  await expect(page.getByText("Help", { exact: true })).not.toBeVisible();
+
+  // Synthetic/demo content is not displayed as if it belongs to the production case
+  await expect(page.getByText("Synthetic session preview")).not.toBeVisible();
+  await expect(
+    page.getByText("Typed synthetic demo candidates"),
+  ).not.toBeVisible();
+  await expect(page.getByText("Synthetic demo catalog")).not.toBeVisible();
+
+  // Neutral case-derived empty state appears when no review records exist
+  await expect(
+    page.getByText(
+      "No case-derived evidence review records are available yet.",
+    ),
   ).toBeVisible();
 });

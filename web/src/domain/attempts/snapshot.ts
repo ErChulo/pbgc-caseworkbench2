@@ -12,6 +12,26 @@ export async function createPackageSnapshot(
       left.normalizedDisplayPath.localeCompare(right.normalizedDisplayPath) ||
       left.sha256.localeCompare(right.sha256),
   );
+  const snapshotId = await computePackageSnapshotId(sorted);
+  const totalBytes = sorted.reduce((sum, entry) => sum + entry.sizeBytes, 0);
+  return Object.freeze({
+    snapshotId,
+    snapshotRecordId: dependencies.uuid.generate(),
+    entries: Object.freeze(sorted),
+    discoveredCount: sorted.length,
+    totalBytes,
+    frozenAt: dependencies.clock.now(),
+  });
+}
+
+export async function computePackageSnapshotId(
+  entries: readonly SnapshotEntry[],
+): Promise<Sha256> {
+  const sorted = [...entries].sort(
+    (left, right) =>
+      left.normalizedDisplayPath.localeCompare(right.normalizedDisplayPath) ||
+      left.sha256.localeCompare(right.sha256),
+  );
   const deterministicPayload = {
     entries: sorted.map((entry) => ({
       observedRelativePath: entry.observedRelativePath,
@@ -27,14 +47,7 @@ export async function createPackageSnapshot(
     await hashTyped(deterministicPayload, {}),
   );
   if (!parsedSnapshotId.ok) throw new Error("Snapshot hash was invalid.");
-  return Object.freeze({
-    snapshotId: parsedSnapshotId.value,
-    snapshotRecordId: dependencies.uuid.generate(),
-    entries: Object.freeze(sorted),
-    discoveredCount: sorted.length,
-    totalBytes: deterministicPayload.totalBytes,
-    frozenAt: dependencies.clock.now(),
-  });
+  return parsedSnapshotId.value;
 }
 
 export type SnapshotDifference =

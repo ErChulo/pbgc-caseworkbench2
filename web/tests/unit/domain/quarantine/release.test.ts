@@ -206,7 +206,7 @@ describe("T061 exact-byte human release governance", () => {
     ).toMatchObject({ ok: false });
   });
 
-  it("inherits eligibility only from the current effective release for identical bytes", async () => {
+  it("binds inherited eligibility at decision time and blocks it after release revocation or supersession", async () => {
     const release = await quarantine({
       decisionId: uuid("11111111-1111-4111-8111-111111111111"),
       appendOrdinal: 1,
@@ -237,6 +237,46 @@ describe("T061 exact-byte human release governance", () => {
     ).toMatchObject({
       ok: true,
       value: { eligible: true },
+    });
+    const revoke = await quarantine({
+      decisionId: uuid("55555555-5555-4555-8555-555555555555"),
+      appendOrdinal: 2,
+      priorDecisionId: release.decisionId,
+      priorDecisionContentSha256: release.decisionContentSha256,
+      artifactSha256: sha("a"),
+      findingIds: [],
+      action: "revoke",
+      resultingStatus: "revoked",
+      ruleSetVersion: "1",
+      schemaVersion: "1.0.0",
+    });
+    expect(
+      await replayArtifactEligibility(sha("a"), [inherited], [release, revoke]),
+    ).toMatchObject({
+      ok: true,
+      value: { eligible: false, effectiveStatus: "blocked" },
+    });
+    const supersede = await quarantine({
+      decisionId: uuid("66666666-6666-4666-8666-666666666666"),
+      appendOrdinal: 2,
+      priorDecisionId: release.decisionId,
+      priorDecisionContentSha256: release.decisionContentSha256,
+      artifactSha256: sha("a"),
+      findingIds: [],
+      action: "supersede",
+      resultingStatus: "superseded",
+      ruleSetVersion: "1",
+      schemaVersion: "1.0.0",
+    });
+    expect(
+      await replayArtifactEligibility(
+        sha("a"),
+        [inherited],
+        [release, supersede],
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: { eligible: false, effectiveStatus: "blocked" },
     });
     expect(
       await replayArtifactEligibility(

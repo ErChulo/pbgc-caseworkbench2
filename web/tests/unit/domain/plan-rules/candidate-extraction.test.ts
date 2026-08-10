@@ -89,6 +89,28 @@ describe("candidate extraction", () => {
     ]);
   });
 
+  it("preserves PDF.js machine-text page boundaries in candidate locators", async () => {
+    const firstPage = "Effective January 1, 2025, formula A applies.";
+    const secondPage = "Formula B applies.";
+    const result = await extractCandidates(
+      sha,
+      passive(
+        "pdfjs-machine-text",
+        "application/pdf",
+        `[Page 1]\n${firstPage}\n\n[Page 2]\n${secondPage}`,
+      ),
+      { openedAt },
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(
+      result.value.candidates.map((candidate) => candidate.artifactLocator),
+    ).toEqual([
+      `pdf:page=1:offset=0:endOffset=${String(firstPage.length)}`,
+      `pdf:page=2:offset=0:endOffset=${String(secondPage.length)}`,
+    ]);
+  });
+
   it("rejects PDF text without proven page spans", async () => {
     const result = await extractCandidates(
       sha,

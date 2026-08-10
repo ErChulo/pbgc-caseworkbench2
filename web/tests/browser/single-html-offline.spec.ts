@@ -38,9 +38,10 @@ test("completes the offline local flow with outbound requests blocked", async ({
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("offline-reviewer");
   await page.getByLabel("Reviewer display name").fill("Offline Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-OFFLINE-001");
   await page.getByRole("button", { name: "Create production case" }).click();
-  await page.getByLabel("Select individual files").setInputFiles({
+  await page.getByLabel("Add evidence files").setInputFiles({
     name: "offline.txt",
     mimeType: "text/plain",
     buffer: Buffer.from("offline synthetic evidence"),

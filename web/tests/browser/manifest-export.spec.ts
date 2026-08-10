@@ -10,9 +10,10 @@ test("shows a deterministic manifest, unresolved status, and one-view lineage lo
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-MANIFEST");
   await page.getByRole("button", { name: "Create production case" }).click();
-  await page.getByLabel("Select individual files").setInputFiles({
+  await page.getByLabel("Add evidence files").setInputFiles({
     name: "synthetic.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("generalKey,value\nSYN-1,0\nSYN-2,\n"),

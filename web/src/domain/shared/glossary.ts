@@ -42,10 +42,10 @@ export const GLOSSARY = {
       "A human reviewer has decided this artifact must remain quarantined. Only a new typed decision can change this.",
   },
   released: {
-    plain: "Released",
+    plain: "Safety hold released",
     technical: "released",
     tooltip:
-      "An authorized reviewer has approved this artifact for governed downstream use.",
+      "An authorized reviewer has released the exact screening findings. A separate artifact eligibility decision is still required for governed downstream use.",
   },
   revoked: {
     plain: "Revoked",
@@ -83,10 +83,10 @@ export const GLOSSARY = {
       "The system could not determine the status. A human reviewer must investigate.",
   },
   inheritedRelease: {
-    plain: "Inherit approved status",
+    plain: "Inherit safety release",
     technical: "inherit-release",
     tooltip:
-      "Apply the same release decision from a previously approved artifact with identical content.",
+      "Apply the same safety release from a reviewed artifact with identical bytes. This does not grant downstream eligibility.",
   },
   finalQuarantineAction: {
     plain: "Permanently quarantine",

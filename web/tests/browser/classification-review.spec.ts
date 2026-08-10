@@ -10,9 +10,10 @@ test("reviews classification and relationship proposals with immutable human his
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-SYNTHETIC-CLASSIFICATION");
   await page.getByRole("button", { name: "Create production case" }).click();
-  await page.getByLabel("Select individual files").setInputFiles([
+  await page.getByLabel("Add evidence files").setInputFiles([
     {
       name: "synthetic-plan.txt",
       mimeType: "text/plain",
@@ -75,6 +76,23 @@ test("reviews classification and relationship proposals with immutable human his
     .fill("Synthetic similarity evidence reviewed.");
   const firstRelationship = relationship.locator("li").first();
   await firstRelationship.getByRole("button", { name: "Reject" }).click();
+  await expect(
+    firstRelationship.getByText("Rejected", { exact: true }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
+  await page
+    .getByRole("button", { name: "Open PBGC-SYNTHETIC-CLASSIFICATION" })
+    .click();
+  await expect(
+    page.getByText("Evidence restored from this case's persisted manifest."),
+  ).toBeVisible();
+  await expect(
+    firstClassification.getByText("Revoked", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Selected", { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     firstRelationship.getByText("Rejected", { exact: true }),
   ).toBeVisible();

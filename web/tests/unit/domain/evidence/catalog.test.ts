@@ -12,8 +12,14 @@ import type {
   ClassificationProposal,
 } from "../../../../src/domain/classification/models";
 import { createUnresolvedItem } from "../../../../src/domain/plan-rules/unresolved-items";
-import { quarantineDecisionContentHash } from "../../../../src/domain/quarantine/release-service";
-import type { QuarantineDecision } from "../../../../src/domain/quarantine/models";
+import {
+  artifactEligibilityContentHash,
+  quarantineDecisionContentHash,
+} from "../../../../src/domain/quarantine/release-service";
+import type {
+  ArtifactEligibilityDecision,
+  QuarantineDecision,
+} from "../../../../src/domain/quarantine/models";
 import {
   parseSha256,
   parseUtcTimestamp,
@@ -212,9 +218,16 @@ describe("EvidenceCatalog", () => {
         ...input,
         quarantineMetadata: [],
       });
+    const missingEligibility = await buildEvidenceCatalogFromScreenedOutcomes({
+      ...input,
+      eligibilityDecisions: input.eligibilityDecisions.filter(
+        (decision) => decision.artifactSha256 !== hash("a"),
+      ),
+    });
     expect(missingReceipt.ok).toBe(false);
     expect(missingClassification.ok).toBe(false);
     expect(missingQuarantineLink.ok).toBe(false);
+    expect(missingEligibility.ok).toBe(false);
   });
 });
 
@@ -318,6 +331,33 @@ async function quarantine(
   };
 }
 
+async function eligibility(
+  sha256: Sha256,
+  suffix: string,
+  source: QuarantineDecision,
+): Promise<ArtifactEligibilityDecision> {
+  const base = {
+    appendOrdinal: 1,
+    priorDecisionId: null,
+    priorDecisionContentSha256: null,
+    artifactSha256: sha256,
+    action: "inherit-approval" as const,
+    resultingStatus: "eligible" as const,
+    sourceQuarantineDecisionContentSha256: source.decisionContentSha256,
+    ruleSetVersion: "feature-009-screening-v1",
+    schemaVersion: "1.0.0" as const,
+  };
+  return {
+    ...base,
+    decisionId: id(`05${suffix}`),
+    decisionContentSha256: await artifactEligibilityContentHash(base),
+    sourceQuarantineDecisionId: source.decisionId,
+    actor: human,
+    decidedAt: time(),
+    rationale: "Synthetic artifact eligibility approval.",
+  };
+}
+
 async function screenedInput(): Promise<ScreenedCatalogAdapterInput> {
   const caseId = id("002");
   const artifacts = [
@@ -382,6 +422,13 @@ async function screenedInput(): Promise<ScreenedCatalogAdapterInput> {
     quarantine(hash("c"), "3", true),
     quarantine(hash("d"), "4", false),
   ]);
+  const eligibilityDecisions = await Promise.all(
+    quarantineDecisions
+      .slice(0, 3)
+      .map((decision, index) =>
+        eligibility(decision.artifactSha256, String(index + 1), decision),
+      ),
+  );
   const unresolved = await createUnresolvedItem(
     {
       kind: "other",
@@ -441,7 +488,7 @@ async function screenedInput(): Promise<ScreenedCatalogAdapterInput> {
       },
     ],
     quarantineDecisions,
-    eligibilityDecisions: [],
+    eligibilityDecisions,
     origins: [
       { artifactSha256: hash("a"), origin: "case-package" },
       { artifactSha256: hash("b"), origin: "reference-library" },

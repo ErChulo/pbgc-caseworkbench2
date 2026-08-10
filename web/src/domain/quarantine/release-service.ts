@@ -150,6 +150,7 @@ export async function replayArtifactEligibility(
   quarantineDecisions: readonly QuarantineDecision[],
 ): Promise<Result<ArtifactEligibilityProjection, DecisionReplayError>> {
   let prior: ArtifactEligibilityDecision | null = null;
+  let inheritedRelease: QuarantineDecision | null = null;
   const seenDecisionIds = new Set<Uuid>();
   for (const decision of decisions) {
     if ((decision.actor as { actorType?: unknown }).actorType !== "human")
@@ -192,7 +193,7 @@ export async function replayArtifactEligibility(
           "Inherited eligibility requires an effective same-byte release.",
         );
       }
-      const source = quarantineDecisions.find(
+      const sourceIndex = quarantineDecisions.findIndex(
         (item) =>
           item.decisionId === decision.sourceQuarantineDecisionId &&
           item.decisionContentSha256 ===
@@ -200,12 +201,14 @@ export async function replayArtifactEligibility(
           item.artifactSha256 === artifactSha256 &&
           item.resultingStatus === "released",
       );
+      const source = quarantineDecisions[sourceIndex];
       const replayed = await replayQuarantineDecisions(
         artifactSha256,
-        quarantineDecisions,
+        quarantineDecisions.slice(0, sourceIndex + 1),
       );
       if (
-        !source ||
+        source === undefined ||
+        sourceIndex < 0 ||
         !replayed.ok ||
         replayed.value.effectiveDecisionId !== source.decisionId
       ) {
@@ -214,6 +217,7 @@ export async function replayArtifactEligibility(
           "Referenced release is missing or ineffective.",
         );
       }
+      inheritedRelease = source;
     }
     const expected = await artifactEligibilityContentHash(decision);
     if (expected !== decision.decisionContentSha256)
@@ -234,6 +238,24 @@ export async function replayArtifactEligibility(
   }
   if (!prior)
     return ok(projection(artifactSha256, false, "provisional", null, []));
+  if (prior.resultingStatus === "eligible" && inheritedRelease !== null) {
+    const currentQuarantine = await replayQuarantineDecisions(
+      artifactSha256,
+      quarantineDecisions,
+    );
+    if (!currentQuarantine.ok) return currentQuarantine;
+    if (!currentQuarantine.value.eligible) {
+      return ok(
+        projection(
+          artifactSha256,
+          false,
+          "blocked",
+          prior.decisionId,
+          decisions.map((decision) => decision.decisionId),
+        ),
+      );
+    }
+  }
   return ok(
     projection(
       artifactSha256,

@@ -238,14 +238,11 @@ export async function buildEvidenceCatalogFromScreenedOutcomes(
     const eligibilityDecisions = input.eligibilityDecisions.filter(
       (decision) => decision.artifactSha256 === sha256,
     );
-    const eligibility =
-      eligibilityDecisions.length === 0
-        ? quarantine
-        : await replayArtifactEligibility(
-            artifactSha256,
-            eligibilityDecisions,
-            quarantineDecisions,
-          );
+    const eligibility = await replayArtifactEligibility(
+      artifactSha256,
+      eligibilityDecisions,
+      quarantineDecisions,
+    );
     if (!eligibility.ok) return invalid(eligibility.error.safeMessage);
 
     if (!eligibility.value.eligible) {

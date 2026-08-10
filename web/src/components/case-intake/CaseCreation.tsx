@@ -1,5 +1,7 @@
 import { useState, type SyntheticEvent } from "react";
 
+import { CaseList } from "./CaseList";
+
 import type {
   CaseCollision,
   CollisionResolutionInput,
@@ -11,6 +13,7 @@ import type {
 } from "../../domain/case/case";
 
 export type CaseCreationView =
+  | { readonly kind: "identity" }
   | { readonly kind: "ready" }
   | { readonly kind: "collision"; readonly collision: CaseCollision }
   | {
@@ -27,7 +30,6 @@ export type CaseCreationView =
 
 export interface ProductionCaseRequest {
   readonly authoritativeCaseId: string;
-  readonly actor: HumanActor;
 }
 
 interface CaseCreationProps {
@@ -36,6 +38,8 @@ interface CaseCreationProps {
   readonly workspaceError: string | null;
   readonly busy: boolean;
   readonly view: CaseCreationView;
+  readonly cases: readonly CaseRecord[];
+  readonly reviewerIdentity: HumanActor | null;
   readonly error: string | null;
   readonly onSelectWorkspace: () => Promise<void>;
   readonly onCreateProduction: (
@@ -45,6 +49,11 @@ interface CaseCreationProps {
     collision: CaseCollision,
     input: CollisionResolutionInput,
   ) => Promise<void>;
+  readonly onEstablishReviewerIdentity: (
+    reviewerId: string,
+    reviewerDisplayName: string,
+  ) => void;
+  readonly onOpenCase: (caseId: string) => void;
   readonly onCreateAnother: () => void;
 }
 
@@ -54,10 +63,14 @@ export function CaseCreation({
   workspaceError,
   busy,
   view,
+  cases,
+  reviewerIdentity,
   error,
   onSelectWorkspace,
   onCreateProduction,
   onResolveCollision,
+  onEstablishReviewerIdentity,
+  onOpenCase,
   onCreateAnother,
 }: CaseCreationProps) {
   const [authoritativeCaseId, setAuthoritativeCaseId] = useState("");
@@ -67,16 +80,17 @@ export function CaseCreation({
   const [nonProductionPurpose, setNonProductionPurpose] =
     useState<NonProductionCasePurpose>("training");
 
-  const actor = (): HumanActor => ({
-    actorType: "human",
-    actorKey: reviewerId,
-    displayName: reviewerName,
-    authorityContext: "case-intake-and-collision-review",
-  });
+  const actor = (): HumanActor =>
+    reviewerIdentity ?? {
+      actorType: "human",
+      actorKey: "",
+      displayName: "",
+      authorityContext: "case-intake-and-collision-review",
+    };
 
   const submitProduction = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await onCreateProduction({ authoritativeCaseId, actor: actor() });
+    await onCreateProduction({ authoritativeCaseId });
   };
 
   const resolve = async (
@@ -124,13 +138,20 @@ export function CaseCreation({
         </p>
       ) : null}
 
-      {view.kind === "ready" ? (
+      {view.kind === "identity" ? (
         <form
-          className="case-form"
+          className="identity-form"
+          aria-labelledby="identity-title"
           onSubmit={(event) => {
-            void submitProduction(event);
+            event.preventDefault();
+            onEstablishReviewerIdentity(reviewerId, reviewerName);
           }}
         >
+          <h3 id="identity-title">Establish reviewer identity</h3>
+          <p>
+            This identity is used for the local audit trail during this browser
+            session only. It is not persisted and is reused for all cases.
+          </p>
           <div className="form-grid">
             <label>
               <span>Reviewer identifier</span>
@@ -158,26 +179,6 @@ export function CaseCreation({
               />
             </label>
           </div>
-          <label>
-            <span>Case number</span>
-            <input
-              name="authoritativeCaseId"
-              value={authoritativeCaseId}
-              onChange={(event) => {
-                setAuthoritativeCaseId(event.target.value);
-              }}
-              onBlur={(event) => {
-                setAuthoritativeCaseId(event.target.value);
-              }}
-              autoComplete="off"
-              required
-              aria-describedby="case-identifier-help"
-            />
-            <small id="case-identifier-help">
-              The official PBGC case number. No plan, employer, or participant
-              facts are inferred from this number.
-            </small>
-          </label>
           {error ? (
             <p className="form-message form-message-error" role="alert">
               {error}
@@ -186,11 +187,60 @@ export function CaseCreation({
           <button
             className="button button-primary"
             type="submit"
-            disabled={!workspaceReady || busy}
+            disabled={busy}
           >
-            {busy ? "Creating case…" : "Create production case"}
+            Establish identity
           </button>
         </form>
+      ) : null}
+
+      {view.kind === "ready" && reviewerIdentity !== null ? (
+        <>
+          {cases.length > 0 ? (
+            <CaseList cases={cases} onOpenCase={onOpenCase} />
+          ) : (
+            <p className="form-message">No existing cases in this workspace.</p>
+          )}
+          <form
+            className="case-form"
+            onSubmit={(event) => {
+              void submitProduction(event);
+            }}
+          >
+            <label>
+              <span>Case number</span>
+              <input
+                name="authoritativeCaseId"
+                value={authoritativeCaseId}
+                onChange={(event) => {
+                  setAuthoritativeCaseId(event.target.value);
+                }}
+                onBlur={(event) => {
+                  setAuthoritativeCaseId(event.target.value);
+                }}
+                autoComplete="off"
+                required
+                aria-describedby="case-identifier-help"
+              />
+              <small id="case-identifier-help">
+                The official PBGC case number. No plan, employer, or participant
+                facts are inferred from this number.
+              </small>
+            </label>
+            {error ? (
+              <p className="form-message form-message-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={!workspaceReady || busy}
+            >
+              {busy ? "Creating case…" : "Create production case"}
+            </button>
+          </form>
+        </>
       ) : null}
 
       {view.kind === "collision" ? (

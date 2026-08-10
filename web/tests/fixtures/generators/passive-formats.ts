@@ -78,6 +78,33 @@ export const pdfFixture = () =>
   new TextEncoder().encode(
     "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R /Title (Synthetic PDF) >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /Contents 4 0 R >> endobj\n4 0 obj << /Length 23 >> stream\nBT (Passive text) Tj ET\nendstream\nendobj\n%%EOF",
   );
+
+export function pdfJsFixture(text = "Hello local PDF"): Uint8Array {
+  const escapedText = text.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+  const stream = `BT /F1 12 Tf 72 72 Td (${escapedText}) Tj ET`;
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 1000 144] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${String(stream.length)} >>\nstream\n${stream}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let content = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(content.length);
+    content += `${String(index + 1)} 0 obj\n${object}\nendobj\n`;
+  });
+  const xrefOffset = content.length;
+  content += `xref\n0 ${String(objects.length + 1)}\n`;
+  content += "0000000000 65535 f \n";
+  content += offsets
+    .slice(1)
+    .map((offset) => `${String(offset).padStart(10, "0")} 00000 n \n`)
+    .join("");
+  content += `trailer\n<< /Size ${String(objects.length + 1)} /Root 1 0 R >>\nstartxref\n${String(xrefOffset)}\n%%EOF\n`;
+  return new TextEncoder().encode(content);
+}
 export const multiPagePdfFixture = () =>
   new TextEncoder().encode(
     "%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /Contents 4 0 R >> endobj\n4 0 obj << /Length 94 >> stream\nBT (Section 4.1  Benefit = 1.5% of pay.) Tj (Effective 2025-01-01.) Tj ET\nendstream\nendobj\n5 0 obj << /Type /Page /Parent 2 0 R /Contents 6 0 R >> endobj\n6 0 obj << /Length 46 >> stream\nBT (Adopted 2024-12-15.) Tj ET\nendstream\nendobj\n%%EOF",

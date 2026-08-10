@@ -10,11 +10,13 @@ import { QuarantineQueue } from "../components/quarantine/QuarantineQueue";
 import { ClassificationReview } from "../components/review/ClassificationReview";
 import { RelationshipReview } from "../components/review/RelationshipReview";
 import { PopulationReview } from "../components/review/PopulationReview";
+import { ArtifactEligibilityReview } from "../components/review/ArtifactEligibilityReview";
 import { ManifestExport } from "../components/inventory/ManifestExport";
 import { EvidenceCatalogReview } from "../components/evidence/EvidenceCatalogReview";
 import { ProvisionCandidateReview } from "../components/evidence/ProvisionCandidateReview";
 import { PlanRuleAuthor } from "../components/evidence/PlanRuleAuthor";
 import { UnresolvedItemQueue } from "../components/evidence/UnresolvedItemQueue";
+import { EvidenceViewer } from "../components/evidence/EvidenceViewer";
 import { CaseOutputPackagePanel } from "../components/case-output/CaseOutputPackagePanel";
 import { DraftV1SummaryPanel } from "../components/draft-v1-summary/DraftV1SummaryPanel";
 import {
@@ -81,15 +83,18 @@ export function App({
   const orchestrator = useCaseOrchestrator(evidenceGovernanceDependencies);
 
   const evidenceReviewContent =
+    orchestrator.activeCase === null &&
     orchestrator.evidenceReviewView === "catalog" ? (
       <EvidenceCatalogReview catalog={evidenceReviewDemo.catalog} />
-    ) : orchestrator.evidenceReviewView === "candidates" ? (
+    ) : orchestrator.activeCase === null &&
+      orchestrator.evidenceReviewView === "candidates" ? (
       <ProvisionCandidateReview
         candidates={DEMO_PROVISION_CANDIDATES}
         nearDuplicates={evidenceReviewDemo.nearDuplicates}
         supersessions={evidenceReviewDemo.supersessions}
       />
-    ) : orchestrator.evidenceReviewView === "rules" ? (
+    ) : orchestrator.activeCase === null &&
+      orchestrator.evidenceReviewView === "rules" ? (
       <>
         {orchestrator.ruleAuthoringOutcome ? (
           <p
@@ -111,11 +116,36 @@ export function App({
           onAuthor={orchestrator.recordRuleAuthoring}
         />
       </>
-    ) : (
+    ) : orchestrator.activeCase === null &&
+      orchestrator.evidenceReviewView === "unresolved" ? (
       <UnresolvedItemQueue
         items={orchestrator.evidenceUnresolvedItems}
         onAction={orchestrator.recordUnresolvedAction}
       />
+    ) : orchestrator.evidenceReviewView === "catalog" &&
+      orchestrator.evidenceCatalog !== null ? (
+      <EvidenceCatalogReview
+        catalog={orchestrator.evidenceCatalog}
+        syntheticDemo={false}
+      />
+    ) : orchestrator.evidenceReviewView === "candidates" &&
+      orchestrator.provisionCandidates.length > 0 ? (
+      <ProvisionCandidateReview
+        candidates={orchestrator.provisionCandidates}
+        nearDuplicates={orchestrator.candidateNearDuplicates}
+        supersessions={orchestrator.candidateSupersessions}
+      />
+    ) : orchestrator.evidenceReviewView === "unresolved" &&
+      orchestrator.evidenceUnresolvedItems.length > 0 ? (
+      <UnresolvedItemQueue
+        items={orchestrator.evidenceUnresolvedItems}
+        onAction={orchestrator.recordUnresolvedAction}
+      />
+    ) : (
+      <p role="status" aria-live="polite">
+        {orchestrator.evidenceReviewMessage ??
+          "No case-derived evidence review records are available yet."}
+      </p>
     );
 
   const finalOutputPayload = orchestrator.finalOutputInput
@@ -136,6 +166,37 @@ export function App({
           Case intake
         </span>
       </header>
+      {orchestrator.activeCase !== null ? (
+        <div
+          className="active-case-banner"
+          role="status"
+          aria-label="Active case"
+        >
+          <div>
+            <span className="eyebrow">Active case</span>
+            <strong
+              data-testid="active-case-authoritative-id"
+              className="case-number-display"
+            >
+              {orchestrator.activeCase.authoritativeCaseId ??
+                orchestrator.activeCase.caseId}
+            </strong>
+            <small>
+              Internal ID:{" "}
+              <span data-testid="current-case-id">
+                {orchestrator.activeCase.caseId}
+              </span>
+            </small>
+          </div>
+          <button
+            className="button button-secondary button-small"
+            type="button"
+            onClick={orchestrator.returnToWorkspaceHome}
+          >
+            Return to workspace home
+          </button>
+        </div>
+      ) : null}
       <main id="main-content" className="app-main" tabIndex={-1}>
         <section className="intro" aria-labelledby="intro-title">
           <p className="section-label">Local-first workspace</p>
@@ -146,39 +207,58 @@ export function App({
           </p>
           <FeasibilityStatus />
         </section>
-        <HelpPanel />
+        {orchestrator.activeCase === null ? <HelpPanel /> : null}
         <StageNavigation
           stages={CASWORK_STAGES}
           activeStage="intake"
           // eslint-disable-next-line @typescript-eslint/no-empty-function
           onStageSelect={() => {}}
         />
-        <CaseCreation
-          workspaceReady={orchestrator.workspaceReady}
-          workspaceLabel={orchestrator.workspaceLabel}
-          workspaceError={orchestrator.workspaceError}
-          busy={orchestrator.busy}
-          view={orchestrator.view as CaseCreationView}
-          error={orchestrator.error}
-          onSelectWorkspace={orchestrator.selectWorkspace}
-          onCreateProduction={async (input: ProductionCaseRequest) => {
-            await orchestrator.createProduction(input);
-          }}
-          onResolveCollision={async (collision, input) => {
-            await orchestrator.resolveCollision(collision, input);
-          }}
-          onCreateAnother={() => {
-            orchestrator.setError(null);
-            orchestrator.setView({ kind: "ready" });
-          }}
-        />
+        {orchestrator.activeCase === null ? (
+          <CaseCreation
+            workspaceReady={orchestrator.workspaceReady}
+            workspaceLabel={orchestrator.workspaceLabel}
+            workspaceError={orchestrator.workspaceError}
+            busy={orchestrator.busy}
+            view={orchestrator.view as CaseCreationView}
+            cases={orchestrator.cases}
+            reviewerIdentity={orchestrator.reviewerIdentity}
+            error={orchestrator.error}
+            onSelectWorkspace={orchestrator.selectWorkspace}
+            onCreateProduction={async (input: ProductionCaseRequest) => {
+              await orchestrator.createProduction(input);
+            }}
+            onResolveCollision={async (collision, input) => {
+              await orchestrator.resolveCollision(collision, input);
+            }}
+            onEstablishReviewerIdentity={(reviewerId, reviewerName) => {
+              orchestrator.establishReviewerIdentity(reviewerId, reviewerName);
+            }}
+            onOpenCase={orchestrator.openCase}
+            onCreateAnother={() => {
+              orchestrator.setError(null);
+              orchestrator.setView({ kind: "ready" });
+            }}
+          />
+        ) : null}
         <PackageIntake
           enabled={
             orchestrator.workspaceReady && orchestrator.activeCase !== null
           }
+          items={orchestrator.evidenceItems}
+          summary={orchestrator.evidencePackageSummary}
+          restoreMessage={orchestrator.evidenceRestoreMessage}
+          onOpenEvidence={orchestrator.openEvidence}
           onProcess={(files, signal, update) =>
             orchestrator.processPackage(files, signal, update)
           }
+        />
+        <EvidenceViewer
+          artifact={orchestrator.evidenceViewerArtifact}
+          loading={orchestrator.evidenceViewerLoading}
+          error={orchestrator.evidenceViewerError}
+          onSaveCorrection={orchestrator.saveEvidenceCorrection}
+          onClose={orchestrator.closeEvidence}
         />
         <DraftV1SummaryPanel
           enabled={
@@ -196,6 +276,21 @@ export function App({
           onRationaleChange={orchestrator.setSharedRationale}
           onDecision={async (item, action, reviewer, rationale) => {
             await orchestrator.recordQuarantineDecision(
+              item,
+              action,
+              reviewer,
+              rationale,
+            );
+          }}
+        />
+        <ArtifactEligibilityReview
+          items={orchestrator.eligibilityItems}
+          reviewer={orchestrator.sharedReviewer}
+          rationale={orchestrator.sharedRationale}
+          onReviewerChange={orchestrator.setSharedReviewer}
+          onRationaleChange={orchestrator.setSharedRationale}
+          onDecision={async (item, action, reviewer, rationale) => {
+            await orchestrator.recordArtifactEligibilityDecision(
               item,
               action,
               reviewer,
@@ -233,26 +328,32 @@ export function App({
                 Evidence and plan-rule review
               </h2>
             </div>
-            <p>Typed synthetic demo candidates</p>
-          </div>
-          <div className="notice session-preview-controls">
             <p>
-              <strong>
-                Synthetic session preview with production persistence.
-              </strong>
-              Governed operations use typed demo candidates. Plan-rule records
-              persist to the active local case workspace when one is selected;
-              otherwise they remain preview-only. Reset or browser refresh
-              restores the initial synthetic preview state.
+              {orchestrator.activeCase === null
+                ? "Typed synthetic demo candidates"
+                : "Case-derived evidence review"}
             </p>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={orchestrator.resetEvidenceSessionPreview}
-            >
-              Reset session preview
-            </button>
           </div>
+          {orchestrator.activeCase === null ? (
+            <div className="notice session-preview-controls">
+              <p>
+                <strong>
+                  Synthetic session preview with production persistence.
+                </strong>
+                Governed operations use typed demo candidates. Plan-rule records
+                persist to the active local case workspace when one is selected;
+                otherwise they remain preview-only. Reset or browser refresh
+                restores the initial synthetic preview state.
+              </p>
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={orchestrator.resetEvidenceSessionPreview}
+              >
+                Reset session preview
+              </button>
+            </div>
+          ) : null}
           <nav
             className="evidence-review-nav"
             aria-label="Evidence review stages"

@@ -16,8 +16,10 @@ export interface ArtifactInventoryItem {
 
 export function ArtifactInventory({
   items,
+  onOpen,
 }: {
   readonly items: readonly ArtifactInventoryItem[];
+  readonly onOpen?: (item: ArtifactInventoryItem) => Promise<void>;
 }) {
   if (items.length === 0) {
     return <p className="inventory-empty">No artifacts selected.</p>;
@@ -32,26 +34,46 @@ export function ArtifactInventory({
             <th scope="col">Bytes</th>
             <th scope="col">Status</th>
             <th scope="col">SHA-256</th>
+            {onOpen !== undefined ? <th scope="col">Action</th> : null}
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
             <tr key={item.id}>
-              <td>
+              <td data-label="Submitted path">
                 <strong>{item.path}</strong>
                 <span>{item.message}</span>
               </td>
-              <td>{item.sizeBytes.toLocaleString("en-US")}</td>
-              <td>
+              <td data-label="Bytes">
+                {item.sizeBytes.toLocaleString("en-US")}
+              </td>
+              <td data-label="Status">
                 <span
                   className={`inventory-status inventory-status-${item.status}`}
                 >
                   {item.status}
                 </span>
               </td>
-              <td>
+              <td data-label="SHA-256">
                 <code>{item.sha256 ?? "Pending"}</code>
               </td>
+              {onOpen !== undefined ? (
+                <td data-label="Action">
+                  <button
+                    type="button"
+                    className="button button-secondary button-small"
+                    disabled={
+                      item.sha256 === null ||
+                      item.status === "failed" ||
+                      item.status === "interrupted"
+                    }
+                    onClick={() => void onOpen(item)}
+                  >
+                    Open evidence
+                    <span className="visually-hidden">: {item.path}</span>
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>

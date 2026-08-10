@@ -8,23 +8,30 @@ import {
 export interface PackageIntakeResult {
   readonly items: readonly ArtifactInventoryItem[];
   readonly snapshotId: string | null;
-  readonly resumeKind: "first" | "unchanged-resume" | "linked-divergence";
+  readonly resumeKind:
+    "first" | "unchanged-resume" | "linked-divergence" | "restored";
   readonly packageStatus: "completed" | "partial" | "interrupted";
 }
 
 export function PackageIntake({
   enabled,
+  items,
+  summary,
+  restoreMessage,
+  onOpenEvidence,
   onProcess,
 }: {
   readonly enabled: boolean;
+  readonly items: readonly ArtifactInventoryItem[];
+  readonly summary: PackageIntakeResult | null;
+  readonly restoreMessage?: string | null;
+  readonly onOpenEvidence: (item: ArtifactInventoryItem) => Promise<void>;
   readonly onProcess: (
     files: readonly File[],
     signal: AbortSignal,
     update: (items: readonly ArtifactInventoryItem[]) => void,
   ) => Promise<PackageIntakeResult>;
 }) {
-  const [items, setItems] = useState<readonly ArtifactInventoryItem[]>([]);
-  const [summary, setSummary] = useState<PackageIntakeResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -39,12 +46,9 @@ export function PackageIntake({
       await new Promise<void>((resolve) => {
         globalThis.setTimeout(resolve, 250);
       });
-      const result = await onProcess(
-        [...files],
-        nextController.signal,
-        setItems,
-      );
-      setSummary(result);
+      await onProcess([...files], nextController.signal, () => {
+        /* Progress and completion rows are owned by the orchestrator. */
+      });
     } catch {
       setError(
         "File intake failed safely. Previously preserved files remain unchanged.",
@@ -68,12 +72,16 @@ export function PackageIntake({
         <span className="status-chip">Pending review</span>
       </div>
       <p>
-        Files stay on your device. Each file is fingerprinted and preserved
-        without opening or executing its content. All records are blocked from
-        downstream use until screening and human review are complete.
+        <strong>Source evidence vs. controlled workspace</strong>. Source files
+        may be selected from anywhere locally that this browser can read. The
+        Workbench workspace is the controlled destination only; it is never the
+        evidence-source folder. Files stay on your device. Each file is
+        fingerprinted and preserved without opening or executing its content.
+        All records are blocked from downstream use until screening and human
+        review are complete.
       </p>
       <label className="file-picker">
-        <span>Select individual files</span>
+        <span>Add evidence files</span>
         <input
           type="file"
           multiple
@@ -82,7 +90,7 @@ export function PackageIntake({
         />
       </label>
       <label className="file-picker">
-        <span>Select a folder</span>
+        <span>Import evidence folder</span>
         <input
           type="file"
           multiple
@@ -115,6 +123,11 @@ export function PackageIntake({
           {error}
         </p>
       )}
+      {restoreMessage !== null && restoreMessage !== undefined && (
+        <p className="form-message form-message-warning" role="status">
+          {restoreMessage}
+        </p>
+      )}
       {summary && (
         <div className="package-summary" role="status">
           <strong>
@@ -124,15 +137,17 @@ export function PackageIntake({
           </strong>
           <span>
             {summary.resumeKind === "unchanged-resume"
-              ? "Same files as before — no duplicate records created."
+              ? "Same active evidence as before — additional intake provenance preserved."
               : summary.resumeKind === "linked-divergence"
                 ? "Files changed — new snapshot linked to the previous one."
-                : "First snapshot of this file set created."}
+                : summary.resumeKind === "restored"
+                  ? "Evidence restored from this case's persisted manifest."
+                  : "First snapshot of this file set created."}
           </span>
           {summary.snapshotId && <code>Snapshot {summary.snapshotId}</code>}
         </div>
       )}
-      <ArtifactInventory items={items} />
+      <ArtifactInventory items={items} onOpen={onOpenEvidence} />
     </section>
   );
 }

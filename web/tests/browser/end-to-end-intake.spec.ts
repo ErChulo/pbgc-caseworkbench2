@@ -11,6 +11,7 @@ async function createCase(
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill(caseId);
   await page.getByRole("button", { name: "Create production case" }).click();
 }
@@ -20,10 +21,10 @@ test("handles nested archives, interruption, and unchanged resumption", async ({
   outboundRequests,
 }) => {
   await createCase(page, "PBGC-T118-ARCHIVE");
-  await expect(page.getByLabel("Select individual files")).toBeEnabled();
+  await expect(page.getByLabel("Add evidence files")).toBeEnabled();
 
   const archive = archiveFixtures().nested;
-  await page.getByLabel("Select individual files").setInputFiles([
+  await page.getByLabel("Add evidence files").setInputFiles([
     {
       name: "nested.zip",
       mimeType: "application/zip",
@@ -42,7 +43,7 @@ test("handles nested archives, interruption, and unchanged resumption", async ({
     page.getByText("Work stopped at a durable boundary.").first(),
   ).toBeVisible();
 
-  await page.getByLabel("Select individual files").setInputFiles([
+  await page.getByLabel("Add evidence files").setInputFiles([
     {
       name: "nested.zip",
       mimeType: "application/zip",
@@ -61,7 +62,7 @@ test("completes quarantine, classification, population, and manifest export", as
   outboundRequests,
 }) => {
   await createCase(page, "PBGC-T118-INTAKE");
-  await page.getByLabel("Select individual files").setInputFiles([
+  await page.getByLabel("Add evidence files").setInputFiles([
     {
       name: "synthetic-risk.exe",
       mimeType: "application/octet-stream",
@@ -118,14 +119,16 @@ test("completes quarantine, classification, population, and manifest export", as
     hasText: "synthetic-risk.exe",
   });
   // The QuarantineQueue renders a keyboard-shortcut hint inside the Release
-  // button ("⌘↵"), so its accessible name is "Release for use⌘↵". Use a
+  // button ("⌘↵"), so its accessible name includes the shortcut. Use a
   // substring match rather than `exact` to keep the test green.
   const releaseButton = riskItem.getByRole("button", {
-    name: "Release for use",
+    name: "Release safety hold",
   });
   await expect(releaseButton).toBeEnabled();
   await releaseButton.click();
-  await expect(riskItem.getByText("Released", { exact: true })).toBeVisible();
+  await expect(
+    riskItem.getByText("Safety hold released", { exact: true }),
+  ).toBeVisible();
 
   await classification.getByLabel("Reviewer name").fill("authorized-reviewer");
   await classification

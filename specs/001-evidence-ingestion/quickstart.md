@@ -10,7 +10,7 @@ A reviewer who has already completed a Feature 009 intake and has a preserved, s
 
 1. **Open the case** in the Feature 009 workspace. Feature 009's intake pipeline has produced `ScreenedArtifactOutcome[]` with `downstreamBlocked: true` and `governedState: "provisional"`. US1 of Feature 009 (case creation) has run; the active case is `(caseId, authoritativeCaseId, purpose: "production")`.
 
-2. **Build the evidence catalog** (`EvidenceCatalogReview.tsx`). Feature 001's `buildEvidenceCatalog(caseId, screenedOutcomes)` consumes the reactive Feature 009 state and writes `cases/<caseId>/evidence/catalog.json` containing:
+2. **Build the evidence catalog** (`EvidenceCatalogReview.tsx`). Feature 001's `buildEvidenceCatalog(caseId, screenedOutcomes)` consumes the reactive Feature 009 state and writes an immutable `cases/<caseId>/evidence/catalogs/<catalogContentSha256>.json` snapshot, then updates pointer-only `cases/<caseId>/evidence/catalogs/current.json` per ADR 010. The catalog contains:
    - `caseEvidence`: every released artifact, typed by `sourceRole`, with inherited `sha256`/`sizeBytes`/`locator`/canonical `receiptId`/all sorted `receiptIds`/`exactDuplicateOfSha256`/`containedBySha256`/`importedAt`.
    - `referenceOnly`: every reference-library artifact imported separately (regulations, training, PBGC policy).
    - `excludedQuarantined`: every artifact excluded by Feature 009 screening, each linked to an `UnresolvedItem` so the omission is auditable.

@@ -115,6 +115,10 @@ export function ClassificationReview({
                 <dd>{item.proposal.proposedValue}</dd>
               </div>
               <div>
+                <dt>Scope</dt>
+                <dd>{classificationScope(item.proposal)}</dd>
+              </div>
+              <div>
                 <dt>Proposal status</dt>
                 <dd>{plainStatus(item.proposal.status)}</dd>
               </div>
@@ -230,4 +234,25 @@ export function ClassificationReview({
       )}
     </section>
   );
+}
+
+function classificationScope(
+  proposal: ClassificationProposal,
+): string {
+  const locators = [
+    ...new Set(
+      proposal.supportingEvidence
+        .filter((evidence) => evidence.evidenceType === "text")
+        .map((evidence) => evidence.sourceLocator),
+    ),
+  ];
+  if (locators.length === 0 || locators.includes("passive-text")) {
+    return "Whole artifact";
+  }
+  return locators
+    .map((locator) => {
+      const page = /^pdf:page=(\d+)$/u.exec(locator)?.[1];
+      return page === undefined ? locator : `PDF page ${page}`;
+    })
+    .join(", ");
 }

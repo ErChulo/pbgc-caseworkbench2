@@ -37,7 +37,7 @@ describe("T077 separate AuthorityDecision governance", () => {
   it("requires separate current same-byte classification approval and invalidates authority when approval changes", async () => {
     const proposal = (
       await proposeClassifications(syntheticClassificationArtifacts()[0]!)
-    ).find((item) => item.proposedValue === "authority-candidate");
+    ).find((item) => item.proposedValue === "executed-plan-document");
     if (!proposal) throw new Error("fixture");
     const approvalBase = {
       approvalId: uuid("11111111-1111-4111-8111-111111111111"),
@@ -125,7 +125,7 @@ describe("T077 separate AuthorityDecision governance", () => {
   it("rejects system authority actors and missing approval linkage", async () => {
     const proposal = (
       await proposeClassifications(syntheticClassificationArtifacts()[0]!)
-    ).find((item) => item.proposedValue === "authority-candidate");
+    ).find((item) => item.proposedValue === "executed-plan-document");
     if (!proposal) throw new Error("fixture");
     expect(await replayAuthorityDecisions(proposal, [], [])).toMatchObject({
       ok: false,

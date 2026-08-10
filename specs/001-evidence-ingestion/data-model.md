@@ -53,7 +53,8 @@ The catalog is the typed, hash-anchored entry point for every eligible artifact 
 1. Each `EvidenceArtifact.sha256` MUST appear in exactly one of `caseEvidence` or `referenceOnly`, never both.
 2. `excludedQuarantined` MUST contain every artifact whose Feature 009 `ScreeningResult.provisionalState` is `provisional-quarantine` or `provisional-safety-block` at build time.
 3. `builtAt` is excluded from `catalogContentSha256` so the catalog is reproducible; every other field participates.
-4. The catalog is regenerated, never mutated. Rebuilds produce byte-identical `catalogContentSha256` for the same set of screened-and-released artifacts.
+4. The catalog is regenerated, never mutated. Rebuilds preserve the case lineage's stable `catalogId` and produce byte-identical `catalogContentSha256` for the same governed content.
+5. Each catalog is stored as an immutable hash-addressed snapshot. A pointer-only current head is updated only after the snapshot is verified, per ADR 010.
 
 ### State transitions
 

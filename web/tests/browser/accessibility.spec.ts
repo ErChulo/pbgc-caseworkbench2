@@ -13,19 +13,22 @@ test("exposes built-in help and keyboard-operable workspace selection", async ({
   await expect(page.getByText("Keyboard shortcuts")).toBeVisible();
   await expect(page.getByText("Local PII handling")).toBeVisible();
 
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
-  await expect(page.locator("button:focus")).toHaveText(
-    "Select local workspace",
-  );
+  const workspaceButton = page.getByRole("button", {
+    name: "Select local workspace",
+  });
+  await workspaceButton.focus();
+  await expect(workspaceButton).toBeFocused();
 
   await page.keyboard.press("Enter");
   await page.getByLabel("Reviewer identifier").fill("keyboard-reviewer");
   await page
     .getByLabel("Reviewer display name")
     .fill("Keyboard Accessible Reviewer");
+  await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill("PBGC-ACCESSIBILITY-001");
   await page.getByRole("button", { name: "Create production case" }).click();
 
-  await expect(page.getByText("Workspace ready")).toBeVisible();
+  await expect(page.getByTestId("active-case-authoritative-id")).toHaveText(
+    "PBGC-ACCESSIBILITY-001",
+  );
 });

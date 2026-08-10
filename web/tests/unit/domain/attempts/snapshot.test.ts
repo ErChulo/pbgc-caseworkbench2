@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createPackageSnapshot,
   compareSnapshots,
+  computePackageSnapshotId,
 } from "../../../../src/domain/attempts/snapshot";
 import { planResume } from "../../../../src/domain/attempts/resume";
 import {
@@ -52,6 +53,16 @@ describe("T044 snapshots and deterministic resume", () => {
     expect(one.snapshotId).toBe(other.snapshotId);
     expect(one.snapshotRecordId).not.toBe(other.snapshotRecordId);
     expect(one.snapshotId).toMatch(/^[0-9a-f]{64}$/u);
+  });
+
+  it("recomputes the deterministic identity from persisted entries", async () => {
+    const snapshot = await createPackageSnapshot(
+      [entry("second"), entry("first")],
+      deps,
+    );
+    await expect(computePackageSnapshotId(snapshot.entries)).resolves.toBe(
+      snapshot.snapshotId,
+    );
   });
 
   it.each([

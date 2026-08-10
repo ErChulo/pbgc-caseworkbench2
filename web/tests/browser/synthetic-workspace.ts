@@ -5,6 +5,8 @@ export async function installSyntheticWorkspace(page: Page) {
   await page.addInitScript(() => {
     const files = new Map<string, Uint8Array>();
     const directories = new Map<string, FileSystemDirectoryHandle>();
+    (globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> })
+      .__syntheticFiles = files;
     const makeDirectory = (prefix: string): FileSystemDirectoryHandle => {
       const cached = directories.get(prefix);
       if (cached) return cached;
@@ -74,4 +76,20 @@ export async function installSyntheticWorkspace(page: Page) {
       value: async () => makeDirectory(""),
     });
   });
+}
+
+export async function createSyntheticCase(
+  page: Page,
+  caseNumber: string,
+  reviewerId = "synthetic-reviewer",
+  reviewerName = "Synthetic Reviewer",
+) {
+  await installSyntheticWorkspace(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Select local workspace" }).click();
+  await page.getByLabel("Reviewer identifier").fill(reviewerId);
+  await page.getByLabel("Reviewer display name").fill(reviewerName);
+  await page.getByRole("button", { name: "Establish identity" }).click();
+  await page.getByLabel("Case number").fill(caseNumber);
+  await page.getByRole("button", { name: "Create production case" }).click();
 }
