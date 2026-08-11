@@ -19,6 +19,7 @@ import { UnresolvedItemQueue } from "../components/evidence/UnresolvedItemQueue"
 import { EvidenceViewer } from "../components/evidence/EvidenceViewer";
 import { CaseOutputPackagePanel } from "../components/case-output/CaseOutputPackagePanel";
 import { DraftV1SummaryPanel } from "../components/draft-v1-summary/DraftV1SummaryPanel";
+import { ArchitectureStage } from "../components/architecture/ArchitectureStage";
 import {
   StageNavigation,
   type StageDefinition,
@@ -421,6 +422,16 @@ export function App({
           onExport={async () => {
             await orchestrator.exportCurrentManifest();
           }}
+        />
+        <ArchitectureStage
+          enabled={
+            orchestrator.workspaceReady && orchestrator.activeCase !== null
+          }
+          scenarioOptions={orchestrator.previewRules.map((rule) => rule.affectedScope)}
+          tabOptions={orchestrator.populationItems.map((item) => item.displayName)}
+          message={orchestrator.architectureBuildMessage}
+          selection={orchestrator.architectureSelection}
+          onApprove={orchestrator.recordArchitectureSelection}
         />
         <CaseOutputPackagePanel
           payload={finalOutputPayload}

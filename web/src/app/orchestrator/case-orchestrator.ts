@@ -122,6 +122,7 @@ import type {
 } from "../../domain/case-output/models";
 import type { DraftV1SummaryArtifact } from "../../domain/draft-v1-summary/models";
 import type { CaseOutputArtifactLinkDraft } from "../../components/case-output/CaseOutputPackagePanel";
+import type { ArchitectureSelection } from "../../components/architecture/ArchitectureStage";
 import { createDraftV1SummaryArtifact } from "../../domain/draft-v1-summary/draft-builder";
 import { validateContract } from "../../contracts/schema-validator";
 import {
@@ -865,6 +866,8 @@ export interface CaseOrchestrator {
   readonly caseOutputArtifacts: readonly CaseworkOutputArtifactInput[];
   readonly draftV1Summary: DraftV1SummaryArtifact | null;
   readonly draftV1SummaryMessage: string | null;
+  readonly architectureSelection: ArchitectureSelection | null;
+  readonly architectureBuildMessage: string | null;
   readonly finalOutputInput: FinalCaseworkOutputInput | null;
   readonly evidenceItems: readonly ArtifactInventoryItem[];
   readonly evidencePackageSummary: PackageIntakeResult | null;
@@ -941,6 +944,9 @@ export interface CaseOrchestrator {
   readonly exportFinalCaseworkOutputPackage: () => Promise<void>;
   readonly exportCurrentManifest: () => Promise<void>;
   readonly generateDraftV1Summary: (file: File) => Promise<void>;
+  readonly recordArchitectureSelection: (
+    selection: ArchitectureSelection,
+  ) => Promise<void>;
   readonly processPackage: (
     files: readonly File[],
     signal: AbortSignal,
@@ -1070,6 +1076,10 @@ export function useCaseOrchestrator(
   const [draftV1SummaryMessage, setDraftV1SummaryMessage] = useState<
     string | null
   >(null);
+  const [architectureSelection, setArchitectureSelection] =
+    useState<ArchitectureSelection | null>(null);
+  const [architectureBuildMessage, setArchitectureBuildMessage] =
+    useState<string | null>(null);
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
   const activeGovernanceDependencies =
@@ -3339,6 +3349,23 @@ export function useCaseOrchestrator(
     );
   };
 
+  const recordArchitectureSelection = (
+    selection: ArchitectureSelection,
+  ): Promise<void> => {
+    if (activeCase === null) {
+      setArchitectureBuildMessage(
+        "Select an active local case before recording architecture selection.",
+      );
+      return Promise.resolve();
+    }
+    setArchitectureBuildMessage(null);
+    setArchitectureSelection(selection);
+    setArchitectureBuildMessage(
+      `Architecture selection approved: ${String(selection.scenarioIds.length)} scenario(s), ${String(selection.tabNames.length)} tab(s).`,
+    );
+    return Promise.resolve();
+  };
+
   const persistCaseOutputArtifactReferences = async (
     caseId: Uuid,
     references: readonly CaseworkOutputArtifactInput[],
@@ -4466,6 +4493,8 @@ export function useCaseOrchestrator(
     caseOutputArtifacts,
     draftV1Summary,
     draftV1SummaryMessage,
+    architectureSelection,
+    architectureBuildMessage,
     finalOutputInput,
     evidenceItems,
     evidencePackageSummary,
@@ -4495,6 +4524,7 @@ export function useCaseOrchestrator(
     exportFinalCaseworkOutputPackage,
     exportCurrentManifest,
     generateDraftV1Summary,
+    recordArchitectureSelection,
     processPackage,
     openEvidence,
     saveEvidenceCorrection,
