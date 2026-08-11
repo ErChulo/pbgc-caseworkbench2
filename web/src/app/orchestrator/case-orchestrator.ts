@@ -1186,6 +1186,8 @@ export function useCaseOrchestrator(
     setCaseOutputExportMessage(null);
     setDraftV1Summary(null);
     setDraftV1SummaryMessage(null);
+    setArchitectureSelection(null);
+    setArchitectureBuildMessage(null);
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
@@ -1196,6 +1198,7 @@ export function useCaseOrchestrator(
     setActiveCase(caseRecord);
     void loadCaseOutputArtifactReferences(caseRecord);
     void loadDraftV1SummaryArtifact(caseRecord);
+    void loadArchitectureSelection(caseRecord);
     void loadPersistedCaseState(caseRecord);
   };
 
@@ -3363,7 +3366,76 @@ export function useCaseOrchestrator(
     setArchitectureBuildMessage(
       `Architecture selection approved: ${String(selection.scenarioIds.length)} scenario(s), ${String(selection.tabNames.length)} tab(s).`,
     );
+    void persistArchitectureSelection(activeCase.caseId, selection);
     return Promise.resolve();
+  };
+
+  const persistArchitectureSelection = async (
+    caseId: Uuid,
+    selection: ArchitectureSelection,
+  ): Promise<void> => {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null) return;
+    try {
+      await activeWorkspace.createDirectory(`cases/${caseId}/outputs`);
+      const payload = {
+        ...selection,
+        approvedAt: dependencies.clock.now(),
+        schemaVersion: "1.0.0",
+      };
+      const saved = await activeWorkspace.writeAtomic(
+        `cases/${caseId}/outputs/architecture-selection.json`,
+        new TextEncoder().encode(`${canonicalize(payload)}\n`),
+      );
+      if (!saved.ok) {
+        setArchitectureBuildMessage(
+          "Architecture selection could not be persisted.",
+        );
+      }
+    } catch {
+      setArchitectureBuildMessage(
+        "Architecture selection persistence failed.",
+      );
+    }
+  };
+
+  const loadArchitectureSelection = async (
+    caseRecord: CaseRecord,
+  ): Promise<void> => {
+    const activeWorkspace = workspace.current;
+    if (activeWorkspace === null) return;
+    const opened = await activeWorkspace.openChunkReader(
+      `cases/${caseRecord.caseId}/outputs/architecture-selection.json`,
+    );
+    if (!opened.ok) {
+      if (opened.error.code !== "NOT_FOUND") {
+        setArchitectureBuildMessage(
+          "Existing architecture selection could not be read.",
+        );
+      }
+      return;
+    }
+    try {
+      const value = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          await readAllBytes(opened.value),
+        ),
+      ) as unknown;
+      if (
+        typeof value === "object" &&
+        value !== null &&
+        "scenarioIds" in value &&
+        "tabNames" in value &&
+        "reviewer" in value &&
+        "rationale" in value
+      ) {
+        setArchitectureSelection(value as ArchitectureSelection);
+      }
+    } catch {
+      setArchitectureBuildMessage(
+        "Existing architecture selection is not valid UTF-8 JSON and was ignored.",
+      );
+    }
   };
 
   const persistCaseOutputArtifactReferences = async (
