@@ -92,6 +92,7 @@ export interface ScreenedCatalogAdapterInput {
   readonly quarantineDecisions: readonly QuarantineDecision[];
   readonly eligibilityDecisions: readonly ArtifactEligibilityDecision[];
   readonly origins: readonly ArtifactOriginMetadata[];
+  readonly referenceOnlyArtifacts?: readonly CatalogArtifactInput[];
   readonly quarantineMetadata: readonly QuarantineCatalogMetadata[];
   readonly unresolvedItems: readonly UnresolvedItem[];
 }
@@ -282,7 +283,7 @@ export async function buildEvidenceCatalogFromScreenedOutcomes(
     caseId: input.caseId,
     builtAt: input.builtAt,
     caseEvidence,
-    referenceOnly,
+    referenceOnly: [...referenceOnly, ...(input.referenceOnlyArtifacts ?? [])],
     excludedQuarantined,
   });
   return catalog.ok

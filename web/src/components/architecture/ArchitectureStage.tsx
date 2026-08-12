@@ -74,7 +74,9 @@ export function ArchitectureStage({
       </p>
       <fieldset disabled={!enabled || busy}>
         <legend>Calculation scenarios</legend>
-        {scenarioOptions.length === 0 ? <p>No governed scenarios are available.</p> : null}
+        {scenarioOptions.length === 0 ? (
+          <p>No governed scenarios are available.</p>
+        ) : null}
         {scenarioOptions.map((value) => (
           <label key={value} className="checkbox-row">
             <input
@@ -90,7 +92,9 @@ export function ArchitectureStage({
       </fieldset>
       <fieldset disabled={!enabled || busy}>
         <legend>Source tabs</legend>
-        {tabOptions.length === 0 ? <p>No approved population tabs are available.</p> : null}
+        {tabOptions.length === 0 ? (
+          <p>No approved population tabs are available.</p>
+        ) : null}
         {tabOptions.map((value) => (
           <label key={value} className="checkbox-row">
             <input
@@ -128,13 +132,28 @@ export function ArchitectureStage({
       <button
         type="button"
         className="button button-primary"
-        disabled={!enabled || busy || scenarios.length === 0 || tabs.length === 0 || reviewer.trim() === "" || rationale.trim() === ""}
+        disabled={
+          !enabled ||
+          busy ||
+          scenarios.length === 0 ||
+          tabs.length === 0 ||
+          reviewer.trim() === "" ||
+          rationale.trim() === ""
+        }
         onClick={() => void approve()}
       >
         Approve architecture selection
       </button>
-      {!enabled ? <p className="form-message form-message-warning">Create or resume a case before selecting architecture.</p> : null}
-      {message !== null ? <p className="notice" role="status">{message}</p> : null}
+      {!enabled ? (
+        <p className="form-message form-message-warning">
+          Create or resume a case before selecting architecture.
+        </p>
+      ) : null}
+      {message !== null ? (
+        <p className="notice" role="status">
+          {message}
+        </p>
+      ) : null}
       {selection !== null ? (
         <div className="case-output-linked-artifacts">
           <h3>Governed selection</h3>

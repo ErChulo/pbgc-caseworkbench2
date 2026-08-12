@@ -1,4 +1,8 @@
 import { useRef, useState } from "react";
+import scenarioSelectionYaml from "../../../../rules/scenario-selection.yaml?raw";
+import tabSelectionYaml from "../../../../rules/tab-selection.yaml?raw";
+import iobClassificationYaml from "../../../../rules/iob-classification.yaml?raw";
+import fieldNameGlossaryYaml from "../../../../rules/field-name-glossary.yaml?raw";
 
 import {
   BrowserDirectoryWorkspace,
@@ -56,6 +60,7 @@ import type {
 import { contentObjectPath } from "../../domain/artifacts/models";
 import { reconcileInventory } from "../../domain/manifests/reconciliation";
 import { buildEvidenceCatalogFromScreenedOutcomes } from "../../domain/evidence/catalog";
+import type { CatalogArtifactInput } from "../../domain/evidence/catalog";
 import type { EvidenceCatalog } from "../../domain/evidence/models";
 import type {
   CaseRecord,
@@ -124,6 +129,7 @@ import type { DraftV1SummaryArtifact } from "../../domain/draft-v1-summary/model
 import type { CaseOutputArtifactLinkDraft } from "../../components/case-output/CaseOutputPackagePanel";
 import type { ArchitectureSelection } from "../../components/architecture/ArchitectureStage";
 import { createDraftV1SummaryArtifact } from "../../domain/draft-v1-summary/draft-builder";
+import { deterministicUuid } from "../../domain/build-spec/identity";
 import { validateContract } from "../../contracts/schema-validator";
 import {
   createEvidenceExtraction,
@@ -144,6 +150,25 @@ import {
   replayArtifactEligibility,
   replayQuarantineDecisions,
 } from "../../domain/quarantine/release-service";
+
+const ruleSourceArtifacts = [
+  {
+    path: "rules/scenario-selection.yaml",
+    content: scenarioSelectionYaml,
+  },
+  {
+    path: "rules/tab-selection.yaml",
+    content: tabSelectionYaml,
+  },
+  {
+    path: "rules/iob-classification.yaml",
+    content: iobClassificationYaml,
+  },
+  {
+    path: "rules/field-name-glossary.yaml",
+    content: fieldNameGlossaryYaml,
+  },
+] as const;
 import {
   classificationDecisionContentHash,
   replayClassificationApprovals,
@@ -1078,8 +1103,9 @@ export function useCaseOrchestrator(
   >(null);
   const [architectureSelection, setArchitectureSelection] =
     useState<ArchitectureSelection | null>(null);
-  const [architectureBuildMessage, setArchitectureBuildMessage] =
-    useState<string | null>(null);
+  const [architectureBuildMessage, setArchitectureBuildMessage] = useState<
+    string | null
+  >(null);
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
   const activeGovernanceDependencies =
@@ -2845,12 +2871,59 @@ export function useCaseOrchestrator(
     ) {
       return;
     }
-    const artifactHashes = [
-      ...new Set(checkpoint.artifacts.map((artifact) => artifact.sha256)),
+    const builtAt = dependencies.clock.now();
+    const ruleArtifacts = await preservedRuleSourceArtifacts(caseId, builtAt);
+    for (const ruleArtifact of ruleArtifacts) {
+      const preserved = await preserveContent(
+        activeWorkspace,
+        bytesReader(ruleArtifact.bytes),
+        ruleArtifact.sha256,
+        dependencies.clock,
+      );
+      if (!preserved.ok || preserved.value.sha256 !== ruleArtifact.sha256) {
+        clearGovernedEvidenceRecords(
+          "Rule-source preservation failed exact-byte verification.",
+        );
+        return;
+      }
+    }
+    storeEligibilityItems([
+      ...caseReviewState.current.eligibilityItems.filter(
+        (item) =>
+          !ruleArtifacts.some(
+            (artifact) => artifact.sha256 === item.artifactSha256,
+          ),
+      ),
+      ...ruleArtifacts.map((ruleArtifact) => {
+        const existing = caseReviewState.current.eligibilityItems.find(
+          (item) => item.artifactSha256 === ruleArtifact.sha256,
+        );
+        return (
+          existing ?? {
+            artifactSha256: ruleArtifact.sha256,
+            displayName: ruleArtifact.artifact.locator,
+            requiresQuarantineRelease: false,
+            quarantineReleased: true,
+            projection: {
+              artifactSha256: ruleArtifact.sha256,
+              eligible: false,
+              effectiveStatus: "provisional" as const,
+              effectiveDecisionId: null,
+              provenance: [],
+            },
+          }
+        );
+      }),
+    ]);
+    const allArtifactHashes = [
+      ...new Set([
+        ...checkpoint.artifacts.map((artifact) => artifact.sha256),
+        ...ruleArtifacts.map((artifact) => artifact.sha256),
+      ]),
     ];
     if (
-      artifactHashes.length === 0 ||
-      artifactHashes.some(
+      allArtifactHashes.length === 0 ||
+      allArtifactHashes.some(
         (sha256) =>
           caseReviewState.current.eligibilityItems.find(
             (item) => item.artifactSha256 === sha256,
@@ -2870,10 +2943,23 @@ export function useCaseOrchestrator(
       clearGovernedEvidenceRecords(storedCatalog.error.safeMessage);
       return;
     }
-    const entriesByHash = new Map(
-      checkpoint.snapshot.entries.map((entry) => [entry.sha256, entry]),
-    );
-    const builtAt = dependencies.clock.now();
+    for (const ruleArtifact of ruleArtifacts) {
+      const preserved = await preserveContent(
+        activeWorkspace,
+        bytesReader(ruleArtifact.bytes),
+        ruleArtifact.sha256,
+        dependencies.clock,
+      );
+      if (
+        !preserved.ok ||
+        preserved.value.sha256 !== ruleArtifact.artifact.sha256
+      ) {
+        clearGovernedEvidenceRecords(
+          "Rule-source preservation failed exact-byte verification.",
+        );
+        return;
+      }
+    }
     const built = await buildEvidenceCatalogFromScreenedOutcomes({
       catalogId: storedCatalog.value?.catalogId ?? dependencies.uuid.generate(),
       caseId,
@@ -2893,32 +2979,29 @@ export function useCaseOrchestrator(
         passiveExtractionAttempted: true,
         downstreamBlocked: true,
       })),
-      contentObjects: artifactHashes.flatMap((sha256) => {
-        const entry = entriesByHash.get(sha256);
-        if (entry === undefined) return [];
-        return [
-          {
-            sha256,
-            sizeBytes: entry.sizeBytes,
-            objectPath: contentObjectPath(sha256),
-            preservationStatus: "verified" as const,
-            postWriteSha256: sha256,
-            firstPreservedAt:
-              checkpoint.receipts.find((receipt) => receipt.sha256 === sha256)
-                ?.submittedAt ?? null,
-          },
-        ];
-      }),
+      contentObjects: checkpoint.snapshot.entries.map((entry) => ({
+        sha256: entry.sha256,
+        sizeBytes: entry.sizeBytes,
+        objectPath: contentObjectPath(entry.sha256),
+        preservationStatus: "verified" as const,
+        postWriteSha256: entry.sha256,
+        firstPreservedAt:
+          checkpoint.receipts.find((receipt) => receipt.sha256 === entry.sha256)
+            ?.submittedAt ?? null,
+      })),
       receipts: checkpoint.receipts,
       classificationProposals: caseReviewState.current.classificationItems.map(
         (item) => item.proposal,
+      ),
+      referenceOnlyArtifacts: ruleArtifacts.map(
+        (ruleArtifact) => ruleArtifact.artifact,
       ),
       classificationApprovals: caseReviewState.current.classificationDecisions,
       containmentEdges: [],
       quarantineDecisions: caseReviewState.current.quarantineDecisions,
       eligibilityDecisions: caseReviewState.current.eligibilityDecisions,
-      origins: artifactHashes.map((artifactSha256) => ({
-        artifactSha256,
+      origins: checkpoint.artifacts.map((artifact) => ({
+        artifactSha256: artifact.sha256,
         origin: "case-package" as const,
       })),
       quarantineMetadata: [],
@@ -3393,9 +3476,7 @@ export function useCaseOrchestrator(
         );
       }
     } catch {
-      setArchitectureBuildMessage(
-        "Architecture selection persistence failed.",
-      );
+      setArchitectureBuildMessage("Architecture selection persistence failed.");
     }
   };
 
@@ -4606,6 +4687,53 @@ export function useCaseOrchestrator(
     setManifestSummary,
     view,
   };
+}
+
+async function preservedRuleSourceArtifacts(
+  caseId: Uuid,
+  now: string,
+): Promise<
+  readonly {
+    readonly artifact: CatalogArtifactInput;
+    readonly bytes: Uint8Array;
+    readonly sha256: Sha256;
+  }[]
+> {
+  return Promise.all(
+    ruleSourceArtifacts.map(async (source) => {
+      const bytes = new TextEncoder().encode(source.content);
+      const hashed = await hashChunkReader(bytesReader(bytes));
+      if (!hashed.ok) throw new Error(hashed.error.safeMessage);
+      const artifactId = await deterministicUuid("ReferenceRuleArtifact", {
+        caseId,
+        locator: source.path,
+        sha256: hashed.value.sha256,
+      });
+      const receiptId = await deterministicUuid("ReferenceRuleReceipt", {
+        caseId,
+        locator: source.path,
+        sha256: hashed.value.sha256,
+      });
+      return {
+        artifact: {
+          artifactId,
+          sha256: hashed.value.sha256,
+          sizeBytes: bytes.byteLength,
+          locator: source.path,
+          mediaType: "text/yaml",
+          receiptId,
+          receiptIds: [receiptId],
+          exactDuplicateOfSha256: null,
+          containedBySha256: null,
+          sourceRole: "other",
+          reviewStatus: "provisional",
+          importedAt: now,
+        },
+        bytes,
+        sha256: hashed.value.sha256,
+      };
+    }),
+  );
 }
 
 function latestUnresolvedItems(

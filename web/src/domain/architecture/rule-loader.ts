@@ -14,6 +14,7 @@ import type {
   RuleSetGovernance,
   TriggerCondition,
 } from "./models";
+import { parseLoadedRuleSets, parseRuleSetText } from "./rule-parser";
 
 export type { FieldNameGlossaryEntry, IoBClassificationRule } from "./models";
 
@@ -102,7 +103,7 @@ interface ParsedLine {
 
 class RuleValidationError extends Error {}
 
-function parseYamlSubset(content: string): Record<string, unknown> {
+export function parseYamlSubset(content: string): Record<string, unknown> {
   const lines: ParsedLine[] = [];
   for (const [index, raw] of content
     .replace(/\r\n?/gu, "\n")
@@ -354,7 +355,7 @@ function parseCondition(value: unknown, path: string): TriggerCondition {
   };
 }
 
-function parsePayload(
+export function parsePayload(
   kind: RuleSet["kind"],
   data: Record<string, unknown>,
 ): {
@@ -377,7 +378,7 @@ function parsePayload(
   return { version, governance: parseGovernance(data.governance), payload };
 }
 
-function parseScenarios(
+export function parseScenarios(
   values: readonly unknown[],
 ): readonly ScenarioSelectionRule[] {
   return values.map((value, index) => {
@@ -441,7 +442,9 @@ function parseScenarios(
   });
 }
 
-function parseTabs(values: readonly unknown[]): readonly TabSelectionRule[] {
+export function parseTabs(
+  values: readonly unknown[],
+): readonly TabSelectionRule[] {
   return values.map((value, index) => {
     const path = `rules[${String(index)}]`;
     const item = record(value, path);
@@ -465,7 +468,7 @@ function parseTabs(values: readonly unknown[]): readonly TabSelectionRule[] {
   });
 }
 
-function parseIoB(
+export function parseIoB(
   values: readonly unknown[],
 ): readonly IoBClassificationRule[] {
   return values.map((value, index) => {
@@ -494,7 +497,7 @@ function parseIoB(
   });
 }
 
-function parseGlossary(
+export function parseGlossary(
   values: readonly unknown[],
 ): readonly FieldNameGlossaryEntry[] {
   return values.map((value, index) => {
@@ -532,6 +535,49 @@ function digest(value: string): Sha256 {
   return createHash("sha256").update(value, "utf8").digest("hex") as Sha256;
 }
 
+export async function loadBundledRuleSets(config: {
+  readonly scenarioSelection: string;
+  readonly tabSelection: string;
+  readonly iobClassification: string;
+  readonly fieldNameGlossary: string;
+  readonly mode?: "candidate" | "production";
+  readonly approvalContext?: PolicyApprovalContext;
+}): Promise<Result<LoadedRuleSets, RuleLoadError>> {
+  const parsed = await parseLoadedRuleSets({
+    scenarioSelection: config.scenarioSelection,
+    tabSelection: config.tabSelection,
+    iobClassification: config.iobClassification,
+    fieldNameGlossary: config.fieldNameGlossary,
+  });
+  if (!parsed.ok) return parsed;
+  const loaded = parsed.value;
+  if ((config.mode ?? "candidate") !== "production") {
+    return { ok: true, value: loaded };
+  }
+  for (const ruleSet of [
+    loaded.scenarioSelection,
+    loaded.tabSelection,
+    loaded.iobClassification,
+    loaded.fieldNameGlossary,
+  ] as const) {
+    const approval = await effectivePolicyApproval(
+      ruleSet,
+      config.approvalContext,
+    );
+    if (!approval.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "RULE_NOT_APPROVED",
+          path: `rules/${ruleSet.kind}.yaml`,
+          message: approval.error,
+        },
+      };
+    }
+  }
+  return { ok: true, value: loaded };
+}
+
 export function policyContentHash(ruleSet: RuleSet): Sha256 {
   return digest(stableJson(ruleSet.rules ?? ruleSet.entries));
 }
@@ -567,39 +613,14 @@ export async function loadRuleSet(
 ): Promise<Result<RuleSet, RuleLoadError>> {
   try {
     const content = await readFile(rulePath, "utf8");
-    const data = parseYamlSubset(content);
-    const parsed = parsePayload(kind, data);
-    const rules =
-      kind === "scenario-selection"
-        ? parseScenarios(parsed.payload)
-        : kind === "tab-selection"
-          ? parseTabs(parsed.payload)
-          : kind === "iob-classification"
-            ? parseIoB(parsed.payload)
-            : undefined;
-    const entries =
-      kind === "field-name-glossary"
-        ? parseGlossary(parsed.payload)
-        : undefined;
-    const policyContentSha256 = digest(stableJson(rules ?? entries));
-    const base = {
-      kind,
-      version: parsed.version,
-      governance: parsed.governance,
-      policyContentSha256,
-      sourceFileSha256: digest(content),
-    };
-    const ruleSet = (
-      kind === "field-name-glossary"
-        ? { ...base, kind, entries }
-        : { ...base, kind, rules }
-    ) as RuleSet;
+    const parsed = await parseRuleSetText(rulePath, content, kind);
+    if (!parsed.ok) return parsed;
     const approval =
       mode === "production"
-        ? await effectivePolicyApproval(ruleSet, approvalContext)
+        ? await effectivePolicyApproval(parsed.value, approvalContext)
         : ({ ok: true, value: undefined } as const);
     return approval.ok
-      ? { ok: true, value: ruleSet }
+      ? { ok: true, value: parsed.value }
       : {
           ok: false,
           error: {
@@ -622,10 +643,7 @@ export async function loadRuleSet(
     return {
       ok: false,
       error: {
-        code:
-          error instanceof RuleValidationError
-            ? "RULE_VALIDATION_ERROR"
-            : "RULE_PARSE_ERROR",
+        code: "RULE_PARSE_ERROR",
         path: rulePath,
         message:
           error instanceof Error ? error.message : "Unknown rule-loading error",
