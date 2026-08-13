@@ -136,13 +136,15 @@ export function PackageIntake({
               : `File inventory ${summary.packageStatus}`}
           </strong>
           <span>
-            {summary.resumeKind === "unchanged-resume"
-              ? "Same active evidence as before — additional intake provenance preserved."
-              : summary.resumeKind === "linked-divergence"
-                ? "Files changed — new snapshot linked to the previous one."
-                : summary.resumeKind === "restored"
-                  ? "Evidence restored from this case's persisted manifest."
-                  : "First snapshot of this file set created."}
+            {summary.packageStatus === "interrupted"
+              ? "Work stopped at a durable boundary."
+              : summary.resumeKind === "unchanged-resume"
+                ? "Same active evidence as before — additional intake provenance preserved."
+                : summary.resumeKind === "linked-divergence"
+                  ? "Files changed — new snapshot linked to the previous one."
+                  : summary.resumeKind === "restored"
+                    ? "Evidence restored from this case's persisted manifest."
+                    : "First snapshot of this file set created."}
           </span>
           {summary.snapshotId && <code>Snapshot {summary.snapshotId}</code>}
         </div>

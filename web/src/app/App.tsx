@@ -20,6 +20,8 @@ import { EvidenceViewer } from "../components/evidence/EvidenceViewer";
 import { CaseOutputPackagePanel } from "../components/case-output/CaseOutputPackagePanel";
 import { DraftV1SummaryPanel } from "../components/draft-v1-summary/DraftV1SummaryPanel";
 import { ArchitectureStage } from "../components/architecture/ArchitectureStage";
+import { ArchitecturePolicyReview } from "../components/architecture/ArchitecturePolicyReview";
+import { CaseControlsReview } from "../components/architecture/CaseControlsReview";
 import {
   StageNavigation,
   type StageDefinition,
@@ -422,6 +424,28 @@ export function App({
           onExport={async () => {
             await orchestrator.exportCurrentManifest();
           }}
+        />
+        <ArchitecturePolicyReview
+          items={orchestrator.architecturePolicyItems}
+          reviewer={orchestrator.sharedReviewer}
+          rationale={orchestrator.sharedRationale}
+          onReviewerChange={orchestrator.setSharedReviewer}
+          onRationaleChange={orchestrator.setSharedRationale}
+          onApprove={async (item) => {
+            await orchestrator.recordArchitecturePolicyApproval(
+              item,
+              orchestrator.sharedReviewer,
+              orchestrator.sharedRationale,
+            );
+          }}
+        />
+        <CaseControlsReview
+          enabled={
+            orchestrator.workspaceReady && orchestrator.activeCase !== null
+          }
+          message={orchestrator.caseControlsMessage}
+          approved={orchestrator.caseControls}
+          onApprove={orchestrator.recordCaseControls}
         />
         <ArchitectureStage
           enabled={

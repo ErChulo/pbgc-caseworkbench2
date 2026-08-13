@@ -1,7 +1,12 @@
 import type {
   PopulationCandidateProfile,
   PopulationDecisionProjection,
+  PopulationEvidenceObservation,
 } from "../../domain/population/population-profile";
+import type {
+  WorkbookNamedRangeObservation,
+  WorkbookPopulationProfile,
+} from "../../domain/population/workbook-adapter";
 import type { Sha256 } from "../../domain/shared/types";
 import { Tooltip } from "../Tooltip";
 import {
@@ -18,6 +23,9 @@ export interface PopulationReviewItem {
   readonly workbookProfileContentSha256: Sha256;
   readonly projection: PopulationDecisionProjection;
   readonly structuralFinding: string;
+  readonly workbook?: WorkbookPopulationProfile;
+  readonly namedRanges?: readonly WorkbookNamedRangeObservation[];
+  readonly evidenceObservations?: readonly PopulationEvidenceObservation[];
 }
 
 export function PopulationReview({

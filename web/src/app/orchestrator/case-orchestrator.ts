@@ -118,9 +118,12 @@ import type {
 import { extractCandidates } from "../../domain/plan-rules/candidate-extraction";
 import { detectNearDuplicates } from "../../domain/plan-rules/near-duplicates";
 import { detectSupersession } from "../../domain/plan-rules/supersession";
-import type { GovernanceDependencies } from "../../domain/plan-rules/rule-authoring";
+import {
+  authorRule,
+  type GovernanceDependencies,
+  validateRuleRecord,
+} from "../../domain/plan-rules/rule-authoring";
 import { resolveItem } from "../../domain/plan-rules/unresolved-items";
-import { authorRule } from "../../domain/plan-rules/rule-authoring";
 import type {
   CaseworkOutputArtifactInput,
   FinalCaseworkOutputInput,
@@ -128,6 +131,13 @@ import type {
 import type { DraftV1SummaryArtifact } from "../../domain/draft-v1-summary/models";
 import type { CaseOutputArtifactLinkDraft } from "../../components/case-output/CaseOutputPackagePanel";
 import type { ArchitectureSelection } from "../../components/architecture/ArchitectureStage";
+import type { ArchitecturePolicyReviewItem } from "../../components/architecture/ArchitecturePolicyReview";
+import { buildArchitecture } from "../../domain/architecture/architecture-builder";
+import type { V1Architecture } from "../../domain/architecture/models";
+import {
+  readArchitectureJson,
+  writeArchitectureJson,
+} from "../../domain/architecture/workspace-adapter";
 import { createDraftV1SummaryArtifact } from "../../domain/draft-v1-summary/draft-builder";
 import { deterministicUuid } from "../../domain/build-spec/identity";
 import { validateContract } from "../../contracts/schema-validator";
@@ -150,25 +160,17 @@ import {
   replayArtifactEligibility,
   replayQuarantineDecisions,
 } from "../../domain/quarantine/release-service";
+import {
+  architecturePolicyDecisionContentHash,
+  replayArchitecturePolicyApprovals,
+  type ArchitecturePolicyApproval,
+} from "../../domain/architecture/architecture-policy-approval";
+import { loadBundledRuleSets } from "../../domain/architecture/rule-loader";
+import {
+  caseControlContentHash,
+  type AuthenticatedCaseControls,
+} from "../../domain/architecture/scenario-selector";
 
-const ruleSourceArtifacts = [
-  {
-    path: "rules/scenario-selection.yaml",
-    content: scenarioSelectionYaml,
-  },
-  {
-    path: "rules/tab-selection.yaml",
-    content: tabSelectionYaml,
-  },
-  {
-    path: "rules/iob-classification.yaml",
-    content: iobClassificationYaml,
-  },
-  {
-    path: "rules/field-name-glossary.yaml",
-    content: fieldNameGlossaryYaml,
-  },
-] as const;
 import {
   classificationDecisionContentHash,
   replayClassificationApprovals,
@@ -197,6 +199,25 @@ import {
   parseCaseReviewSnapshot,
   type CaseReviewState,
 } from "./case-review-persistence";
+
+const ruleSourceArtifacts = [
+  {
+    path: "rules/scenario-selection.yaml",
+    content: scenarioSelectionYaml,
+  },
+  {
+    path: "rules/tab-selection.yaml",
+    content: tabSelectionYaml,
+  },
+  {
+    path: "rules/iob-classification.yaml",
+    content: iobClassificationYaml,
+  },
+  {
+    path: "rules/field-name-glossary.yaml",
+    content: fieldNameGlossaryYaml,
+  },
+] as const;
 
 interface InventoryCheckpointReference {
   readonly attemptId: Uuid;
@@ -893,6 +914,11 @@ export interface CaseOrchestrator {
   readonly draftV1SummaryMessage: string | null;
   readonly architectureSelection: ArchitectureSelection | null;
   readonly architectureBuildMessage: string | null;
+  readonly architecturePolicyItems: readonly ArchitecturePolicyReviewItem[];
+  readonly architecturePolicyApprovals: readonly ArchitecturePolicyApproval[];
+  readonly architecturePolicyMessage: string | null;
+  readonly caseControls: AuthenticatedCaseControls | null;
+  readonly caseControlsMessage: string | null;
   readonly finalOutputInput: FinalCaseworkOutputInput | null;
   readonly evidenceItems: readonly ArtifactInventoryItem[];
   readonly evidencePackageSummary: PackageIntakeResult | null;
@@ -963,6 +989,18 @@ export interface CaseOrchestrator {
     reviewer: string,
     rationale: string,
   ) => Promise<void>;
+  readonly recordArchitecturePolicyApproval: (
+    item: ArchitecturePolicyReviewItem,
+    reviewer: string,
+    rationale: string,
+  ) => Promise<void>;
+  readonly recordCaseControls: (draft: {
+    readonly singleCalculation: boolean;
+    readonly startDate: string;
+    readonly endDate: string | null;
+    readonly reviewer: string;
+    readonly rationale: string;
+  }) => Promise<void>;
   readonly linkCaseOutputArtifact: (
     draft: CaseOutputArtifactLinkDraft,
   ) => Promise<void>;
@@ -1106,6 +1144,20 @@ export function useCaseOrchestrator(
   const [architectureBuildMessage, setArchitectureBuildMessage] = useState<
     string | null
   >(null);
+  const [architecturePolicyItems, setArchitecturePolicyItems] = useState<
+    readonly ArchitecturePolicyReviewItem[]
+  >([]);
+  const [architecturePolicyApprovals, setArchitecturePolicyApprovals] =
+    useState<readonly ArchitecturePolicyApproval[]>([]);
+  const [architecturePolicyMessage, setArchitecturePolicyMessage] = useState<
+    string | null
+  >(null);
+  const [caseControls, setCaseControls] =
+    useState<AuthenticatedCaseControls | null>(null);
+  const [caseControlsMessage, setCaseControlsMessage] = useState<string | null>(
+    null,
+  );
+
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
   const activeGovernanceDependencies =
@@ -1214,6 +1266,11 @@ export function useCaseOrchestrator(
     setDraftV1SummaryMessage(null);
     setArchitectureSelection(null);
     setArchitectureBuildMessage(null);
+    setArchitecturePolicyItems([]);
+    setArchitecturePolicyApprovals([]);
+    setArchitecturePolicyMessage(null);
+    setCaseControls(null);
+    setCaseControlsMessage(null);
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
@@ -2719,6 +2776,8 @@ export function useCaseOrchestrator(
       setDateCandidateItems(projectedDateItems);
       setRelationshipItems(projectedRelationshipItems);
       setPopulationItems(projectedPopulationItems);
+      setArchitecturePolicyApprovals(restored.architecturePolicyApprovals);
+      setCaseControls(restored.authenticatedCaseControls);
     } catch {
       failReviewRestore();
     }
@@ -2727,6 +2786,8 @@ export function useCaseOrchestrator(
   const clearGovernedEvidenceRecords = (message: string): void => {
     evidenceCatalogRef.current = null;
     setEvidenceCatalog(null);
+    setArchitecturePolicyItems([]);
+    setArchitecturePolicyMessage(null);
     setProvisionCandidates([]);
     setCandidateNearDuplicates([]);
     setCandidateSupersessions([]);
@@ -2768,6 +2829,14 @@ export function useCaseOrchestrator(
     const included = [...value.caseEvidence, ...value.referenceOnly];
     if (
       !included.every((artifact) => {
+        if (
+          value.referenceOnly.some((item) => item.sha256 === artifact.sha256)
+        ) {
+          return (
+            artifact.reviewStatus === "released" ||
+            artifact.reviewStatus === "provisional"
+          );
+        }
         const eligibility = caseReviewState.current.eligibilityItems.find(
           (item) => item.artifactSha256 === artifact.sha256,
         );
@@ -2851,6 +2920,10 @@ export function useCaseOrchestrator(
     if (activeCaseId.current !== caseRecord.caseId) return;
     evidenceCatalogRef.current = catalogResult.value;
     setEvidenceCatalog(catalogResult.value);
+    await refreshArchitecturePolicyItems(
+      catalogResult.value,
+      caseReviewState.current.architecturePolicyApprovals,
+    );
     await applyProvisionCandidateState(currentCandidates);
     setEvidenceUnresolvedRecords(unresolved.value);
     setEvidenceUnresolvedItems(latestUnresolved);
@@ -2916,10 +2989,7 @@ export function useCaseOrchestrator(
       }),
     ]);
     const allArtifactHashes = [
-      ...new Set([
-        ...checkpoint.artifacts.map((artifact) => artifact.sha256),
-        ...ruleArtifacts.map((artifact) => artifact.sha256),
-      ]),
+      ...new Set(checkpoint.artifacts.map((artifact) => artifact.sha256)),
     ];
     if (
       allArtifactHashes.length === 0 ||
@@ -3021,6 +3091,10 @@ export function useCaseOrchestrator(
       clearGovernedEvidenceRecords(stored.error.safeMessage);
       return;
     }
+    await refreshArchitecturePolicyItems(
+      built.value.catalog,
+      caseReviewState.current.architecturePolicyApprovals,
+    );
 
     const candidates: ProvisionCandidate[] = [];
     const unresolvedItems: UnresolvedItem[] = [];
@@ -3435,48 +3509,355 @@ export function useCaseOrchestrator(
     );
   };
 
-  const recordArchitectureSelection = (
-    selection: ArchitectureSelection,
-  ): Promise<void> => {
-    if (activeCase === null) {
+  const recordArchitectureSelection = async (): Promise<void> => {
+    if (
+      activeCase === null ||
+      evidenceCatalogRef.current === null ||
+      caseControls === null
+    ) {
       setArchitectureBuildMessage(
-        "Select an active local case before recording architecture selection.",
+        "Active case, approved evidence catalog, and case controls are required.",
       );
-      return Promise.resolve();
+      return;
     }
     setArchitectureBuildMessage(null);
-    setArchitectureSelection(selection);
-    setArchitectureBuildMessage(
-      `Architecture selection approved: ${String(selection.scenarioIds.length)} scenario(s), ${String(selection.tabNames.length)} tab(s).`,
-    );
-    void persistArchitectureSelection(activeCase.caseId, selection);
-    return Promise.resolve();
+    try {
+      const activeWorkspace = workspace.current;
+      if (activeWorkspace === null) throw new Error("Workspace unavailable.");
+
+      const rules = previewRules;
+      for (const rule of rules) {
+        const validation = await validateRuleRecord(rule);
+        if (!validation.ok) throw new Error(validation.error);
+      }
+      const overrides: readonly AuthorityOverride[] = [];
+
+      const populationItems = caseReviewState.current.populationItems;
+      const populationCandidates = populationItems.flatMap((item) =>
+        item.projection.status === "approved" && item.workbook
+          ? [
+              {
+                candidate: item.candidate,
+                workbook: item.workbook,
+                namedRanges: item.namedRanges,
+                evidenceObservations: item.evidenceObservations ?? [],
+                decisions: caseReviewState.current.populationDecisions.filter(
+                  (d) => d.candidateKey === item.candidate.candidateKey,
+                ),
+              },
+            ]
+          : [],
+      );
+
+      const loadedPolicies = await loadBundledRuleSets({
+        scenarioSelection: scenarioSelectionYaml,
+        tabSelection: tabSelectionYaml,
+        iobClassification: iobClassificationYaml,
+        fieldNameGlossary: fieldNameGlossaryYaml,
+        mode: "production",
+        approvalContext: {
+          evidenceCatalog: evidenceCatalogRef.current,
+          decisions: architecturePolicyApprovals,
+        },
+      });
+      if (!loadedPolicies.ok)
+        throw new Error("Architecture policies could not be loaded.");
+
+      const architectureResult = await buildArchitecture({
+        caseId: activeCase.caseId,
+        planRules: rules,
+        evidenceCatalog: evidenceCatalogRef.current,
+        authorityOverrides: overrides,
+        population: { candidates: populationCandidates },
+        caseControls,
+        policies: loadedPolicies.value,
+        policyApprovals: {
+          decisions: architecturePolicyApprovals,
+        },
+        dependencies: {
+          uuid: () => dependencies.uuid.generate(),
+          now: () => dependencies.clock.now(),
+        },
+      });
+
+      if (!architectureResult.ok) {
+        const blocker = architectureResult.error;
+        const message =
+          "code" in blocker && blocker.code === "ARCHITECTURE_BLOCKED"
+            ? ((
+                blocker as unknown as {
+                  unresolvedItems?: readonly { consequence?: string }[];
+                }
+              ).unresolvedItems?.[0]?.consequence ?? blocker.message)
+            : blocker.message;
+        setArchitectureBuildMessage(`Architecture build blocked: ${message}`);
+        return;
+      }
+
+      const architecture = architectureResult.value.architecture;
+      await persistArchitecture(activeCase.caseId, architecture);
+      setArchitectureSelection(null);
+      setArchitectureBuildMessage(
+        `Architecture built deterministically: ${String(architecture.runs.length)} run(s), ${String(architecture.sourceTabs.length)} tab(s), ${String(architecture.cells.size)} field(s). Hash: ${architecture.architectureContentSha256.slice(0, 12)}.`,
+      );
+    } catch (error) {
+      setArchitectureBuildMessage(
+        error instanceof Error ? error.message : "Architecture build failed.",
+      );
+    }
   };
 
-  const persistArchitectureSelection = async (
+  const persistArchitecture = async (
     caseId: Uuid,
-    selection: ArchitectureSelection,
+    architecture: V1Architecture,
   ): Promise<void> => {
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) return;
     try {
-      await activeWorkspace.createDirectory(`cases/${caseId}/outputs`);
-      const payload = {
-        ...selection,
-        approvedAt: dependencies.clock.now(),
-        schemaVersion: "1.0.0",
-      };
-      const saved = await activeWorkspace.writeAtomic(
-        `cases/${caseId}/outputs/architecture-selection.json`,
-        new TextEncoder().encode(`${canonicalize(payload)}\n`),
+      await activeWorkspace.createDirectory(`cases/${caseId}/architecture`);
+      const encoded = await writeArchitectureJson(architecture);
+      if (!encoded.ok) throw new Error(encoded.error.message);
+      const target = `cases/${caseId}/architecture/${architecture.architectureId}.json`;
+      const saved = await activeWorkspace.createImmutable(
+        target,
+        bytesReader(encoded.value),
       );
-      if (!saved.ok) {
-        setArchitectureBuildMessage(
-          "Architecture selection could not be persisted.",
+      if (!saved.ok) throw new Error("Architecture file could not be saved.");
+      const verified = await activeWorkspace.openChunkReader(target);
+      if (!verified.ok)
+        throw new Error("Architecture file could not be verified.");
+      const bytes = await readAllBytes(verified.value);
+      const decoded = await readArchitectureJson(bytes);
+      if (!decoded.ok)
+        throw new Error("Architecture file failed post-write validation.");
+      if (
+        decoded.value.architectureContentSha256 !==
+        architecture.architectureContentSha256
+      )
+        throw new Error(
+          "Architecture content hash mismatch after persistence.",
         );
+    } catch (error) {
+      throw error instanceof Error
+        ? error
+        : new Error("Architecture persistence failed.");
+    }
+  };
+
+  const refreshArchitecturePolicyItems = async (
+    evidenceCatalog: EvidenceCatalog | null,
+    approvals: readonly ArchitecturePolicyApproval[] = architecturePolicyApprovals,
+  ): Promise<void> => {
+    const loaded = await loadBundledRuleSets({
+      scenarioSelection: scenarioSelectionYaml,
+      tabSelection: tabSelectionYaml,
+      iobClassification: iobClassificationYaml,
+      fieldNameGlossary: fieldNameGlossaryYaml,
+      mode: "candidate",
+    });
+    if (!loaded.ok) {
+      setArchitecturePolicyItems([]);
+      setArchitecturePolicyMessage(
+        "Architecture policy sources could not be loaded or validated.",
+      );
+      return;
+    }
+    const policyItems: ArchitecturePolicyReviewItem[] = [];
+    for (const policy of [
+      loaded.value.scenarioSelection,
+      loaded.value.tabSelection,
+      loaded.value.iobClassification,
+      loaded.value.fieldNameGlossary,
+    ] as const) {
+      const sourcePath = `rules/${policy.kind}.yaml`;
+      const artifact = evidenceCatalog?.referenceOnly.find(
+        (item) => item.locator === sourcePath,
+      );
+      const eligibility = artifact?.reviewStatus === "released";
+      const projection = evidenceCatalog
+        ? await replayArchitecturePolicyApprovals(
+            policy,
+            approvals.filter((approval) => approval.policyKind === policy.kind),
+            evidenceCatalog,
+          )
+        : {
+            ok: true as const,
+            value: {
+              status: "provisional" as const,
+              effectiveDecisionId: null,
+              effectiveDecisionContentSha256: null,
+            },
+          };
+      if (!projection.ok) {
+        setArchitecturePolicyMessage(projection.error);
+        policyItems.push({
+          policy,
+          sourcePath,
+          eligibility,
+          approval: {
+            status: "provisional",
+            effectiveDecisionId: null,
+            effectiveDecisionContentSha256: null,
+          },
+        });
+        continue;
       }
-    } catch {
-      setArchitectureBuildMessage("Architecture selection persistence failed.");
+      policyItems.push({
+        policy,
+        sourcePath,
+        eligibility,
+        approval: projection.value,
+      });
+    }
+    setArchitecturePolicyItems(policyItems);
+  };
+
+  const recordArchitecturePolicyApproval = async (
+    item: ArchitecturePolicyReviewItem,
+    reviewer: string,
+    rationale: string,
+  ): Promise<void> => {
+    if (
+      activeCase === null ||
+      evidenceCatalogRef.current === null ||
+      priorSnapshot.current === null
+    ) {
+      setArchitecturePolicyMessage(
+        "An active governed evidence snapshot and catalog are required.",
+      );
+      return;
+    }
+    try {
+      const evidenceSnapshotId = priorSnapshot.current.snapshotId;
+      const policyHistory = architecturePolicyApprovals.filter(
+        (approval) => approval.policyKind === item.policy.kind,
+      );
+      const prior = policyHistory.at(-1) ?? null;
+      const decidedAt = activeGovernanceDependencies.now();
+      const decisionWithoutHash = {
+        decisionId: activeGovernanceDependencies.uuid() as never,
+        appendOrdinal: (prior?.appendOrdinal ?? 0) + 1,
+        priorDecisionId: prior?.decisionId ?? null,
+        priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
+        decisionType: "approve" as const,
+        resultingStatus: "approved" as const,
+        policyKind: item.policy.kind,
+        policyVersion: item.policy.version,
+        policyContentSha256: item.policy.policyContentSha256,
+        sourceFileSha256: item.policy.sourceFileSha256,
+        evidenceCatalogId: evidenceCatalogRef.current.catalogId,
+        evidenceCatalogContentSha256:
+          evidenceCatalogRef.current.catalogContentSha256,
+        evidenceCitations: [
+          {
+            sourceArtifactSha256: item.policy.sourceFileSha256,
+            sourceLocator: item.sourcePath,
+            effectiveDate: decidedAt.slice(0, 10),
+            adoptionDate: null,
+            supersedesArtifactSha256: null,
+          },
+        ],
+        humanActor: {
+          actorType: "human" as const,
+          actorKey: reviewer,
+          displayName: reviewer,
+          authorityContext: "case-orchestrator",
+        },
+        rationale,
+        decidedAt: decidedAt as never,
+        schemaVersion: "1.0.0" as const,
+      };
+      const decision = {
+        ...decisionWithoutHash,
+        decisionContentSha256:
+          await architecturePolicyDecisionContentHash(decisionWithoutHash),
+      };
+      const nextApprovals = [...architecturePolicyApprovals, decision].sort(
+        (left, right) =>
+          left.policyKind.localeCompare(right.policyKind) ||
+          left.appendOrdinal - right.appendOrdinal,
+      );
+      setArchitecturePolicyApprovals(nextApprovals);
+      caseReviewState.current = {
+        ...caseReviewState.current,
+        architecturePolicyApprovals: nextApprovals,
+      };
+      await persistCaseReviewState(
+        activeCase.caseId,
+        evidenceSnapshotId,
+        caseReviewState.current,
+      );
+      await refreshArchitecturePolicyItems(
+        evidenceCatalogRef.current,
+        nextApprovals,
+      );
+      setArchitecturePolicyMessage(
+        `${item.policy.kind} approved by ${reviewer}.`,
+      );
+    } catch (error) {
+      setArchitecturePolicyMessage(
+        error instanceof Error ? error.message : "Approval failed.",
+      );
+    }
+  };
+
+  const recordCaseControls = async (draft: {
+    readonly singleCalculation: boolean;
+    readonly startDate: string;
+    readonly endDate: string | null;
+    readonly reviewer: string;
+    readonly rationale: string;
+  }): Promise<void> => {
+    if (
+      activeCase === null ||
+      evidenceCatalogRef.current === null ||
+      priorSnapshot.current === null
+    ) {
+      setCaseControlsMessage(
+        "An active governed evidence snapshot and catalog are required.",
+      );
+      return;
+    }
+    try {
+      const evidenceSnapshotId = priorSnapshot.current.snapshotId;
+      const controlWithoutHash: Omit<
+        AuthenticatedCaseControls,
+        "caseControlContentSha256"
+      > = {
+        controlId: activeGovernanceDependencies.uuid() as never,
+        dimensions: draft.singleCalculation
+          ? { "case-purpose": "single-calculation" }
+          : {},
+        effectiveDateRange: {
+          startDate: draft.startDate,
+          endDate: draft.endDate,
+        },
+        reviewStatus: "human-approved",
+        approvedBy: draft.reviewer,
+        approvalRationale: draft.rationale,
+      };
+      const control = {
+        ...controlWithoutHash,
+        caseControlContentSha256:
+          await caseControlContentHash(controlWithoutHash),
+      };
+      setCaseControls(control);
+      caseReviewState.current = {
+        ...caseReviewState.current,
+        authenticatedCaseControls: control,
+      };
+      await persistCaseReviewState(
+        activeCase.caseId,
+        evidenceSnapshotId,
+        caseReviewState.current,
+      );
+      setCaseControlsMessage(
+        `Case controls approved for ${draft.startDate} by ${draft.reviewer}.`,
+      );
+    } catch (error) {
+      setCaseControlsMessage(
+        error instanceof Error ? error.message : "Approval failed.",
+      );
     }
   };
 
@@ -4135,6 +4516,10 @@ export function useCaseOrchestrator(
                 population.candidate.candidateStatus === "proposed"
                   ? "Likely population structure detected; governed use remains blocked pending human review."
                   : "Structure is ambiguous or incomplete; route to unresolved review.",
+              evidenceObservations: population.observations,
+              ...(workbookProfile === null
+                ? {}
+                : { workbook: workbookProfile }),
             },
           ]);
         }
@@ -4521,6 +4906,7 @@ export function useCaseOrchestrator(
       checkpointReference.snapshot.snapshotId,
       caseReviewState.current,
     );
+
     priorSnapshot.current = checkpointReference.snapshot;
     inventoryCheckpoints.current.set(
       checkpointReference.snapshot.snapshotId,
@@ -4648,6 +5034,13 @@ export function useCaseOrchestrator(
     draftV1SummaryMessage,
     architectureSelection,
     architectureBuildMessage,
+    architecturePolicyItems,
+    architecturePolicyApprovals,
+    architecturePolicyMessage,
+    caseControls,
+    caseControlsMessage,
+    recordArchitecturePolicyApproval,
+    recordCaseControls,
     finalOutputInput,
     evidenceItems,
     evidencePackageSummary,

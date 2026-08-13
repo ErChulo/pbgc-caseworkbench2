@@ -147,7 +147,15 @@ export function ArtifactEligibilityReview({
                     )
                   }
                 >
-                  {labels[action]}
+                  {item.displayName.startsWith("rules/")
+                    ? action === "approve"
+                      ? `Approve rule source ${item.displayName}`
+                      : action === "block"
+                        ? `Block rule source ${item.displayName}`
+                        : action === "revoke"
+                          ? `Revoke rule-source eligibility ${item.displayName}`
+                          : `Supersede rule-source decision ${item.displayName}`
+                    : labels[action]}
                 </button>
               ))}
             </div>

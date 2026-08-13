@@ -350,17 +350,18 @@ function parseScenarios(
         `${path}.exclusionConditions`,
       ),
       defaultEffectiveDateRange: {
-        startDate: stringValue(
-          range.startDate,
-          `${path}.defaultEffectiveDateRange.startDate`,
-        ),
+         startDate: dateValue(
+           range.startDate,
+           `${path}.defaultEffectiveDateRange.startDate`,
+         ),
+
         endDate:
           range.endDate === null
             ? null
-            : stringValue(
-                range.endDate,
-                `${path}.defaultEffectiveDateRange.endDate`,
-              ),
+             : dateValue(
+                 range.endDate,
+                 `${path}.defaultEffectiveDateRange.endDate`,
+               ),
       },
     });
   });
@@ -462,11 +463,16 @@ function parseGlossary(
   return values.map((value, index) => {
     const path = `entries[${String(index)}]`;
     const item = record(value, path);
-    exactKeys(
-      item,
-      ["workbookPattern", "genericField", "description", "tabContext"],
-      path,
-    );
+     const keys = Object.keys(item).sort();
+     if (
+       keys.some(
+         (key) =>
+           !["workbookPattern", "genericField", "description", "tabContext"].includes(key),
+       ) ||
+       keys.filter((key) => key !== "tabContext").length !== 3
+     )
+       invalid(`${path} contains invalid fields.`);
+
     return Object.freeze({
       workbookPattern: stringValue(
         item.workbookPattern,
@@ -475,7 +481,7 @@ function parseGlossary(
       genericField: stringValue(item.genericField, `${path}.genericField`),
       description: stringValue(item.description, `${path}.description`),
       tabContext:
-        item.tabContext === null
+        item.tabContext == null
           ? null
           : stringValue(item.tabContext, `${path}.tabContext`),
     });
@@ -516,6 +522,19 @@ function stringArray(value: unknown, path: string): readonly string[] {
   return arrayValue(value, path).map((item, index) =>
     stringValue(item, `${path}[${String(index)}]`),
   );
+}
+
+function dateValue(value: unknown, path: string): string {
+  const result = stringValue(value, path);
+  const parsed = Date.parse(`${result}T00:00:00Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/u.test(result) ||
+    Number.isNaN(parsed) ||
+    new Date(parsed).toISOString().slice(0, 10) !== result
+  ) {
+    invalid(`${path} must be a valid ISO calendar date.`);
+  }
+  return result;
 }
 
 function invalid(message: string): never {

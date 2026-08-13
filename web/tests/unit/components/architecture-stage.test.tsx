@@ -34,7 +34,7 @@ describe("governed architecture stage UI", () => {
     await user.click(screen.getByLabelText("RETIREES"));
     await user.type(screen.getByLabelText("Reviewer"), "Synthetic Reviewer");
     await user.type(
-      screen.getByLabelText("Approval rationale"),
+      screen.getByLabelText("Architecture approval rationale"),
       "Governed scenario and tab approval.",
     );
 

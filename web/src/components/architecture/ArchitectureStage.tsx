@@ -119,7 +119,7 @@ export function ArchitectureStage({
         />
       </label>
       <label>
-        Approval rationale
+        Architecture approval rationale
         <textarea
           value={rationale}
           onChange={(event) => {

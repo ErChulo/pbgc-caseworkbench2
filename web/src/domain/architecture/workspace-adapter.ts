@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { validateContract } from "../../contracts/schema-validator";
 import type { Result, Sha256, Uuid, UtcTimestamp } from "../shared/types";
 import type {
@@ -122,9 +121,31 @@ export function architectureContentToJsonValue(
 export function computeArchitectureContentSha256(
   architecture: V1ArchitectureContent,
 ): Sha256 {
-  return createHash("sha256")
-    .update(stableJson(architectureContentToJsonValue(architecture)), "utf8")
-    .digest("hex") as Sha256;
+  const bytes = new TextEncoder().encode(
+    stableJson(architectureContentToJsonValue(architecture)),
+  );
+  const { createHash } = requireNodeCrypto();
+  return createHash("sha256").update(bytes).digest("hex") as Sha256;
+}
+
+function requireNodeCrypto(): {
+  createHash: (algorithm: string) => {
+    update: (data: Uint8Array) => { digest: (encoding: "hex") => string };
+  };
+} {
+  const processValue = (globalThis as { process?: unknown }).process as
+    { getBuiltinModule?: (name: string) => unknown } | undefined;
+  const crypto =
+    processValue !== undefined &&
+    typeof processValue.getBuiltinModule === "function"
+      ? processValue.getBuiltinModule("node:crypto")
+      : undefined;
+  if (crypto === undefined) throw new Error("Node crypto is unavailable.");
+  return crypto as {
+    createHash: (algorithm: string) => {
+      update: (data: Uint8Array) => { digest: (encoding: "hex") => string };
+    };
+  };
 }
 
 function readRecord(value: unknown, name: string): Record<string, unknown> {

@@ -1,6 +1,3 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import type { EvidenceCatalog } from "../evidence/models";
 import type { Result, Sha256 } from "../shared/types";
 import {
@@ -514,7 +511,7 @@ export function parseGlossary(
       genericField: string(item.genericField, `${path}.genericField`),
       description: string(item.description, `${path}.description`),
       tabContext:
-        item.tabContext === undefined
+        item.tabContext == null
           ? null
           : nullableString(item.tabContext, `${path}.tabContext`),
     };
@@ -531,8 +528,34 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function nodeBuiltin(id: string): unknown {
+  const processValue = (globalThis as { process?: unknown }).process as
+    { getBuiltinModule?: (name: string) => unknown } | undefined;
+  const module =
+    processValue !== undefined &&
+    typeof processValue.getBuiltinModule === "function"
+      ? processValue.getBuiltinModule(id)
+      : undefined;
+  if (module === undefined)
+    throw new Error(`Node builtin ${id} is unavailable.`);
+  return module;
+}
+
 function digest(value: string): Sha256 {
-  return createHash("sha256").update(value, "utf8").digest("hex") as Sha256;
+  const crypto = nodeBuiltin("node:crypto") as {
+    createHash: (algorithm: string) => {
+      update: (
+        data: string,
+        encoding: "utf8",
+      ) => {
+        digest: (encoding: "hex") => string;
+      };
+    };
+  };
+  return crypto
+    .createHash("sha256")
+    .update(value, "utf8")
+    .digest("hex") as Sha256;
 }
 
 export async function loadBundledRuleSets(config: {
@@ -612,6 +635,7 @@ export async function loadRuleSet(
   approvalContext?: PolicyApprovalContext,
 ): Promise<Result<RuleSet, RuleLoadError>> {
   try {
+    const { readFile } = await import("node:fs/promises");
     const content = await readFile(rulePath, "utf8");
     const parsed = await parseRuleSetText(rulePath, content, kind);
     if (!parsed.ok) return parsed;
@@ -678,5 +702,16 @@ export async function loadRuleSets(
 }
 
 export function resolveRulePath(baseDir: string, ruleName: string): string {
-  return resolve(baseDir, `${ruleName}.yaml`);
+  const processValue = (globalThis as { process?: unknown }).process as
+    { getBuiltinModule?: (name: string) => unknown } | undefined;
+  if (
+    processValue !== undefined &&
+    typeof processValue.getBuiltinModule === "function"
+  ) {
+    const { resolve } = nodeBuiltin("node:path") as {
+      resolve: (...segments: string[]) => string;
+    };
+    return resolve(baseDir, `${ruleName}.yaml`);
+  }
+  return `${baseDir.replace(/\/$/u, "")}/${ruleName}.yaml`;
 }

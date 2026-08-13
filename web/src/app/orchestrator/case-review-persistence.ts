@@ -13,6 +13,8 @@ import type {
 } from "../../domain/classification/models";
 import { hashTyped } from "../../domain/manifests/canonical-json";
 import type { PopulationCandidateDecision } from "../../domain/population/population-profile";
+import type { ArchitecturePolicyApproval } from "../../domain/architecture/architecture-policy-approval";
+import type { AuthenticatedCaseControls } from "../../domain/architecture/scenario-selector";
 import type {
   ArtifactEligibilityDecision,
   QuarantineDecision,
@@ -40,6 +42,8 @@ export interface CaseReviewState {
   readonly dateSelections: readonly DateSelectionDecision[];
   readonly relationshipDecisions: readonly RelationshipDecision[];
   readonly populationDecisions: readonly PopulationCandidateDecision[];
+  readonly architecturePolicyApprovals: readonly ArchitecturePolicyApproval[];
+  readonly authenticatedCaseControls: AuthenticatedCaseControls | null;
 }
 
 export interface PersistedCaseReviewSnapshot extends CaseReviewState {
@@ -78,6 +82,8 @@ export function createEmptyCaseReviewState(): CaseReviewState {
     dateSelections: [],
     relationshipDecisions: [],
     populationDecisions: [],
+    architecturePolicyApprovals: [],
+    authenticatedCaseControls: null,
   };
 }
 
@@ -112,7 +118,17 @@ export async function parseCaseReviewSnapshot(
   if (!hasReviewArrays(value)) {
     return invalid("Case review snapshot collections are invalid.");
   }
-  const snapshot = value as unknown as PersistedCaseReviewSnapshot;
+  const snapshot = {
+    ...(value as unknown as PersistedCaseReviewSnapshot),
+    architecturePolicyApprovals: Array.isArray(
+      value.architecturePolicyApprovals,
+    )
+      ? (value.architecturePolicyApprovals as readonly ArchitecturePolicyApproval[])
+      : [],
+    authenticatedCaseControls:
+      (value.authenticatedCaseControls as unknown as AuthenticatedCaseControls | null) ??
+      null,
+  } as PersistedCaseReviewSnapshot;
   const { reviewSnapshotId: ignored, ...payload } = snapshot;
   void ignored;
   let recomputed: Sha256;
@@ -156,7 +172,10 @@ export function parseCaseReviewPointer(
 function hasReviewArrays(
   value: Record<string, unknown>,
 ): value is Record<keyof CaseReviewState, readonly Record<string, unknown>[]> {
-  const keys: readonly (keyof CaseReviewState)[] = [
+  const requiredKeys: readonly Exclude<
+    keyof CaseReviewState,
+    "architecturePolicyApprovals" | "authenticatedCaseControls"
+  >[] = [
     "quarantineItems",
     "eligibilityItems",
     "classificationItems",
@@ -170,11 +189,21 @@ function hasReviewArrays(
     "relationshipDecisions",
     "populationDecisions",
   ];
-  return keys.every(
+  const requiredValid = requiredKeys.every(
     (key) =>
       Array.isArray(value[key]) &&
       (value[key] as readonly unknown[]).every((item) => isRecord(item)),
   );
+  if (!requiredValid) return false;
+  const approvalsValid =
+    value.architecturePolicyApprovals === undefined ||
+    (Array.isArray(value.architecturePolicyApprovals) &&
+      value.architecturePolicyApprovals.every((item) => isRecord(item)));
+  const controlsValid =
+    value.authenticatedCaseControls === undefined ||
+    value.authenticatedCaseControls === null ||
+    isRecord(value.authenticatedCaseControls);
+  return approvalsValid && controlsValid;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

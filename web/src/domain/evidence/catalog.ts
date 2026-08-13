@@ -278,12 +278,28 @@ export async function buildEvidenceCatalogFromScreenedOutcomes(
     }
   }
 
+  const additionalReferenceOnly: CatalogArtifactInput[] = [];
+  for (const artifact of input.referenceOnlyArtifacts ?? []) {
+    const eligibility = await replayArtifactEligibility(
+      artifact.sha256 as Sha256,
+      input.eligibilityDecisions.filter(
+        (decision) => decision.artifactSha256 === artifact.sha256,
+      ),
+      [],
+    );
+    if (!eligibility.ok) return invalid(eligibility.error.safeMessage);
+    additionalReferenceOnly.push({
+      ...artifact,
+      reviewStatus: eligibility.value.eligible ? "released" : "provisional",
+    });
+  }
+
   const catalog = await buildEvidenceCatalog({
     catalogId: input.catalogId,
     caseId: input.caseId,
     builtAt: input.builtAt,
     caseEvidence,
-    referenceOnly: [...referenceOnly, ...(input.referenceOnlyArtifacts ?? [])],
+    referenceOnly: [...referenceOnly, ...additionalReferenceOnly],
     excludedQuarantined,
   });
   return catalog.ok

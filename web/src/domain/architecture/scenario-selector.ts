@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import type { EvidenceCatalog } from "../evidence/models";
 import type {
   AuthorityOverride,
@@ -88,7 +87,29 @@ export async function caseControlContentHash(
 export function scenarioPolicyContentHash(
   rules: readonly ScenarioSelectionRule[],
 ): Sha256 {
-  return createHash("sha256")
+  const processValue = (globalThis as { process?: unknown }).process as
+    { getBuiltinModule?: (name: string) => unknown } | undefined;
+  const crypto =
+    processValue !== undefined &&
+    typeof processValue.getBuiltinModule === "function"
+      ? (processValue.getBuiltinModule("node:crypto") as {
+          createHash: (algorithm: string) => {
+            update: (
+              data: string,
+              encoding: "utf8",
+            ) => {
+              digest: (encoding: "hex") => string;
+            };
+          };
+        })
+      : undefined;
+  if (crypto === undefined) {
+    throw new Error(
+      "Synchronous scenario-policy hashing is unavailable without Node crypto.",
+    );
+  }
+  return crypto
+    .createHash("sha256")
     .update(stableJson(rules), "utf8")
     .digest("hex") as Sha256;
 }
