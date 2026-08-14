@@ -17,7 +17,12 @@ const minimalWasmModule = Uint8Array.from([0, 97, 115, 109, 1, 0, 0, 0]);
 
 async function checkWorker(): Promise<boolean> {
   if (typeof Worker === "undefined") return false;
-  const worker = new FeasibilityWorker();
+  let worker: Worker;
+  try {
+    worker = new FeasibilityWorker();
+  } catch {
+    return false;
+  }
 
   try {
     return await new Promise<boolean>((resolve) => {
@@ -29,6 +34,14 @@ async function checkWorker(): Promise<boolean> {
         (event: MessageEvent<{ echoed?: string }>) => {
           window.clearTimeout(timeout);
           resolve(event.data.echoed === "phase-1");
+        },
+        { once: true },
+      );
+      worker.addEventListener(
+        "error",
+        () => {
+          window.clearTimeout(timeout);
+          resolve(false);
         },
         { once: true },
       );

@@ -28,7 +28,6 @@ export function FeasibilityStatus() {
   }
 
   const requiredChecks = [
-    result.worker,
     result.wasm,
     result.schema,
     result.asset,
@@ -45,6 +44,7 @@ export function FeasibilityStatus() {
       <p>
         Browser:{" "}
         <strong>{passed ? "Compatible" : "Not fully compatible"}</strong>
+        {result.mode === "direct-file" ? " (direct file)" : ""}
         {!result.fileSystemAccess && " (limited mode)"}
       </p>
       <button
@@ -74,6 +74,7 @@ export function FeasibilityStatus() {
               ))}
           </dl>
           <p className="capability-note">
+            Mode: {result.mode === "direct-file" ? "direct file" : "static origin"};
             Secure context: {result.secureContext ? "yes" : "no"}; File System
             Access API: {result.fileSystemAccess ? "available" : "unavailable"}.
           </p>

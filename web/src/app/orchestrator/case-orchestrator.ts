@@ -10,6 +10,11 @@ import {
   saveCaseWorkspace,
 } from "../../adapters/filesystem/case-workspace";
 import {
+  detectFileSystemCapability,
+  PRODUCTION_CAPABILITY_POLICY,
+  type FileSystemCapability,
+} from "../../adapters/filesystem/capability";
+import {
   appendProvisionCandidates,
   appendUnresolvedItems,
   readCurrentEvidenceCatalog,
@@ -890,6 +895,7 @@ export interface CaseOrchestrator {
   readonly workspaceReady: boolean;
   readonly workspaceLabel: string;
   readonly workspaceError: string | null;
+  readonly fileSystemCapability: FileSystemCapability | null;
   readonly activeCase: CaseRecord | null;
   readonly reviewerIdentity: HumanActor | null;
   readonly cases: readonly CaseRecord[];
@@ -1047,6 +1053,10 @@ export function useCaseOrchestrator(
   );
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [workspaceReady, setWorkspaceReady] = useState(false);
+  const fileSystemCapability = detectFileSystemCapability(
+    globalThis,
+    PRODUCTION_CAPABILITY_POLICY,
+  );
   const [view, setView] = useState<unknown>({ kind: "ready" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1313,6 +1323,17 @@ export function useCaseOrchestrator(
     setBusy(true);
     setWorkspaceError(null);
     try {
+      const capability = fileSystemCapability;
+      if (capability.mode !== "production-local-workspace") {
+        setWorkspaceError(
+          capability.blockingReasons.includes("DIRECTORY_PICKER_UNAVAILABLE")
+            ? "This browser cannot select a production local workspace. Use an approved Chromium or Edge profile."
+            : capability.blockingReasons.includes("SECURE_CONTEXT_REQUIRED")
+              ? "This browser is not running in a secure context. Use https or file://."
+              : "This browser cannot select a production local workspace. Use an approved Chromium or Edge profile.",
+        );
+        return;
+      }
       const picker = (
         globalThis as typeof globalThis & {
           showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -5106,6 +5127,7 @@ export function useCaseOrchestrator(
     workspaceReady,
     workspaceLabel,
     workspaceError,
+    fileSystemCapability,
     activeCase,
     reviewerIdentity,
     cases,

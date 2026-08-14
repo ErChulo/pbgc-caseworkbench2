@@ -8,10 +8,6 @@ test("loads the single-file artifact offline without console errors", async ({
   page,
   outboundRequests,
 }) => {
-  test.skip(
-    test.info().project.name === "edge",
-    "Edge direct-file is not approved.",
-  );
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());

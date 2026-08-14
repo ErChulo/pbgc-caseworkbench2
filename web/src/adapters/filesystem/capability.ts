@@ -2,6 +2,12 @@ export const PRODUCTION_MODE_LABEL = "Production local workspace" as const;
 export const NON_PRODUCTION_MODE_LABEL =
   "Non-production session — durable preservation and resumability unavailable" as const;
 
+export const PRODUCTION_CAPABILITY_POLICY: FileSystemCapabilityPolicy = {
+  approvedBrowserProfile: true,
+  directFileApproved: true,
+  loopbackStaticOriginApproved: true,
+} as const;
+
 export type FileSystemDeliveryMode =
   "direct-file" | "loopback-static-origin" | "unsupported";
 

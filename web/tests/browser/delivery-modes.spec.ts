@@ -8,10 +8,6 @@ test("supports the approved direct-file acceptance check without outbound reques
   offlinePage: page,
   outboundRequests,
 }) => {
-  test.skip(
-    test.info().project.name === "edge",
-    "Edge direct-file is not approved.",
-  );
   const artifact = pathToFileURL(resolve("dist/pbgc-caseworkbench.html")).href;
   await page.goto(artifact);
 
@@ -19,6 +15,7 @@ test("supports the approved direct-file acceptance check without outbound reques
     page.getByRole("heading", { name: "Evidence intake foundation" }),
   ).toBeVisible();
   await expect(page.locator(".feasibility")).toBeVisible();
+  await expect(page.locator(".feasibility")).toContainText("direct file");
   expect(outboundRequests).toEqual([]);
 });
 
