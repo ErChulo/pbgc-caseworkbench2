@@ -460,6 +460,8 @@ export function App({
           message={orchestrator.architectureBuildMessage}
           selection={orchestrator.architectureSelection}
           onApprove={orchestrator.recordArchitectureSelection}
+          v1Ready={orchestrator.v1XlsxBytes !== null}
+          onDownload={orchestrator.downloadV1Workbook}
         />
         <CaseOutputPackagePanel
           payload={finalOutputPayload}

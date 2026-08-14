@@ -140,6 +140,13 @@ import {
 } from "../../domain/architecture/workspace-adapter";
 import { createDraftV1SummaryArtifact } from "../../domain/draft-v1-summary/draft-builder";
 import { deterministicUuid } from "../../domain/build-spec/identity";
+import { buildSpecEngine } from "../../domain/build-spec/build-spec-engine";
+import type { BuildSpecV2 } from "../../domain/build-spec/models";
+import { compileBuildSpec } from "../../domain/formula-compiler/compiler";
+import type { CompilationResult } from "../../domain/formula-compiler/models";
+import { buildWorkbook } from "../../domain/workbook-builder/workbook-builder";
+import type { V1Workbook } from "../../domain/workbook-builder/models";
+import { buildXLSXSpec, writeXLSXBytes } from "../../domain/workbook-builder/serialization";
 import { validateContract } from "../../contracts/schema-validator";
 import {
   createEvidenceExtraction,
@@ -919,6 +926,12 @@ export interface CaseOrchestrator {
   readonly architecturePolicyMessage: string | null;
   readonly caseControls: AuthenticatedCaseControls | null;
   readonly caseControlsMessage: string | null;
+  readonly v1BuildSpec: BuildSpecV2 | null;
+  readonly v1CompilationResult: CompilationResult | null;
+  readonly v1Workbook: V1Workbook | null;
+  readonly v1XlsxBytes: Uint8Array | null;
+  readonly v1OutputMessage: string | null;
+  readonly downloadV1Workbook: () => void;
   readonly finalOutputInput: FinalCaseworkOutputInput | null;
   readonly evidenceItems: readonly ArtifactInventoryItem[];
   readonly evidencePackageSummary: PackageIntakeResult | null;
@@ -1157,6 +1170,12 @@ export function useCaseOrchestrator(
   const [caseControlsMessage, setCaseControlsMessage] = useState<string | null>(
     null,
   );
+  const [v1BuildSpec, setV1BuildSpec] = useState<BuildSpecV2 | null>(null);
+  const [v1CompilationResult, setV1CompilationResult] =
+    useState<CompilationResult | null>(null);
+  const [v1Workbook, setV1Workbook] = useState<V1Workbook | null>(null);
+  const [v1XlsxBytes, setV1XlsxBytes] = useState<Uint8Array | null>(null);
+  const [v1OutputMessage, setV1OutputMessage] = useState<string | null>(null);
 
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
@@ -1271,6 +1290,11 @@ export function useCaseOrchestrator(
     setArchitecturePolicyMessage(null);
     setCaseControls(null);
     setCaseControlsMessage(null);
+    setV1BuildSpec(null);
+    setV1CompilationResult(null);
+    setV1Workbook(null);
+    setV1XlsxBytes(null);
+    setV1OutputMessage(null);
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
@@ -3597,8 +3621,72 @@ export function useCaseOrchestrator(
       const architecture = architectureResult.value.architecture;
       await persistArchitecture(activeCase.caseId, architecture);
       setArchitectureSelection(null);
+
+      const buildSpecResult = await buildSpecEngine({
+        architecture,
+        architectureGovernance: {
+          caseId: activeCase.caseId,
+          planRules: rules,
+          evidenceCatalog: evidenceCatalogRef.current,
+          authorityOverrides: overrides,
+          population: { candidates: populationCandidates },
+          caseControls,
+          policies: loadedPolicies.value,
+          policyApprovals: { decisions: architecturePolicyApprovals },
+        },
+        formulaGovernance: {
+          approvedPlanRules: rules,
+          formulas: [],
+        },
+      });
+
+      if (!buildSpecResult.ok) {
+        const messages = buildSpecResult.errors.map((e) => e.message).join("; ");
+        setArchitectureBuildMessage(
+          `Architecture built but BuildSpec generation failed: ${messages}`,
+        );
+        return;
+      }
+      const buildSpec = buildSpecResult.buildSpec;
+      setV1BuildSpec(buildSpec);
+
+      const compilation = await compileBuildSpec({
+        buildSpec,
+        compilerVersion: "1.0.0",
+        clock: { now: () => dependencies.clock.now() },
+        uuid: { generate: () => dependencies.uuid.generate() },
+      });
+      setV1CompilationResult(compilation);
+
+      const workbookResult = await buildWorkbook({
+        buildSpec,
+        populationProfile: {
+          effectiveDecisionId: null,
+          effectiveWorkbookProfileContentSha256: buildSpec.buildSpecContentSha256,
+          status: "approved",
+          provenance: ["architecture-builder"],
+        },
+        workbookProfileContentSha256: buildSpec.buildSpecContentSha256,
+        generatorVersion: "1.0.0",
+      });
+
+      if (!workbookResult.ok) {
+        const messages = workbookResult.errors.map((e) => e.message).join("; ");
+        setV1OutputMessage(`Workbook generation failed: ${messages}`);
+        setArchitectureBuildMessage(
+          `Architecture built and BuildSpec generated, but workbook failed: ${messages}`,
+        );
+        return;
+      }
+      const workbook = workbookResult.workbook;
+      setV1Workbook(workbook);
+
+      const xlsxSpec = buildXLSXSpec(workbook);
+      const xlsxBytes = writeXLSXBytes(xlsxSpec);
+      setV1XlsxBytes(xlsxBytes);
+
       setArchitectureBuildMessage(
-        `Architecture built deterministically: ${String(architecture.runs.length)} run(s), ${String(architecture.sourceTabs.length)} tab(s), ${String(architecture.cells.size)} field(s). Hash: ${architecture.architectureContentSha256.slice(0, 12)}.`,
+        `V1 output built: architecture → BuildSpec → ${compilation.status} compilation → workbook (${String(xlsxBytes.byteLength)} bytes). Hash: ${architecture.architectureContentSha256.slice(0, 12)}.`,
       );
     } catch (error) {
       setArchitectureBuildMessage(
@@ -3859,6 +3947,21 @@ export function useCaseOrchestrator(
         error instanceof Error ? error.message : "Approval failed.",
       );
     }
+  };
+
+  const downloadV1Workbook = (): void => {
+    if (v1XlsxBytes === null || activeCase === null) return;
+    const blob = new Blob([v1XlsxBytes.buffer as ArrayBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `V1-Workbook-${String(activeCase.caseId)}.xlsx`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
   };
 
   const loadArchitectureSelection = async (
@@ -5039,6 +5142,12 @@ export function useCaseOrchestrator(
     architecturePolicyMessage,
     caseControls,
     caseControlsMessage,
+    v1BuildSpec,
+    v1CompilationResult,
+    v1Workbook,
+    v1XlsxBytes,
+    v1OutputMessage,
+    downloadV1Workbook,
     recordArchitecturePolicyApproval,
     recordCaseControls,
     finalOutputInput,

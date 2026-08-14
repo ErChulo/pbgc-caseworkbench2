@@ -14,6 +14,8 @@ export interface ArchitectureStageProps {
   readonly message: string | null;
   readonly selection: ArchitectureSelection | null;
   readonly onApprove: (selection: ArchitectureSelection) => Promise<void>;
+  readonly v1Ready: boolean;
+  readonly onDownload: () => void;
 }
 
 export function ArchitectureStage({
@@ -23,6 +25,8 @@ export function ArchitectureStage({
   message,
   selection,
   onApprove,
+  v1Ready,
+  onDownload,
 }: ArchitectureStageProps) {
   const [scenarios, setScenarios] = useState<readonly string[]>([]);
   const [tabs, setTabs] = useState<readonly string[]>([]);
@@ -153,6 +157,15 @@ export function ArchitectureStage({
         <p className="notice" role="status">
           {message}
         </p>
+      ) : null}
+      {v1Ready ? (
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={onDownload}
+        >
+          Download V1 Workbook (.xlsx)
+        </button>
       ) : null}
       {selection !== null ? (
         <div className="case-output-linked-artifacts">

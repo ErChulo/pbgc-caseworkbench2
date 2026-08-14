@@ -20,6 +20,8 @@ describe("governed architecture stage UI", () => {
         message={null}
         selection={null}
         onApprove={onApprove}
+        v1Ready={false}
+        onDownload={vi.fn()}
       />,
     );
 
