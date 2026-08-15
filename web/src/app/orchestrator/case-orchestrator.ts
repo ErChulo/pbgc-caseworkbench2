@@ -151,7 +151,10 @@ import { compileBuildSpec } from "../../domain/formula-compiler/compiler";
 import type { CompilationResult } from "../../domain/formula-compiler/models";
 import { buildWorkbook } from "../../domain/workbook-builder/workbook-builder";
 import type { V1Workbook } from "../../domain/workbook-builder/models";
-import { buildXLSXSpec, writeXLSXBytes } from "../../domain/workbook-builder/serialization";
+import {
+  buildXLSXSpec,
+  writeXLSXBytes,
+} from "../../domain/workbook-builder/serialization";
 import { validateContract } from "../../contracts/schema-validator";
 import {
   createEvidenceExtraction,
@@ -197,6 +200,14 @@ import {
   type PopulationCandidateDecision,
 } from "../../domain/population/population-profile";
 import { validateDateSelection } from "../../domain/classification/date-candidates";
+import {
+  createEmptyPlanSummaryRecord,
+  approvePlanSummaryAttribute,
+  type PlanSummaryRecord,
+  type PlanSummaryDecision,
+} from "../../domain/plan-summary";
+import type { FormulaApprovalRecord } from "../../domain/build-spec/models";
+import { formulaApprovalContentHash } from "../../domain/build-spec/formula-approval";
 import { bytesReader, readAllBytes } from "../utilities/file-readers";
 import {
   createFinalOutputInput,
@@ -925,6 +936,23 @@ export interface CaseOrchestrator {
   readonly caseOutputArtifacts: readonly CaseworkOutputArtifactInput[];
   readonly draftV1Summary: DraftV1SummaryArtifact | null;
   readonly draftV1SummaryMessage: string | null;
+  readonly planSummaryRecord: PlanSummaryRecord | null;
+  readonly planSummaryMessage: string | null;
+  readonly planSummaryDecisions: readonly PlanSummaryDecision[];
+  readonly formulaApprovalRecords: readonly FormulaApprovalRecord[];
+  readonly initializePlanSummary: () => Promise<void>;
+  readonly approvePlanSummaryAttribute: (
+    attributeId: string,
+    selectedValue: string | null,
+    rationale: string,
+  ) => Promise<void>;
+  readonly approveFormula: (
+    cellKey: string,
+    scenarioId: string,
+    formulaText: string,
+    sourcePlanRuleIds: readonly string[],
+    rationale: string,
+  ) => Promise<void>;
   readonly architectureSelection: ArchitectureSelection | null;
   readonly architectureBuildMessage: string | null;
   readonly architecturePolicyItems: readonly ArchitecturePolicyReviewItem[];
@@ -1186,6 +1214,17 @@ export function useCaseOrchestrator(
   const [v1Workbook, setV1Workbook] = useState<V1Workbook | null>(null);
   const [v1XlsxBytes, setV1XlsxBytes] = useState<Uint8Array | null>(null);
   const [v1OutputMessage, setV1OutputMessage] = useState<string | null>(null);
+  const [planSummaryRecord, setPlanSummaryRecord] =
+    useState<PlanSummaryRecord | null>(null);
+  const [planSummaryMessage, setPlanSummaryMessage] = useState<string | null>(
+    null,
+  );
+  const [planSummaryDecisions, setPlanSummaryDecisions] = useState<
+    readonly PlanSummaryDecision[]
+  >([]);
+  const [formulaApprovalRecords, setFormulaApprovalRecords] = useState<
+    readonly FormulaApprovalRecord[]
+  >([]);
 
   const [sessionGovernanceDependencies, setSessionGovernanceDependencies] =
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
@@ -1305,6 +1344,10 @@ export function useCaseOrchestrator(
     setV1Workbook(null);
     setV1XlsxBytes(null);
     setV1OutputMessage(null);
+    setPlanSummaryRecord(null);
+    setPlanSummaryMessage(null);
+    setPlanSummaryDecisions([]);
+    setFormulaApprovalRecords([]);
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
@@ -3554,6 +3597,187 @@ export function useCaseOrchestrator(
     );
   };
 
+  const initializePlanSummary = async (): Promise<void> => {
+    if (activeCase === null) {
+      setPlanSummaryMessage(
+        "Select an active case before initializing Plan Summary.",
+      );
+      return;
+    }
+    setPlanSummaryMessage(null);
+    try {
+      const record = await createEmptyPlanSummaryRecord(activeCase.caseId, {
+        uuid: { generate: () => dependencies.uuid.generate() },
+        clock: { now: () => dependencies.clock.now() },
+      });
+      setPlanSummaryRecord(record);
+      caseReviewState.current = {
+        ...caseReviewState.current,
+        planSummaryRecord: record,
+      };
+      setPlanSummaryMessage(
+        "Plan Summary initialized. Add attributes from approved evidence.",
+      );
+    } catch (error) {
+      setPlanSummaryMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to initialize Plan Summary.",
+      );
+    }
+  };
+
+  const approvePlanSummaryAttributeAction = async (
+    attributeId: string,
+    selectedValue: string | null,
+    rationale: string,
+  ): Promise<void> => {
+    if (planSummaryRecord === null || activeCase === null) {
+      setPlanSummaryMessage("No active Plan Summary record.");
+      return;
+    }
+    setPlanSummaryMessage(null);
+    try {
+      const parsedAttributeId = parseUuid(attributeId);
+      if (!parsedAttributeId.ok) {
+        setPlanSummaryMessage("Invalid attribute ID.");
+        return;
+      }
+      const result = await approvePlanSummaryAttribute(
+        planSummaryRecord,
+        parsedAttributeId.value,
+        selectedValue,
+        null,
+        rationale,
+        {
+          actorType: "human",
+          actorKey:
+            sharedReviewer.trim() === "" ? "anonymous" : sharedReviewer.trim(),
+          displayName:
+            sharedReviewer.trim() === "" ? "Anonymous" : sharedReviewer.trim(),
+          authorityContext: "actuary",
+        },
+        {
+          uuid: { generate: () => dependencies.uuid.generate() },
+          clock: { now: () => dependencies.clock.now() },
+        },
+      );
+      setPlanSummaryRecord(result.record);
+      setPlanSummaryDecisions((prev) => [...prev, result.decision]);
+      caseReviewState.current = {
+        ...caseReviewState.current,
+        planSummaryRecord: result.record,
+        planSummaryDecisions: [
+          ...caseReviewState.current.planSummaryDecisions,
+          result.decision,
+        ],
+      };
+      setPlanSummaryMessage("Attribute approved successfully.");
+    } catch (error) {
+      setPlanSummaryMessage(
+        error instanceof Error ? error.message : "Failed to approve attribute.",
+      );
+    }
+  };
+
+  const approveFormulaAction = async (
+    cellKey: string,
+    scenarioId: string,
+    formulaText: string,
+    sourcePlanRuleIds: readonly string[],
+    rationale: string,
+  ): Promise<void> => {
+    if (activeCase === null) {
+      setArchitectureBuildMessage(
+        "Select an active case before approving formulas.",
+      );
+      return;
+    }
+    setArchitectureBuildMessage(null);
+    try {
+      const parsedRuleIds = sourcePlanRuleIds.map((id) => parseUuid(id));
+      const invalidRule = parsedRuleIds.find((r) => !r.ok);
+      if (invalidRule) {
+        setArchitectureBuildMessage("Invalid plan rule ID provided.");
+        return;
+      }
+      const validRuleIds = parsedRuleIds
+        .filter((r) => r.ok)
+        .map((r) => r.value);
+
+      const existingRecords = formulaApprovalRecords.filter(
+        (r) => r.target.cellAddress === cellKey && r.scenarioId === scenarioId,
+      );
+      const nextOrdinal = existingRecords.length + 1;
+      const lastDecision = existingRecords[existingRecords.length - 1];
+
+      const sourcePlanRuleHashes = previewRules
+        .filter((rule) => validRuleIds.includes(rule.ruleId))
+        .map((rule) => ({
+          ruleId: rule.ruleId,
+          ruleContentSha256: rule.ruleContentSha256,
+          relationship: "governing" as const,
+        }));
+
+      const decisionId = dependencies.uuid.generate();
+      const recordWithoutHash: Omit<
+        FormulaApprovalRecord,
+        "decisionContentSha256"
+      > = {
+        decisionId,
+        appendOrdinal: nextOrdinal,
+        priorDecisionId: lastDecision?.decisionId ?? null,
+        priorDecisionContentSha256: lastDecision?.decisionContentSha256 ?? null,
+        decisionType: "approve",
+        resultingStatus: "approved",
+        formulaText,
+        target: {
+          tabName: "V1",
+          cellAddress: cellKey,
+          genericField: cellKey,
+        },
+        scenarioId,
+        iobClassification: "O",
+        sourcePlanRules: sourcePlanRuleHashes,
+        derivationDescription: `Formula approved for cell ${cellKey}`,
+        affectedTestIds: [],
+        regenerationImpact: "none",
+        validationOracleIds: [],
+        humanActor: {
+          actorType: "human",
+          actorKey:
+            sharedReviewer.trim() === "" ? "anonymous" : sharedReviewer.trim(),
+          displayName:
+            sharedReviewer.trim() === "" ? "Anonymous" : sharedReviewer.trim(),
+          authorityContext: "actuary",
+        },
+        rationale,
+        decidedAt: dependencies.clock.now(),
+        schemaVersion: "1.0.0",
+      };
+      const decisionContentSha256 =
+        await formulaApprovalContentHash(recordWithoutHash);
+      const newRecord: FormulaApprovalRecord = {
+        ...recordWithoutHash,
+        decisionContentSha256,
+      };
+
+      setFormulaApprovalRecords((prev) => [...prev, newRecord]);
+      caseReviewState.current = {
+        ...caseReviewState.current,
+        formulaApprovalRecords: [
+          ...caseReviewState.current.formulaApprovalRecords,
+          newRecord,
+        ],
+      };
+      setArchitectureBuildMessage(`Formula approved for cell ${cellKey}.`);
+    } catch (error) {
+      setArchitectureBuildMessage(
+        error instanceof Error ? error.message : "Failed to approve formula.",
+      );
+    }
+  };
+
   const recordArchitectureSelection = async (): Promise<void> => {
     if (
       activeCase === null ||
@@ -3657,12 +3881,44 @@ export function useCaseOrchestrator(
         },
         formulaGovernance: {
           approvedPlanRules: rules,
-          formulas: [],
+          formulas: formulaApprovalRecords.reduce<
+            {
+              cellKey: string;
+              scenarioId: string;
+              approvalDecisions: readonly FormulaApprovalRecord[];
+            }[]
+          >((entries, record) => {
+            const existing = entries.find(
+              (e) =>
+                e.cellKey === record.target.cellAddress &&
+                e.scenarioId === record.scenarioId,
+            );
+            if (existing) {
+              return entries.map((e) =>
+                e === existing
+                  ? {
+                      ...e,
+                      approvalDecisions: [...e.approvalDecisions, record],
+                    }
+                  : e,
+              );
+            }
+            return [
+              ...entries,
+              {
+                cellKey: record.target.cellAddress,
+                scenarioId: record.scenarioId,
+                approvalDecisions: [record],
+              },
+            ];
+          }, []),
         },
       });
 
       if (!buildSpecResult.ok) {
-        const messages = buildSpecResult.errors.map((e) => e.message).join("; ");
+        const messages = buildSpecResult.errors
+          .map((e) => e.message)
+          .join("; ");
         setArchitectureBuildMessage(
           `Architecture built but BuildSpec generation failed: ${messages}`,
         );
@@ -3679,16 +3935,48 @@ export function useCaseOrchestrator(
       });
       setV1CompilationResult(compilation);
 
+      const approvedPopulationItem = populationItems.find(
+        (item) =>
+          item.projection.status === "approved" &&
+          item.projection.effectiveDecisionId !== null,
+      );
+
+      const populationProfile = approvedPopulationItem?.projection ?? {
+        effectiveDecisionId: null,
+        effectiveWorkbookProfileContentSha256: null,
+        status: "provisional" as const,
+        provenance: [],
+      };
+
+      const workbookContentSha256 =
+        populationProfile.effectiveWorkbookProfileContentSha256 ??
+        buildSpec.buildSpecContentSha256;
+
+      let populationData:
+        | ReadonlyMap<string, ReadonlyMap<string, readonly unknown[]>>
+        | undefined;
+      if (approvedPopulationItem?.workbook) {
+        const dataMap = new Map<string, Map<string, unknown[]>>();
+        for (const sheet of approvedPopulationItem.workbook.sheets) {
+          const columnMap = new Map<string, unknown[]>();
+          for (const cell of sheet.cells) {
+            const colMatch = /^([A-Z]+)/.exec(cell.address);
+            const column = colMatch?.[1] ?? "A";
+            const existing = columnMap.get(column) ?? [];
+            existing.push(cell.storedValue);
+            columnMap.set(column, existing);
+          }
+          dataMap.set(sheet.name, columnMap);
+        }
+        populationData = dataMap;
+      }
+
       const workbookResult = await buildWorkbook({
         buildSpec,
-        populationProfile: {
-          effectiveDecisionId: null,
-          effectiveWorkbookProfileContentSha256: buildSpec.buildSpecContentSha256,
-          status: "approved",
-          provenance: ["architecture-builder"],
-        },
-        workbookProfileContentSha256: buildSpec.buildSpecContentSha256,
+        populationProfile,
+        workbookProfileContentSha256: workbookContentSha256,
         generatorVersion: "1.0.0",
+        populationData,
       });
 
       if (!workbookResult.ok) {
@@ -5201,6 +5489,13 @@ export function useCaseOrchestrator(
     exportFinalCaseworkOutputPackage,
     exportCurrentManifest,
     generateDraftV1Summary,
+    planSummaryRecord,
+    planSummaryMessage,
+    planSummaryDecisions,
+    formulaApprovalRecords,
+    initializePlanSummary,
+    approvePlanSummaryAttribute: approvePlanSummaryAttributeAction,
+    approveFormula: approveFormulaAction,
     recordArchitectureSelection,
     processPackage,
     openEvidence,

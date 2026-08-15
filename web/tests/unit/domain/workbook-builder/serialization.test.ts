@@ -105,11 +105,10 @@ describe("XLSX serialization", () => {
     if (!result.ok) throw new Error("workbook build failed");
 
     const spec = buildXLSXSpec(result.workbook);
-    expect(spec.sheets.map((s) => s.name)).toEqual([
-      "Summary",
-      "Tables",
-      "UD Table",
-    ]);
+    const sheetNames = spec.sheets.map((s) => s.name);
+    expect(sheetNames).toContain("Summary");
+    expect(sheetNames).toContain("Tables");
+    expect(sheetNames).toContain("UD Table");
   });
 
   it("populates summary sheet rows with metadata values", async () => {

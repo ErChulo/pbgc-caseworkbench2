@@ -19,6 +19,11 @@ import type {
   ArtifactEligibilityDecision,
   QuarantineDecision,
 } from "../../domain/quarantine/models";
+import type {
+  PlanSummaryRecord,
+  PlanSummaryDecision,
+} from "../../domain/plan-summary/models";
+import type { FormulaApprovalRecord } from "../../domain/build-spec/models";
 import {
   parseSha256,
   parseUtcTimestamp,
@@ -44,6 +49,9 @@ export interface CaseReviewState {
   readonly populationDecisions: readonly PopulationCandidateDecision[];
   readonly architecturePolicyApprovals: readonly ArchitecturePolicyApproval[];
   readonly authenticatedCaseControls: AuthenticatedCaseControls | null;
+  readonly planSummaryRecord: PlanSummaryRecord | null;
+  readonly planSummaryDecisions: readonly PlanSummaryDecision[];
+  readonly formulaApprovalRecords: readonly FormulaApprovalRecord[];
 }
 
 export interface PersistedCaseReviewSnapshot extends CaseReviewState {
@@ -84,6 +92,9 @@ export function createEmptyCaseReviewState(): CaseReviewState {
     populationDecisions: [],
     architecturePolicyApprovals: [],
     authenticatedCaseControls: null,
+    planSummaryRecord: null,
+    planSummaryDecisions: [],
+    formulaApprovalRecords: [],
   };
 }
 
@@ -128,6 +139,14 @@ export async function parseCaseReviewSnapshot(
     authenticatedCaseControls:
       (value.authenticatedCaseControls as unknown as AuthenticatedCaseControls | null) ??
       null,
+    planSummaryRecord:
+      (value.planSummaryRecord as unknown as PlanSummaryRecord | null) ?? null,
+    planSummaryDecisions: Array.isArray(value.planSummaryDecisions)
+      ? (value.planSummaryDecisions as readonly PlanSummaryDecision[])
+      : [],
+    formulaApprovalRecords: Array.isArray(value.formulaApprovalRecords)
+      ? (value.formulaApprovalRecords as readonly FormulaApprovalRecord[])
+      : [],
   } as PersistedCaseReviewSnapshot;
   const { reviewSnapshotId: ignored, ...payload } = snapshot;
   void ignored;
@@ -174,7 +193,11 @@ function hasReviewArrays(
 ): value is Record<keyof CaseReviewState, readonly Record<string, unknown>[]> {
   const requiredKeys: readonly Exclude<
     keyof CaseReviewState,
-    "architecturePolicyApprovals" | "authenticatedCaseControls"
+    | "architecturePolicyApprovals"
+    | "authenticatedCaseControls"
+    | "planSummaryRecord"
+    | "planSummaryDecisions"
+    | "formulaApprovalRecords"
   >[] = [
     "quarantineItems",
     "eligibilityItems",
@@ -203,7 +226,25 @@ function hasReviewArrays(
     value.authenticatedCaseControls === undefined ||
     value.authenticatedCaseControls === null ||
     isRecord(value.authenticatedCaseControls);
-  return approvalsValid && controlsValid;
+  const planSummaryValid =
+    value.planSummaryRecord === undefined ||
+    value.planSummaryRecord === null ||
+    isRecord(value.planSummaryRecord);
+  const planSummaryDecisionsValid =
+    value.planSummaryDecisions === undefined ||
+    (Array.isArray(value.planSummaryDecisions) &&
+      value.planSummaryDecisions.every((item) => isRecord(item)));
+  const formulaApprovalValid =
+    value.formulaApprovalRecords === undefined ||
+    (Array.isArray(value.formulaApprovalRecords) &&
+      value.formulaApprovalRecords.every((item) => isRecord(item)));
+  return (
+    approvalsValid &&
+    controlsValid &&
+    planSummaryValid &&
+    planSummaryDecisionsValid &&
+    formulaApprovalValid
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

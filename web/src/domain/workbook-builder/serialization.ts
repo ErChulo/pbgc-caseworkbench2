@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { hashTyped } from "../manifests/canonical-json";
 import type { Sha256 } from "../shared/types";
-import type { V1Workbook } from "./models";
+import type { V1Workbook, WorkbookSheet, WorkbookCell } from "./models";
 
 export async function computeWorkbookHash(
   workbook: Omit<V1Workbook, "workbookContentSha256">,
@@ -35,8 +35,14 @@ export function buildXLSXSpec(workbook: V1Workbook): XLSXWorkbookSpec {
   const tablesSheet = buildTablesSheet(workbook);
   const udTableSheet = buildUDTableSheet(workbook);
 
+  const calcSheets: XLSXSheet[] = workbook.sheets.map((sheet) => ({
+    name: sheet.name,
+    hidden: sheet.hidden,
+    rows: buildCalcSheetRows(sheet),
+  }));
+
   return {
-    sheets: [summarySheet, tablesSheet, udTableSheet],
+    sheets: [summarySheet, tablesSheet, udTableSheet, ...calcSheets],
     namedRanges: workbook.namedRanges.map((nr) => ({
       name: nr.rangeName,
       scope: nr.scope,
@@ -44,6 +50,68 @@ export function buildXLSXSpec(workbook: V1Workbook): XLSXWorkbookSpec {
       reference: `${nr.tabName}!${nr.cellAddress}`,
     })),
   };
+}
+
+function buildCalcSheetRows(
+  sheet: WorkbookSheet,
+): readonly (readonly (string | number | boolean | null)[])[] {
+  const rows: (readonly (string | number | boolean | null)[])[] = [];
+
+  const cellMap = new Map<string, WorkbookCell>();
+  for (const cell of sheet.cells) {
+    cellMap.set(cell.address, cell);
+  }
+
+  let maxRow = 0;
+  let maxCol = 0;
+  for (const cell of sheet.cells) {
+    const match = /^([A-Z]+)(\d+)$/.exec(cell.address);
+    if (match) {
+      const rowNum = parseInt(match[2] ?? "0", 10);
+      const colNum = columnToIndex(match[1] ?? "A");
+      if (rowNum > maxRow) maxRow = rowNum;
+      if (colNum > maxCol) maxCol = colNum;
+    }
+  }
+
+  for (let r = 1; r <= maxRow; r++) {
+    const row: (string | number | boolean | null)[] = [];
+    for (let c = 0; c <= maxCol; c++) {
+      const addr = `${indexToColumn(c)}${String(r)}`;
+      const cell = cellMap.get(addr);
+      if (cell) {
+        if (cell.kind === "formula") {
+          row.push(cell.formulaText ?? "");
+        } else {
+          row.push(cell.value as string | number | boolean | null);
+        }
+      } else {
+        row.push(null);
+      }
+    }
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function columnToIndex(col: string): number {
+  let index = 0;
+  for (let i = 0; i < col.length; i++) {
+    index = index * 26 + (col.charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+
+function indexToColumn(index: number): string {
+  let col = "";
+  let n = index + 1;
+  while (n > 0) {
+    const remainder = (n - 1) % 26;
+    col = String.fromCharCode(65 + remainder) + col;
+    n = Math.floor((n - 1) / 26);
+  }
+  return col;
 }
 
 function buildSummarySheet(workbook: V1Workbook): XLSXSheet {

@@ -125,20 +125,29 @@ export function populateDataCells(
       rowIndexes.set(key, rowIndex + 1);
     }
 
+    let dataSourceMetadata: import("./models").PopulationDataSource | null =
+      null;
+    if (mapping.dataSource) {
+      const sourceValues =
+        resolver?.resolve(
+          mapping.dataSource.sourceTab,
+          mapping.dataSource.sourceField,
+        ) ?? [];
+      dataSourceMetadata = {
+        sourceTab: mapping.dataSource.sourceTab,
+        columnIdentifier: mapping.dataSource.sourceField,
+        rowRange: { start: 0, count: sourceValues.length },
+        recordCount: sourceValues.length,
+        recordHash: "0".repeat(64) as import("../shared/types").Sha256,
+      };
+    }
+
     existing.push({
       address: mapping.cellAddress,
       kind,
       formulaText: null,
       value,
-      dataSource: mapping.dataSource
-        ? {
-            sourceTab: mapping.dataSource.sourceTab,
-            columnIdentifier: mapping.dataSource.sourceField,
-            rowRange: { start: 0, count: 0 },
-            recordCount: 0,
-            recordHash: "0".repeat(64) as import("../shared/types").Sha256,
-          }
-        : null,
+      dataSource: dataSourceMetadata,
       mappingId: mapping.mappingId,
     });
     cellsByTab.set(mapping.tabName, existing);

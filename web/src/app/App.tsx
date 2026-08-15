@@ -19,6 +19,8 @@ import { UnresolvedItemQueue } from "../components/evidence/UnresolvedItemQueue"
 import { EvidenceViewer } from "../components/evidence/EvidenceViewer";
 import { CaseOutputPackagePanel } from "../components/case-output/CaseOutputPackagePanel";
 import { DraftV1SummaryPanel } from "../components/draft-v1-summary/DraftV1SummaryPanel";
+import { PlanSummaryPanel } from "../components/plan-summary/PlanSummaryPanel";
+import { FormulaGovernancePanel } from "../components/formula-governance/FormulaGovernancePanel";
 import { ArchitectureStage } from "../components/architecture/ArchitectureStage";
 import { ArchitecturePolicyReview } from "../components/architecture/ArchitecturePolicyReview";
 import { CaseControlsReview } from "../components/architecture/CaseControlsReview";
@@ -270,6 +272,25 @@ export function App({
           draft={orchestrator.draftV1Summary}
           message={orchestrator.draftV1SummaryMessage}
           onGenerate={orchestrator.generateDraftV1Summary}
+        />
+        <PlanSummaryPanel
+          enabled={
+            orchestrator.workspaceReady && orchestrator.activeCase !== null
+          }
+          record={orchestrator.planSummaryRecord}
+          message={orchestrator.planSummaryMessage}
+          onInitialize={orchestrator.initializePlanSummary}
+          onApproveAttribute={orchestrator.approvePlanSummaryAttribute}
+        />
+        <FormulaGovernancePanel
+          enabled={
+            orchestrator.workspaceReady && orchestrator.activeCase !== null
+          }
+          architecture={null}
+          formulaApprovalRecords={orchestrator.formulaApprovalRecords}
+          planRules={orchestrator.previewRules}
+          message={orchestrator.architectureBuildMessage}
+          onApproveFormula={orchestrator.approveFormula}
         />
         <QuarantineQueue
           items={orchestrator.quarantineItems}
