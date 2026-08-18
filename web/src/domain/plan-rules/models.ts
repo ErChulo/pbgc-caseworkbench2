@@ -60,7 +60,14 @@ export type ApplicabilityDimension =
   | "service-definition"
   | "actuarial-equivalence-purpose"
   | "freeze-or-restriction"
-  | "amendment-period";
+  | "amendment-period"
+  | "benefit-type"
+  | "normal-retirement-age"
+  | "early-retirement-provision"
+  | "survivor-benefit"
+  | "qpsa-provision"
+  | "required-beginning-date"
+  | "case-purpose";
 
 export const planRuleAbsentApplicabilityValue = "absent" as const;
 

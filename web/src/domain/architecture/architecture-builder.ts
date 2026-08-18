@@ -261,7 +261,7 @@ export async function buildArchitecture(
     architectureId: identity.value,
     builtAt: builtAt.value,
     ...content,
-    architectureContentSha256: computeArchitectureContentSha256(content),
+    architectureContentSha256: await computeArchitectureContentSha256(content),
   };
   return { ok: true, value: { architecture, unresolvedItems: [] } };
 }
@@ -281,7 +281,7 @@ async function validatePolicies(
     readonly approval: ArchitecturePolicyProjection;
   }[] = [];
   for (const policy of ruleSets) {
-    if (policyContentHash(policy) !== policy.policyContentSha256)
+    if ((await policyContentHash(policy)) !== policy.policyContentSha256)
       return {
         ok: false as const,
         error: `${policy.kind} policy content hash is invalid.`,

@@ -1,3 +1,4 @@
+import { sha256Hex } from "../shared/digest";
 import type { EvidenceCatalog } from "../evidence/models";
 import type { Result, Sha256 } from "../shared/types";
 import {
@@ -541,21 +542,8 @@ function nodeBuiltin(id: string): unknown {
   return module;
 }
 
-function digest(value: string): Sha256 {
-  const crypto = nodeBuiltin("node:crypto") as {
-    createHash: (algorithm: string) => {
-      update: (
-        data: string,
-        encoding: "utf8",
-      ) => {
-        digest: (encoding: "hex") => string;
-      };
-    };
-  };
-  return crypto
-    .createHash("sha256")
-    .update(value, "utf8")
-    .digest("hex") as Sha256;
+async function digest(value: string): Promise<Sha256> {
+  return sha256Hex(value);
 }
 
 export async function loadBundledRuleSets(config: {
@@ -601,7 +589,7 @@ export async function loadBundledRuleSets(config: {
   return { ok: true, value: loaded };
 }
 
-export function policyContentHash(ruleSet: RuleSet): Sha256 {
+export async function policyContentHash(ruleSet: RuleSet): Promise<Sha256> {
   return digest(stableJson(ruleSet.rules ?? ruleSet.entries));
 }
 

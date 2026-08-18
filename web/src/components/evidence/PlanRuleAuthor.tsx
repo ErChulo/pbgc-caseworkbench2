@@ -32,6 +32,13 @@ const dimensions: readonly ApplicabilityDimension[] = [
   "actuarial-equivalence-purpose",
   "freeze-or-restriction",
   "amendment-period",
+  "benefit-type",
+  "normal-retirement-age",
+  "early-retirement-provision",
+  "survivor-benefit",
+  "qpsa-provision",
+  "required-beginning-date",
+  "case-purpose",
 ];
 
 export function PlanRuleAuthor({
@@ -39,12 +46,14 @@ export function PlanRuleAuthor({
   unresolvedItems,
   existingRules,
   busy = false,
+  production = false,
   onAuthor,
 }: {
   readonly candidates: readonly RuleAuthorCandidate[];
   readonly unresolvedItems: readonly UnresolvedItem[];
   readonly existingRules: readonly PlanRuleRecord[];
   readonly busy?: boolean;
+  readonly production?: boolean;
   readonly onAuthor: (draft: RuleAuthoringDraft) => Promise<void>;
 }) {
   const first = candidates[0];
@@ -111,7 +120,9 @@ export function PlanRuleAuthor({
           <p className="section-label">Governed rule validation</p>
           <h2 id="rule-author-title">Plan rule author</h2>
         </div>
-        <span className="status-chip">Session preview only</span>
+        <span className="status-chip">
+          {production ? "Case-derived candidates" : "Session preview only"}
+        </span>
       </div>
       {blockingItems.length > 0 ? (
         <div

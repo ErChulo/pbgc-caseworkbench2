@@ -2,7 +2,6 @@ import type {
   V1Architecture,
   V1ArchitectureContent,
 } from "../../src/domain/architecture/models";
-import { computeArchitectureContentSha256 } from "../../src/domain/architecture/workspace-adapter";
 import { buildArchitecture } from "../../src/domain/architecture/architecture-builder";
 import { formulaApprovalContentHash } from "../../src/domain/build-spec/formula-approval";
 import type { FormulaGovernanceInput } from "../../src/domain/build-spec/models";
@@ -214,11 +213,15 @@ export function createGovernedArchitecture(
       },
     ],
   };
+  // Mapping-unit consumers of this synthetic fixture only copy the content
+  // hash into their outputs; they never verify it, so a deterministic
+  // placeholder keeps the fixture synchronous. Hash-authenticating tests use
+  // authenticatedGovernedInput()/buildArchitecture instead.
   return {
     architectureId: uuid("1"),
     builtAt: timestamp,
     ...content,
-    architectureContentSha256: computeArchitectureContentSha256(content),
+    architectureContentSha256: "0".repeat(64) as Sha256,
   };
 }
 

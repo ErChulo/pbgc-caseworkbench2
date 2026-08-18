@@ -199,7 +199,7 @@ async function authenticateArchitecture(
     formulaDependencies: architecture.formulaDependencies,
     namedRanges: architecture.namedRanges,
   };
-  const computed = computeArchitectureContentSha256(content);
+  const computed = await computeArchitectureContentSha256(content);
   if (computed !== architecture.architectureContentSha256)
     errors.push(
       makeError(

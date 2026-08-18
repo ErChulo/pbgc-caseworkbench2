@@ -50,9 +50,7 @@ test.describe("Direct-file production acceptance", () => {
     await expect(page.getByLabel("Case number")).toBeVisible();
   });
 
-  test("case workflow loads from file://", async ({
-    offlinePage: page,
-  }) => {
+  test("case workflow loads from file://", async ({ offlinePage: page }) => {
     await installSyntheticWorkspace(page);
     await page.goto(pathToFileURL(ARTIFACT_PATH).href);
 

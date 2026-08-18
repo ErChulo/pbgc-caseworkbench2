@@ -1,4 +1,5 @@
 import { validateContract } from "../../contracts/schema-validator";
+import { sha256Bytes } from "../shared/digest";
 import type { Result, Sha256, Uuid, UtcTimestamp } from "../shared/types";
 import type {
   CellDescriptor,
@@ -118,34 +119,13 @@ export function architectureContentToJsonValue(
   };
 }
 
-export function computeArchitectureContentSha256(
+export async function computeArchitectureContentSha256(
   architecture: V1ArchitectureContent,
-): Sha256 {
+): Promise<Sha256> {
   const bytes = new TextEncoder().encode(
     stableJson(architectureContentToJsonValue(architecture)),
   );
-  const { createHash } = requireNodeCrypto();
-  return createHash("sha256").update(bytes).digest("hex") as Sha256;
-}
-
-function requireNodeCrypto(): {
-  createHash: (algorithm: string) => {
-    update: (data: Uint8Array) => { digest: (encoding: "hex") => string };
-  };
-} {
-  const processValue = (globalThis as { process?: unknown }).process as
-    { getBuiltinModule?: (name: string) => unknown } | undefined;
-  const crypto =
-    processValue !== undefined &&
-    typeof processValue.getBuiltinModule === "function"
-      ? processValue.getBuiltinModule("node:crypto")
-      : undefined;
-  if (crypto === undefined) throw new Error("Node crypto is unavailable.");
-  return crypto as {
-    createHash: (algorithm: string) => {
-      update: (data: Uint8Array) => { digest: (encoding: "hex") => string };
-    };
-  };
+  return sha256Bytes(bytes);
 }
 
 function readRecord(value: unknown, name: string): Record<string, unknown> {
@@ -377,49 +357,49 @@ function readNamedRange(value: unknown, index: number): NamedRange {
   };
 }
 
-export function writeArchitectureJson(
+export async function writeArchitectureJson(
   architecture: V1Architecture,
 ): Promise<Result<Uint8Array, ArchitectureWriteError>> {
   try {
     const serializable = architectureToJsonValue(architecture);
     const validation = validateContract("v1Architecture", serializable);
     if (!validation.valid) {
-      return Promise.resolve({
+      return {
         ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: validation.issues.map((issue) => issue.message).join("; "),
         },
-      });
+      };
     }
     if (
-      computeArchitectureContentSha256(architecture) !==
+      (await computeArchitectureContentSha256(architecture)) !==
       architecture.architectureContentSha256
     ) {
-      return Promise.resolve({
+      return {
         ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: "Architecture content hash does not match its content.",
         },
-      });
+      };
     }
 
     const json = `${JSON.stringify(serializable, null, 2)}\n`;
     const bytes = new TextEncoder().encode(json);
-    return Promise.resolve({ ok: true, value: bytes });
+    return { ok: true, value: bytes };
   } catch (error) {
-    return Promise.resolve({
+    return {
       ok: false,
       error: {
         code: "WRITE_FAILED",
         message: errorMessage(error),
       },
-    });
+    };
   }
 }
 
-export function readArchitectureJson(
+export async function readArchitectureJson(
   bytes: Uint8Array,
 ): Promise<Result<V1Architecture, ArchitectureReadError>> {
   try {
@@ -428,13 +408,13 @@ export function readArchitectureJson(
     const data = readRecord(parsed, "architecture");
     const validation = validateContract("v1Architecture", data);
     if (!validation.valid) {
-      return Promise.resolve({
+      return {
         ok: false,
         error: {
           code: "VALIDATION_ERROR",
           message: validation.issues.map((issue) => issue.message).join("; "),
         },
-      });
+      };
     }
     const cells = new Map<string, CellDescriptor>();
     for (const [key, value] of Object.entries(
@@ -470,25 +450,25 @@ export function readArchitectureJson(
     };
 
     if (
-      computeArchitectureContentSha256(architecture) !==
+      (await computeArchitectureContentSha256(architecture)) !==
       architecture.architectureContentSha256
     ) {
-      return Promise.resolve({
+      return {
         ok: false,
         error: {
           code: "HASH_MISMATCH",
           message: "Stored architecture content hash is invalid.",
         },
-      });
+      };
     }
-    return Promise.resolve({ ok: true, value: architecture });
+    return { ok: true, value: architecture };
   } catch (error) {
-    return Promise.resolve({
+    return {
       ok: false,
       error: {
         code: "PARSE_ERROR",
         message: errorMessage(error),
       },
-    });
+    };
   }
 }

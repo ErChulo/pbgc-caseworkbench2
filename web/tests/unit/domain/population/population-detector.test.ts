@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { parseDelimited } from "../../../../src/adapters/parsers/delimited-parser";
 import { hashTyped } from "../../../../src/domain/manifests/canonical-json";
-import { detectTabularPopulation } from "../../../../src/domain/population/population-detector";
+import {
+  detectTabularPopulation,
+  detectWorkbookPopulation,
+} from "../../../../src/domain/population/population-detector";
 import {
   canonicalPopulationCandidate,
   createPopulationCandidate,
@@ -12,6 +15,7 @@ import {
   validatePopulationEvidence,
   type PopulationCandidateDecision,
 } from "../../../../src/domain/population/population-profile";
+import type { RawValueKind } from "../../../../src/domain/population/tabular-adapter";
 import { adaptTabularExtraction } from "../../../../src/domain/population/tabular-adapter";
 import { parseSha256, type Sha256 } from "../../../../src/domain/shared/types";
 import { syntheticPopulationCsv } from "../../../fixtures/generators/populations";
@@ -188,7 +192,110 @@ describe("T093 population candidate identity and governance", () => {
       ).ok,
     ).toBe(false);
   });
+
+  it("emits participant-group characteristics from recognizable workbook sheet names", async () => {
+    const detected = await workbookDetection([
+      {
+        name: "Retirees",
+        hidden: false,
+        cells: [workbookCell("A1", "DOB"), workbookCell("B1", "BSEX")],
+      },
+      {
+        name: "Tables",
+        hidden: false,
+        cells: [workbookCell("A1", "Freeze Date")],
+      },
+    ]);
+    const characteristic = detected.observations.find(
+      (observation) => observation.evidenceKind === "population-characteristic",
+    );
+    expect(characteristic).toBeDefined();
+    expect(characteristic?.observedTextOrValue).toEqual({
+      dimension: "participant-group",
+      value: "retired-participants",
+    });
+    expect(
+      detected.observations.filter(
+        (observation) =>
+          observation.evidenceKind === "population-characteristic",
+      ),
+    ).toHaveLength(1);
+    expect(
+      (
+        await validatePopulationEvidence(
+          detected.candidate,
+          detected.observations,
+          [artifact],
+        )
+      ).ok,
+    ).toBe(true);
+  });
+
+  it("emits no participant-group characteristic for unrecognized sheet names", async () => {
+    const detected = await workbookDetection([
+      {
+        name: "Population",
+        hidden: false,
+        cells: [workbookCell("A1", "generalKey")],
+      },
+    ]);
+    expect(
+      detected.observations.some(
+        (observation) =>
+          observation.evidenceKind === "population-characteristic",
+      ),
+    ).toBe(false);
+  });
 });
+
+async function workbookDetection(
+  sheets: readonly WorkbookPopulationSheetInput[],
+) {
+  return detectWorkbookPopulation(
+    artifact,
+    {
+      status: "profiled",
+      sheets,
+      formulaExecutionCount: 0,
+      limitations: [],
+    },
+    "synthetic-mock",
+  );
+}
+
+interface WorkbookPopulationSheetInput {
+  readonly name: string;
+  readonly hidden: boolean;
+  readonly cells: readonly {
+    readonly sheet: string;
+    readonly address: string;
+    readonly storedValue: string;
+    readonly formulaText: null;
+    readonly cellType: string;
+    readonly kind: RawValueKind;
+  }[];
+}
+
+function workbookCell(
+  address: string,
+  storedValue: string,
+): {
+  readonly sheet: string;
+  readonly address: string;
+  readonly storedValue: string;
+  readonly formulaText: null;
+  readonly cellType: string;
+  readonly kind: RawValueKind;
+} {
+  return {
+    sheet: "",
+    address,
+    storedValue,
+    formulaText: null,
+    cellType: "s",
+    kind: "text",
+  };
+}
 
 async function detection() {
   const profile = adaptTabularExtraction(

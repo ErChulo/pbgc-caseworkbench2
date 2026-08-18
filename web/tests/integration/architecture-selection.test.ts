@@ -102,7 +102,7 @@ describe("Feature 004 architecture selection integration", () => {
         genericField: "FREEZE_DATE",
       },
     ]);
-    expect(computeArchitectureContentSha256(architecture)).toBe(
+    expect(await computeArchitectureContentSha256(architecture)).toBe(
       architecture.architectureContentSha256,
     );
     const replayRecord = {
@@ -110,7 +110,7 @@ describe("Feature 004 architecture selection integration", () => {
       architectureId: "00000000-0000-4000-8000-000000000499" as Uuid,
       builtAt: "2027-01-01T00:00:00.000Z" as never,
     };
-    expect(computeArchitectureContentSha256(replayRecord)).toBe(
+    expect(await computeArchitectureContentSha256(replayRecord)).toBe(
       architecture.architectureContentSha256,
     );
   });
@@ -416,7 +416,7 @@ export async function approvedFixture(
     ...controlContent,
     caseControlContentSha256: await caseControlContentHash(controlContent),
   };
-  const policies = approvedPolicies(scenarioRules);
+  const policies = await approvedPolicies(scenarioRules);
   const populationArtifact = catalog.caseEvidence[0];
   if (populationArtifact === undefined)
     throw new Error("Synthetic catalog has no released case evidence.");
@@ -583,15 +583,15 @@ function defaultScenarioRules(): readonly ScenarioSelectionRule[] {
   ];
 }
 
-function approvedPolicies(
+async function approvedPolicies(
   scenarioRules: readonly ScenarioSelectionRule[],
-): LoadedRuleSets {
+): Promise<LoadedRuleSets> {
   return {
-    scenarioSelection: approve({
+    scenarioSelection: await approve({
       kind: "scenario-selection",
       rules: scenarioRules,
     }),
-    tabSelection: approve({
+    tabSelection: await approve({
       kind: "tab-selection",
       rules: [
         {
@@ -602,7 +602,7 @@ function approvedPolicies(
         },
       ],
     }),
-    iobClassification: approve({
+    iobClassification: await approve({
       kind: "iob-classification",
       rules: [
         {
@@ -614,7 +614,7 @@ function approvedPolicies(
         },
       ],
     }),
-    fieldNameGlossary: approve({
+    fieldNameGlossary: await approve({
       kind: "field-name-glossary",
       entries: [
         glossary("DOB", "DOB"),
@@ -637,9 +637,9 @@ function glossary(workbookPattern: string, genericField: string) {
   };
 }
 
-function approve<T extends Pick<RuleSet, "kind"> & Partial<RuleSet>>(
+async function approve<T extends Pick<RuleSet, "kind"> & Partial<RuleSet>>(
   payload: T,
-): Extract<RuleSet, { kind: T["kind"] }> {
+): Promise<Extract<RuleSet, { kind: T["kind"] }>> {
   const candidate = {
     ...payload,
     version: "1.0.0",
@@ -649,7 +649,7 @@ function approve<T extends Pick<RuleSet, "kind"> & Partial<RuleSet>>(
       reviewStatus: "provisional" as const,
     },
   } as RuleSet;
-  const contentHash = policyContentHash(candidate);
+  const contentHash = await policyContentHash(candidate);
   return {
     ...candidate,
     policyContentSha256: contentHash,

@@ -350,18 +350,18 @@ function parseScenarios(
         `${path}.exclusionConditions`,
       ),
       defaultEffectiveDateRange: {
-         startDate: dateValue(
-           range.startDate,
-           `${path}.defaultEffectiveDateRange.startDate`,
-         ),
+        startDate: dateValue(
+          range.startDate,
+          `${path}.defaultEffectiveDateRange.startDate`,
+        ),
 
         endDate:
           range.endDate === null
             ? null
-             : dateValue(
-                 range.endDate,
-                 `${path}.defaultEffectiveDateRange.endDate`,
-               ),
+            : dateValue(
+                range.endDate,
+                `${path}.defaultEffectiveDateRange.endDate`,
+              ),
       },
     });
   });
@@ -463,15 +463,20 @@ function parseGlossary(
   return values.map((value, index) => {
     const path = `entries[${String(index)}]`;
     const item = record(value, path);
-     const keys = Object.keys(item).sort();
-     if (
-       keys.some(
-         (key) =>
-           !["workbookPattern", "genericField", "description", "tabContext"].includes(key),
-       ) ||
-       keys.filter((key) => key !== "tabContext").length !== 3
-     )
-       invalid(`${path} contains invalid fields.`);
+    const keys = Object.keys(item).sort();
+    if (
+      keys.some(
+        (key) =>
+          ![
+            "workbookPattern",
+            "genericField",
+            "description",
+            "tabContext",
+          ].includes(key),
+      ) ||
+      keys.filter((key) => key !== "tabContext").length !== 3
+    )
+      invalid(`${path} contains invalid fields.`);
 
     return Object.freeze({
       workbookPattern: stringValue(

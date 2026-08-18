@@ -152,10 +152,10 @@ describe("rule-loader", () => {
     );
     expect(first.ok && second.ok).toBe(true);
     if (!first.ok || !second.ok) return;
-    expect(policyContentHash(first.value)).toBe(
-      policyContentHash(second.value),
+    expect(await policyContentHash(first.value)).toBe(
+      await policyContentHash(second.value),
     );
-    expect(policyContentHash(first.value)).toBe(
+    expect(await policyContentHash(first.value)).toBe(
       first.value.policyContentSha256,
     );
   });

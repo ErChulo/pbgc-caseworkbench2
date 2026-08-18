@@ -27,12 +27,7 @@ export function FeasibilityStatus() {
     );
   }
 
-  const requiredChecks = [
-    result.wasm,
-    result.schema,
-    result.asset,
-    result.csp,
-  ];
+  const requiredChecks = [result.wasm, result.schema, result.asset, result.csp];
   const passed = requiredChecks.every(Boolean);
 
   return (
@@ -74,7 +69,8 @@ export function FeasibilityStatus() {
               ))}
           </dl>
           <p className="capability-note">
-            Mode: {result.mode === "direct-file" ? "direct file" : "static origin"};
+            Mode:{" "}
+            {result.mode === "direct-file" ? "direct file" : "static origin"};
             Secure context: {result.secureContext ? "yes" : "no"}; File System
             Access API: {result.fileSystemAccess ? "available" : "unavailable"}.
           </p>

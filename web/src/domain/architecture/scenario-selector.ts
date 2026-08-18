@@ -11,6 +11,7 @@ import {
   validateRuleRecord,
 } from "../plan-rules/rule-authoring";
 import { createUnresolvedItem } from "../review/unresolved-items";
+import { sha256Hex } from "../shared/digest";
 import { hashTyped } from "../manifests/canonical-json";
 import {
   parseSha256,
@@ -84,34 +85,10 @@ export async function caseControlContentHash(
   return parsed.value;
 }
 
-export function scenarioPolicyContentHash(
+export async function scenarioPolicyContentHash(
   rules: readonly ScenarioSelectionRule[],
-): Sha256 {
-  const processValue = (globalThis as { process?: unknown }).process as
-    { getBuiltinModule?: (name: string) => unknown } | undefined;
-  const crypto =
-    processValue !== undefined &&
-    typeof processValue.getBuiltinModule === "function"
-      ? (processValue.getBuiltinModule("node:crypto") as {
-          createHash: (algorithm: string) => {
-            update: (
-              data: string,
-              encoding: "utf8",
-            ) => {
-              digest: (encoding: "hex") => string;
-            };
-          };
-        })
-      : undefined;
-  if (crypto === undefined) {
-    throw new Error(
-      "Synchronous scenario-policy hashing is unavailable without Node crypto.",
-    );
-  }
-  return crypto
-    .createHash("sha256")
-    .update(stableJson(rules), "utf8")
-    .digest("hex") as Sha256;
+): Promise<Sha256> {
+  return sha256Hex(stableJson(rules));
 }
 
 export function evaluateTriggerCondition(
@@ -165,7 +142,7 @@ export async function selectScenarios({
   Result<readonly RunDescriptor[], ArchitectureBuildError>
 > {
   if (
-    scenarioPolicyContentHash(scenarioPolicy.rules) !==
+    (await scenarioPolicyContentHash(scenarioPolicy.rules)) !==
     scenarioPolicy.policyContentSha256
   ) {
     return failure(

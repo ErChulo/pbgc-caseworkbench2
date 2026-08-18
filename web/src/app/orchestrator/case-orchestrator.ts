@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import scenarioSelectionYaml from "../../../../rules/scenario-selection.yaml?raw";
 import tabSelectionYaml from "../../../../rules/tab-selection.yaml?raw";
 import iobClassificationYaml from "../../../../rules/iob-classification.yaml?raw";
@@ -101,7 +101,10 @@ import type {
   RelationshipDecision,
 } from "../../domain/classification/models";
 import { evidenceReviewDemo } from "../../components/evidence/demo-evidence";
-import type { RuleAuthoringDraft } from "../../components/evidence/PlanRuleAuthor";
+import type {
+  RuleAuthorCandidate,
+  RuleAuthoringDraft,
+} from "../../components/evidence/PlanRuleAuthor";
 import type { ManifestExportSummary } from "../../components/inventory/ManifestExport";
 import type { QuarantineQueueItem } from "../../components/quarantine/QuarantineQueue";
 import type {
@@ -924,6 +927,7 @@ export interface CaseOrchestrator {
   readonly evidenceReviewView: EvidenceReviewView;
   readonly evidenceCatalog: EvidenceCatalog | null;
   readonly provisionCandidates: readonly ProvisionCandidate[];
+  readonly ruleAuthorCandidates: readonly RuleAuthorCandidate[];
   readonly candidateNearDuplicates: readonly NearDuplicateRelationship[];
   readonly candidateSupersessions: readonly SupersessionProposal[];
   readonly evidenceReviewMessage: string | null;
@@ -1176,6 +1180,10 @@ export function useCaseOrchestrator(
   const [ruleAuthoringOutcome, setRuleAuthoringOutcome] =
     useState<SessionPreviewOutcome | null>(null);
   const [ruleAuthoringBusy, setRuleAuthoringBusy] = useState(false);
+  const ruleAuthorCandidates = useMemo(
+    () => buildRuleAuthorCandidates(evidenceCatalog, provisionCandidates),
+    [evidenceCatalog, provisionCandidates],
+  );
   const [caseOutputExportMessage, setCaseOutputExportMessage] = useState<
     string | null
   >(null);
@@ -1686,7 +1694,11 @@ export function useCaseOrchestrator(
     setRuleAuthoringBusy(true);
     setRuleAuthoringOutcome(null);
     const selectedIds = new Set(draft.candidateIds);
-    const selectedCandidates = evidenceReviewDemo.candidates
+    const sources =
+      activeCase === null && evidenceCatalog === null
+        ? evidenceReviewDemo.candidates
+        : ruleAuthorCandidates;
+    const selectedCandidates = sources
       .filter((entry) => selectedIds.has(entry.candidate.candidateId))
       .map((entry) => entry.candidate);
     const primaryCandidate = selectedCandidates.find(
@@ -1694,6 +1706,7 @@ export function useCaseOrchestrator(
         candidate.artifactSha256 === draft.primaryCitation.artifactSha256 &&
         candidate.artifactLocator === draft.primaryCitation.artifactLocator,
     );
+    const catalog = evidenceCatalogRef.current ?? evidenceReviewDemo.catalog;
     const predecessor =
       draft.predecessorRuleId === null
         ? null
@@ -1704,7 +1717,7 @@ export function useCaseOrchestrator(
       {
         proposedCandidates: selectedCandidates,
         primaryCitation: draft.primaryCitation,
-        catalog: evidenceReviewDemo.catalog,
+        catalog,
         unresolvedRecords: evidenceUnresolvedRecords,
         authorityOverrides: EMPTY_AUTHORITY_OVERRIDES,
         governingRestatement: draft.governingRestatement,
@@ -1720,12 +1733,15 @@ export function useCaseOrchestrator(
           },
         ],
         requiredApplicabilityDimensions: [draft.applicabilityDimension],
-        affectedScope: SYNTHETIC_RULE_SCOPE,
+        affectedScope: `provision/${primaryCandidate?.provisionIdentifier ?? SYNTHETIC_RULE_SCOPE}`,
         reviewer: {
           actorType: "human",
           actorKey: draft.reviewer,
           displayName: draft.reviewer,
-          authorityContext: `synthetic-session-preview: ${draft.rationale}`,
+          authorityContext:
+            activeCase === null
+              ? `synthetic-session-preview: ${draft.rationale}`
+              : `case-orchestrator: ${draft.rationale}`,
         },
         approvalRationale: draft.rationale,
         confidence: Math.min(
@@ -5433,6 +5449,7 @@ export function useCaseOrchestrator(
     evidenceReviewView,
     evidenceCatalog,
     provisionCandidates,
+    ruleAuthorCandidates,
     candidateNearDuplicates,
     candidateSupersessions,
     evidenceReviewMessage,
@@ -5553,6 +5570,45 @@ async function preservedRuleSourceArtifacts(
       };
     }),
   );
+}
+
+function buildRuleAuthorCandidates(
+  catalog: EvidenceCatalog | null,
+  candidates: readonly ProvisionCandidate[],
+): readonly RuleAuthorCandidate[] {
+  if (catalog === null) return [];
+  const releasedCaseEvidence = catalog.caseEvidence.filter(
+    (artifact) => artifact.reviewStatus === "released",
+  );
+  const artifactBySha256 = new Map(
+    releasedCaseEvidence.map((artifact) => [artifact.sha256, artifact]),
+  );
+  return candidates.flatMap((candidate) => {
+    const artifact = artifactBySha256.get(candidate.artifactSha256);
+    if (artifact === undefined) return [];
+    // The rule-authoring contract resolves the primary citation against BOTH
+    // the proposed candidate (by artifactSha256 + artifactLocator) and the
+    // released catalog artifact (by sha256 + locator + sourceRole + released).
+    // Production candidates carry segment locators while released catalog
+    // artifacts carry the observed file-path locator, so present the pairing
+    // with the catalog artifact's locator and preserve the precise segment in
+    // citationLocator.
+    return [
+      {
+        candidate: {
+          ...candidate,
+          artifactLocator: artifact.locator,
+        },
+        citation: {
+          artifactSha256: artifact.sha256,
+          artifactLocator: artifact.locator,
+          sourceRole: artifact.sourceRole,
+          provisionIdentifier: candidate.provisionIdentifier,
+          citationLocator: candidate.artifactLocator,
+        },
+      },
+    ];
+  });
 }
 
 function latestUnresolvedItems(

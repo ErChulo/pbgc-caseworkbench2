@@ -113,10 +113,10 @@ function policyRule(
   };
 }
 
-function approvedPolicy(
+async function approvedPolicy(
   rules: readonly ScenarioSelectionRule[],
-): Extract<RuleSet, { kind: "scenario-selection" }> {
-  const policyContentSha256 = scenarioPolicyContentHash(rules);
+): Promise<Extract<RuleSet, { kind: "scenario-selection" }>> {
+  const policyContentSha256 = await scenarioPolicyContentHash(rules);
   return {
     kind: "scenario-selection",
     version: "1.0.0",
@@ -143,7 +143,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([policyRule("NRD", "normal")]),
+      scenarioPolicy: await approvedPolicy([policyRule("NRD", "normal")]),
     });
 
     expect(result).toEqual({
@@ -195,7 +195,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls({ blocked: true }),
-      scenarioPolicy: approvedPolicy([
+      scenarioPolicy: await approvedPolicy([
         policyRule("ERD", "early", [
           {
             dimension: "blocked",
@@ -243,7 +243,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([
+      scenarioPolicy: await approvedPolicy([
         {
           ...policyRule("NO-RESTRICTION", "unused"),
           triggerConditions: [absenceCondition],
@@ -287,7 +287,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([scenario]),
+      scenarioPolicy: await approvedPolicy([scenario]),
     });
     expect(
       result.ok && result.value.map((run) => run.effectiveDateRange),
@@ -329,7 +329,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([splitScenario]),
+      scenarioPolicy: await approvedPolicy([splitScenario]),
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -370,7 +370,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([
+      scenarioPolicy: await approvedPolicy([
         {
           ...policyRule("NRD", "normal"),
           triggerConditions: [
@@ -411,7 +411,7 @@ describe("governed scenario selection", () => {
       authorityOverrides: [],
       caseControls: await controls(),
       population: populationDimension("participant-status", "retired"),
-      scenarioPolicy: approvedPolicy([
+      scenarioPolicy: await approvedPolicy([
         policyRule("QPSA", "survivor", [
           {
             dimension: "participant-status",
@@ -430,7 +430,7 @@ describe("governed scenario selection", () => {
       authorityOverrides: [],
       caseControls: await controls(),
       population: populationDimension("participant-status", "retired"),
-      scenarioPolicy: approvedPolicy([
+      scenarioPolicy: await approvedPolicy([
         {
           ...policyRule("QPSA", "survivor"),
           triggerConditions: [
@@ -486,7 +486,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([policyRule("QPSA", "survivor")]),
+      scenarioPolicy: await approvedPolicy([policyRule("QPSA", "survivor")]),
       dependencies: {
         uuid: () => {
           const value = ids[index];
@@ -519,7 +519,7 @@ describe("governed scenario selection", () => {
       "normal",
       "2020-01-01",
     );
-    const scenarioPolicy = approvedPolicy([policyRule("NRD", "normal")]);
+    const scenarioPolicy = await approvedPolicy([policyRule("NRD", "normal")]);
     const caseControls = await controls();
 
     const tamperedPolicy = await selectScenarios({
@@ -566,7 +566,7 @@ describe("governed scenario selection", () => {
       evidenceCatalog: catalog,
       authorityOverrides: [],
       caseControls: await controls(),
-      scenarioPolicy: approvedPolicy([policyRule("ERD", "early")]),
+      scenarioPolicy: await approvedPolicy([policyRule("ERD", "early")]),
     };
     expect(JSON.stringify(await selectScenarios(input))).toBe(
       JSON.stringify(await selectScenarios(input)),

@@ -140,6 +140,30 @@ export function App({
         nearDuplicates={orchestrator.candidateNearDuplicates}
         supersessions={orchestrator.candidateSupersessions}
       />
+    ) : orchestrator.evidenceReviewView === "rules" &&
+      orchestrator.ruleAuthorCandidates.length > 0 ? (
+      <>
+        {orchestrator.ruleAuthoringOutcome ? (
+          <p
+            className={`form-message ${orchestrator.ruleAuthoringOutcome.kind === "error" ? "form-message-error" : "notice"}`}
+            role={
+              orchestrator.ruleAuthoringOutcome.kind === "error"
+                ? "alert"
+                : "status"
+            }
+          >
+            {orchestrator.ruleAuthoringOutcome.message}
+          </p>
+        ) : null}
+        <PlanRuleAuthor
+          candidates={orchestrator.ruleAuthorCandidates}
+          unresolvedItems={orchestrator.evidenceUnresolvedItems}
+          existingRules={orchestrator.previewRules}
+          busy={orchestrator.ruleAuthoringBusy}
+          production
+          onAuthor={orchestrator.recordRuleAuthoring}
+        />
+      </>
     ) : orchestrator.evidenceReviewView === "unresolved" &&
       orchestrator.evidenceUnresolvedItems.length > 0 ? (
       <UnresolvedItemQueue

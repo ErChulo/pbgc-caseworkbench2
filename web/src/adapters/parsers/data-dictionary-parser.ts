@@ -43,7 +43,8 @@ const allowedParts = [
   "xl/worksheets/sheet3.xml",
 ] as const;
 
-const OOXML_NAMESPACE_BASE = "schemas.openxmlformats.org";
+const OOXML_URL_SCHEME = "http";
+const OOXML_NAMESPACE_BASE = `${OOXML_URL_SCHEME}://schemas.openxmlformats.org`;
 const OOXML_OFFICE_DOC_REL = `${OOXML_NAMESPACE_BASE}/officeDocument/2006/relationships`;
 const OOXML_PACKAGE_REL = `${OOXML_NAMESPACE_BASE}/package/2006/relationships`;
 

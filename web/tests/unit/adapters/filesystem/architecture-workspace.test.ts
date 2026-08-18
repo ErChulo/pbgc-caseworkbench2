@@ -39,7 +39,7 @@ async function temporaryRoot(): Promise<string> {
   return root;
 }
 
-function architecture(): V1Architecture {
+async function architecture(): Promise<V1Architecture> {
   const initial: V1Architecture = {
     architectureId,
     caseId,
@@ -177,7 +177,7 @@ function architecture(): V1Architecture {
   };
   return {
     ...initial,
-    architectureContentSha256: computeArchitectureContentSha256(initial),
+    architectureContentSha256: await computeArchitectureContentSha256(initial),
   };
 }
 
@@ -187,7 +187,7 @@ describe("ArchitectureFilesystemWorkspace", () => {
     const opened = await ArchitectureFilesystemWorkspace.open(root, caseId);
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
-    const value = architecture();
+    const value = await architecture();
     expect((await opened.value.saveArchitecture(value)).ok).toBe(true);
     expect((await opened.value.saveArchitecture(value)).ok).toBe(false);
     const loaded = await opened.value.loadArchitecture(architectureId);
@@ -212,7 +212,7 @@ describe("ArchitectureFilesystemWorkspace", () => {
     const opened = await ArchitectureFilesystemWorkspace.open(root, caseId);
     if (!opened.ok) throw new Error(opened.error.message);
     const value = {
-      ...architecture(),
+      ...(await architecture()),
       architectureContentSha256: "f".repeat(64) as Sha256,
     };
     const saved = await opened.value.saveArchitecture(value);
@@ -224,7 +224,7 @@ describe("ArchitectureFilesystemWorkspace", () => {
     const root = await temporaryRoot();
     const opened = await ArchitectureFilesystemWorkspace.open(root, caseId);
     if (!opened.ok) throw new Error(opened.error.message);
-    const valid = architecture();
+    const valid = await architecture();
     const original = valid.cells.get("Synthetic Retirees::A1");
     if (original === undefined) throw new Error("Fixture cell is missing.");
     const malformed: V1Architecture = {
@@ -238,7 +238,8 @@ describe("ArchitectureFilesystemWorkspace", () => {
     };
     const hashValidMalformed = {
       ...malformed,
-      architectureContentSha256: computeArchitectureContentSha256(malformed),
+      architectureContentSha256:
+        await computeArchitectureContentSha256(malformed),
     };
     const saved = await opened.value.saveArchitecture(hashValidMalformed);
     expect(saved.ok).toBe(false);
@@ -264,7 +265,9 @@ describe("ArchitectureFilesystemWorkspace", () => {
     const root = await temporaryRoot();
     const opened = await ArchitectureFilesystemWorkspace.open(root, caseId);
     if (!opened.ok) throw new Error(opened.error.message);
-    expect((await opened.value.saveArchitecture(architecture())).ok).toBe(true);
+    expect((await opened.value.saveArchitecture(await architecture())).ok).toBe(
+      true,
+    );
     const path = join(opened.value.workspacePath, `${architectureId}.json`);
     const text = await readFile(path, "utf8");
     await chmod(path, 0o600);
@@ -284,7 +287,7 @@ describe("ArchitectureFilesystemWorkspace", () => {
     const root = await temporaryRoot();
     const opened = await ArchitectureFilesystemWorkspace.open(root, caseId);
     if (!opened.ok) throw new Error(opened.error.message);
-    const valid = architecture();
+    const valid = await architecture();
     const original = valid.cells.get("Synthetic Retirees::A1");
     if (original === undefined) throw new Error("Fixture cell is missing.");
     const malformed: V1Architecture = {
@@ -301,7 +304,8 @@ describe("ArchitectureFilesystemWorkspace", () => {
     };
     const hashValidMalformed = {
       ...malformed,
-      architectureContentSha256: computeArchitectureContentSha256(malformed),
+      architectureContentSha256:
+        await computeArchitectureContentSha256(malformed),
     };
     const path = join(opened.value.workspacePath, `${architectureId}.json`);
     await writeFile(

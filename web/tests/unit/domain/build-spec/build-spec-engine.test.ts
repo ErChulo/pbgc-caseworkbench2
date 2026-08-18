@@ -85,7 +85,8 @@ describe("BuildSpec engine", () => {
     const architecture = {
       ...input.architecture,
       ...content,
-      architectureContentSha256: computeArchitectureContentSha256(content),
+      architectureContentSha256:
+        await computeArchitectureContentSha256(content),
     };
     const result = await buildSpecEngine({
       architecture,
@@ -114,7 +115,8 @@ describe("BuildSpec engine", () => {
       architecture: {
         ...input.architecture,
         ...content,
-        architectureContentSha256: computeArchitectureContentSha256(content),
+        architectureContentSha256:
+          await computeArchitectureContentSha256(content),
       },
     });
     expect(
@@ -190,7 +192,7 @@ describe("BuildSpec engine", () => {
       builtAt: original.builtAt,
       ...invalidContent,
       architectureContentSha256:
-        computeArchitectureContentSha256(invalidContent),
+        await computeArchitectureContentSha256(invalidContent),
     };
     const result = await buildSpecEngine({
       architecture,

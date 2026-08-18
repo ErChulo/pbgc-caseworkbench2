@@ -112,8 +112,8 @@ export async function detectWorkbookPopulation(
   const { createEvidenceObservation, createCandidate } =
     deps ?? (await getDefaultDependencies());
 
-  const observations = await Promise.all(
-    profile.sheets.map((sheet, index) =>
+  const observations = await Promise.all([
+    ...profile.sheets.map((sheet, index) =>
       createEvidenceObservation({
         citationId: `population-sheet-${String(index + 1)}`,
         artifactSha256,
@@ -126,7 +126,24 @@ export async function detectWorkbookPopulation(
         },
       }),
     ),
-  );
+    ...profile.sheets.flatMap((sheet) => {
+      const participantGroup = participantGroupForSheet(sheet.name);
+      return participantGroup === null
+        ? []
+        : [
+            createEvidenceObservation({
+              citationId: `population-characteristic-${participantGroup}`,
+              artifactSha256,
+              sourceLocator: `sheet:${sheet.name}`,
+              evidenceKind: "population-characteristic",
+              observedTextOrValue: {
+                dimension: "participant-group",
+                value: participantGroup,
+              },
+            }),
+          ];
+    }),
+  ]);
   const fields = profile.sheets.flatMap((sheet) =>
     sheet.cells
       .filter((cell) => isHeaderCell(cell.address))
@@ -156,4 +173,24 @@ export async function detectWorkbookPopulation(
     candidate,
     observations: Object.freeze(observations),
   });
+}
+
+/**
+ * Maps a visible workbook sheet name to the participant-group characteristic it
+ * evidences, matching the population requirements declared by the tab-selection
+ * rules (rules/tab-selection.yaml). A null result means the sheet name does not
+ * itself establish any participant group.
+ */
+export function participantGroupForSheet(sheetName: string): string | null {
+  const normalized = sheetName.trim().toLowerCase();
+  if (normalized.includes("retiree")) return "retired-participants";
+  if (normalized.includes("separated vested"))
+    return "separated-vested-participants";
+  if (normalized.includes("def_act vested"))
+    return "active-vested-participants";
+  if (normalized.includes("def_act non-vested"))
+    return "active-non-vested-participants";
+  if (normalized.includes("terminated vested"))
+    return "terminated-vested-participants";
+  return null;
 }
