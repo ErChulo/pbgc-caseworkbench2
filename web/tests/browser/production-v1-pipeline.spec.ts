@@ -7,18 +7,24 @@ const PLAN_TEXT =
   "Executed Defined Benefit Plan Document. Effective 2020-01-01.";
 
 function populationWorkbook(): Uint8Array {
-  // The Def_Act Non-Vested tab pattern requires only DOB, BSEX, and COMP
-  // (rules/tab-selection.yaml), and every one of those fields is
-  // I-classified by rules/iob-classification.yaml. With no O/B fields the
-  // governed BuildSpec needs no approved formulas, so the deterministic
-  // production path can complete end-to-end in one build.
+  // The Retirees tab pattern requires DOB, NRD, BSEX, COMP, and FV
+  // (rules/tab-selection.yaml). FV is O-classified by
+  // rules/iob-classification.yaml, so the governed BuildSpec demands an
+  // approved formula for it: the FV column carries a real formula that the
+  // reviewer approves through Formula Governance before the rebuild.
   const workbook = XLSX.utils.book_new();
-  const nonVested = XLSX.utils.aoa_to_sheet([
-    ["DOB", "BSEX", "COMP"],
-    ["1960-05-12", "M", 42000],
-    ["1972-11-03", "F", 38500],
+  const retirees = XLSX.utils.aoa_to_sheet([
+    ["DOB", "NRD", "BSEX", "COMP", "FV"],
+    ["1960-05-12", "2025-05-01", "M", 42000, null],
   ]);
-  XLSX.utils.book_append_sheet(workbook, nonVested, "Def_Act Non-Vested");
+  // aoa_to_sheet keeps "=" strings as text, so write the FV formula as an
+  // explicit formula cell. Leaving the cached result absent means the passive
+  // parser records only the formula text (no stored-value "example" segment),
+  // so candidate extraction emits no blocking unresolved item. The reference
+  // targets D1 (the COMP header cell) because only header and formula cells
+  // are included in the governed architecture; plain value cells are not.
+  retirees.E2 = { t: "n", f: "D1*0.05" };
+  XLSX.utils.book_append_sheet(workbook, retirees, "Retirees");
   return new Uint8Array(
     XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer,
   );
@@ -187,11 +193,15 @@ test("completes the governed production path from intake to V1 workbook", async 
   const controls = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Authenticated case controls" }),
   });
+  // The case controls bind the effective date range without selecting the
+  // single-calculation purpose (unchecked from its default): that purpose
+  // would create the "Single Run" aggregation scenario, which has no
+  // plan-rule justification of its own for formula governance.
   await controls
     .locator("label")
     .filter({ hasText: "Single calculation purpose" })
     .locator("input")
-    .check();
+    .uncheck();
   await controls.getByLabel("Effective date (start)").fill("2020-01-01");
   await controls
     .getByLabel("Case-controls approving actor")
@@ -229,10 +239,38 @@ test("completes the governed production path from intake to V1 workbook", async 
   await architecture
     .getByLabel("Architecture approval rationale")
     .fill("E2E approved scenario and tab selection.");
+  // 7b. First build attempt: the O-classified FV column blocks BuildSpec until
+  // its formula receives explicit human governance approval.
   await architecture
     .getByRole("button", { name: "Approve architecture selection" })
     .click();
+  await expect(
+    architecture.getByText(/O\/B mapping lacks its exact formula/u),
+  ).toBeVisible();
 
+  // 7c. Formula governance: approve the FV formula for the governed ERD
+  // scenario against the authored early-retirement-provision rule, then
+  // rebuild.
+  const formulaPanel = page.getByRole("region", { name: "Formula Governance" });
+  await formulaPanel
+    .getByRole("button", { name: "Approve", exact: true })
+    .click();
+  await formulaPanel
+    .locator(".plan-rule-checkbox input[type='checkbox']")
+    .first()
+    .check();
+  await formulaPanel
+    .locator(".rationale-input textarea")
+    .first()
+    .fill("E2E approved FV formula governance.");
+  await formulaPanel.getByRole("button", { name: "Confirm Approval" }).click();
+  await expect(
+    formulaPanel.getByText("Approved", { exact: true }).first(),
+  ).toBeVisible();
+
+  await architecture
+    .getByRole("button", { name: "Approve architecture selection" })
+    .click();
   await expect(
     architecture.getByText(/V1 output built: architecture → BuildSpec/u),
   ).toBeVisible();

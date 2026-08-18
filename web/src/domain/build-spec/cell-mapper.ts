@@ -10,6 +10,18 @@ export async function generateCellMappings(config: {
   const sourceTabs = new Map(
     config.architecture.sourceTabs.map((tab) => [tab.tabName, tab]),
   );
+  // A column's header cell is a label, not a data cell. When a formula cell
+  // already represents the same field in a tab, mapping the header as well
+  // would duplicate the field identity and demand a formula from a cell that
+  // carries none, so label cells are mapped only for fields that have no
+  // formula-bearing cell.
+  const fieldsWithFormula = new Map<string, Set<string>>();
+  for (const cell of config.architecture.cells.values()) {
+    if (!cell.hasFormula || !cell.formulaText?.trim()) continue;
+    const fields = fieldsWithFormula.get(cell.sourceTab) ?? new Set<string>();
+    fields.add(cell.genericField);
+    fieldsWithFormula.set(cell.sourceTab, fields);
+  }
   for (const run of [...config.architecture.runs].sort((a, b) =>
     compareCodePoint(a.runId, b.runId),
   )) {
@@ -18,6 +30,11 @@ export async function generateCellMappings(config: {
     )) {
       const classification = cell.perRunClassification.get(run.runId);
       if (!classification) continue;
+      if (
+        !cell.hasFormula &&
+        (fieldsWithFormula.get(cell.sourceTab)?.has(cell.genericField) ?? false)
+      )
+        continue;
       const hasObservedFormula =
         cell.hasFormula && Boolean(cell.formulaText?.trim());
       const hasInput = classification.iob === "I" || classification.iob === "B";

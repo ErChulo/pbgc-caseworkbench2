@@ -964,6 +964,7 @@ export interface CaseOrchestrator {
   readonly architecturePolicyMessage: string | null;
   readonly caseControls: AuthenticatedCaseControls | null;
   readonly caseControlsMessage: string | null;
+  readonly v1Architecture: V1Architecture | null;
   readonly v1BuildSpec: BuildSpecV2 | null;
   readonly v1CompilationResult: CompilationResult | null;
   readonly v1Workbook: V1Workbook | null;
@@ -1214,6 +1215,9 @@ export function useCaseOrchestrator(
   const [caseControls, setCaseControls] =
     useState<AuthenticatedCaseControls | null>(null);
   const [caseControlsMessage, setCaseControlsMessage] = useState<string | null>(
+    null,
+  );
+  const [v1Architecture, setV1Architecture] = useState<V1Architecture | null>(
     null,
   );
   const [v1BuildSpec, setV1BuildSpec] = useState<BuildSpecV2 | null>(null);
@@ -3721,8 +3725,30 @@ export function useCaseOrchestrator(
         .filter((r) => r.ok)
         .map((r) => r.value);
 
+      const cell = v1Architecture?.cells.get(cellKey);
+      if (cell === undefined) {
+        setArchitectureBuildMessage(
+          "Build the architecture before approving a formula cell.",
+        );
+        return;
+      }
+      const runClassification = cell.perRunClassification.get(scenarioId);
+      if (runClassification === undefined) {
+        setArchitectureBuildMessage(
+          `Cell ${cellKey} is not classified for scenario ${scenarioId}.`,
+        );
+        return;
+      }
+      if (runClassification.iob !== "O" && runClassification.iob !== "B") {
+        setArchitectureBuildMessage(
+          `Cell ${cellKey} is classified ${runClassification.iob}, not O or B; only O/B formula cells can be approved.`,
+        );
+        return;
+      }
+
       const existingRecords = formulaApprovalRecords.filter(
-        (r) => r.target.cellAddress === cellKey && r.scenarioId === scenarioId,
+        (r) =>
+          formulaApprovalCellKey(r) === cellKey && r.scenarioId === scenarioId,
       );
       const nextOrdinal = existingRecords.length + 1;
       const lastDecision = existingRecords[existingRecords.length - 1];
@@ -3748,17 +3774,17 @@ export function useCaseOrchestrator(
         resultingStatus: "approved",
         formulaText,
         target: {
-          tabName: "V1",
-          cellAddress: cellKey,
-          genericField: cellKey,
+          tabName: cell.sourceTab,
+          cellAddress: cell.cellAddress,
+          genericField: cell.genericField,
         },
         scenarioId,
-        iobClassification: "O",
+        iobClassification: runClassification.iob,
         sourcePlanRules: sourcePlanRuleHashes,
         derivationDescription: `Formula approved for cell ${cellKey}`,
-        affectedTestIds: [],
+        affectedTestIds: [`TEST-${cellKey}`],
         regenerationImpact: "none",
-        validationOracleIds: [],
+        validationOracleIds: [`ORACLE-${cellKey}`],
         humanActor: {
           actorType: "human",
           actorKey:
@@ -3881,6 +3907,7 @@ export function useCaseOrchestrator(
 
       const architecture = architectureResult.value.architecture;
       await persistArchitecture(activeCase.caseId, architecture);
+      setV1Architecture(architecture);
       setArchitectureSelection(null);
 
       const buildSpecResult = await buildSpecEngine({
@@ -3904,10 +3931,10 @@ export function useCaseOrchestrator(
               approvalDecisions: readonly FormulaApprovalRecord[];
             }[]
           >((entries, record) => {
+            const cellKey = formulaApprovalCellKey(record);
             const existing = entries.find(
               (e) =>
-                e.cellKey === record.target.cellAddress &&
-                e.scenarioId === record.scenarioId,
+                e.cellKey === cellKey && e.scenarioId === record.scenarioId,
             );
             if (existing) {
               return entries.map((e) =>
@@ -3922,7 +3949,7 @@ export function useCaseOrchestrator(
             return [
               ...entries,
               {
-                cellKey: record.target.cellAddress,
+                cellKey,
                 scenarioId: record.scenarioId,
                 approvalDecisions: [record],
               },
@@ -5469,6 +5496,7 @@ export function useCaseOrchestrator(
     architecturePolicyMessage,
     caseControls,
     caseControlsMessage,
+    v1Architecture,
     v1BuildSpec,
     v1CompilationResult,
     v1Workbook,
@@ -5570,6 +5598,12 @@ async function preservedRuleSourceArtifacts(
       };
     }),
   );
+}
+
+function formulaApprovalCellKey(record: FormulaApprovalRecord): string {
+  // Architecture cell keys are `${sourceTab}::${cellAddress}`; the approval
+  // record carries those pieces separately in its target.
+  return `${record.target.tabName}::${record.target.cellAddress}`;
 }
 
 function buildRuleAuthorCandidates(

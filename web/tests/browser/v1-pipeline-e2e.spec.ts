@@ -9,29 +9,21 @@ test.describe("V1 Pipeline End-to-End", () => {
     await createSyntheticCase(page, "PBGC-V1-PIPELINE-001");
 
     await expect(
-      page.getByRole("heading", { name: "Case intake" }),
+      page.getByRole("button", { name: /Case intake/ }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Evidence and rules" }).click();
-
+    // Stage navigation is decorative in the current single-page layout, so
+    // assert the governed review panels are present directly.
     await expect(
       page.getByRole("heading", { name: "Evidence and plan-rule review" }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Architecture" }).click();
-
     await expect(
-      page.getByRole("heading", { name: "Architecture" }),
+      page.getByRole("heading", { name: "Architecture selection" }),
     ).toBeVisible();
 
     await expect(
       page.getByText("Select an architecture to review formula governance."),
-    ).toBeVisible();
-
-    await expect(
-      page.getByText(
-        "Complete architecture selection before reviewing formula governance.",
-      ),
     ).toBeVisible();
 
     expect(outboundRequests).toEqual([]);
@@ -44,7 +36,7 @@ test.describe("V1 Pipeline End-to-End", () => {
     await createSyntheticCase(page, "PBGC-V1-PLAN-SUMMARY-001");
 
     await expect(
-      page.getByRole("heading", { name: "Case intake" }),
+      page.getByRole("button", { name: /Case intake/ }),
     ).toBeVisible();
 
     await expect(
@@ -53,8 +45,11 @@ test.describe("V1 Pipeline End-to-End", () => {
 
     await expect(
       page.getByText(
-        "Complete evidence intake and classification before starting the Plan Summary.",
+        "Initialize the Plan Summary to begin documenting plan attributes from approved evidence.",
       ),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Initialize Plan Summary" }),
     ).toBeVisible();
 
     expect(outboundRequests).toEqual([]);
@@ -67,7 +62,7 @@ test.describe("V1 Pipeline End-to-End", () => {
     await createSyntheticCase(page, "PBGC-V1-FORMULA-GOV-001");
 
     await expect(
-      page.getByRole("heading", { name: "Case intake" }),
+      page.getByRole("button", { name: /Case intake/ }),
     ).toBeVisible();
 
     await expect(
@@ -75,9 +70,7 @@ test.describe("V1 Pipeline End-to-End", () => {
     ).toBeVisible();
 
     await expect(
-      page.getByText(
-        "Complete architecture selection before reviewing formula governance.",
-      ),
+      page.getByText("Select an architecture to review formula governance."),
     ).toBeVisible();
 
     expect(outboundRequests).toEqual([]);
@@ -90,11 +83,8 @@ test.describe("V1 Pipeline End-to-End", () => {
     await createSyntheticCase(page, "PBGC-V1-NETWORK-001");
 
     await expect(
-      page.getByRole("heading", { name: "Case intake" }),
+      page.getByRole("button", { name: /Case intake/ }),
     ).toBeVisible();
-
-    await page.getByRole("button", { name: "Evidence and rules" }).click();
-    await page.getByRole("button", { name: "Architecture" }).click();
 
     await expect(
       page.getByRole("region", { name: "Plan Summary" }),

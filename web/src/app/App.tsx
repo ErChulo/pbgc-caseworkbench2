@@ -310,7 +310,7 @@ export function App({
           enabled={
             orchestrator.workspaceReady && orchestrator.activeCase !== null
           }
-          architecture={null}
+          architecture={orchestrator.v1Architecture}
           formulaApprovalRecords={orchestrator.formulaApprovalRecords}
           planRules={orchestrator.previewRules}
           message={orchestrator.architectureBuildMessage}

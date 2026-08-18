@@ -29,7 +29,10 @@ export function FormulaGovernancePanel({
   message,
   onApproveFormula,
 }: FormulaGovernancePanelProps): React.ReactElement {
-  const [selectedCell, setSelectedCell] = useState<string | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<{
+    readonly cellKey: string;
+    readonly scenarioId: string;
+  } | null>(null);
   const [approvalRationale, setApprovalRationale] = useState<string>("");
   const [selectedPlanRules, setSelectedPlanRules] = useState<Set<string>>(
     new Set(),
@@ -57,7 +60,7 @@ export function FormulaGovernancePanel({
   ): FormulaApprovalRecord | null => {
     const matching = formulaApprovalRecords.find(
       (r) =>
-        r.target.cellAddress === cellKey &&
+        `${r.target.tabName}::${r.target.cellAddress}` === cellKey &&
         r.scenarioId === scenarioId &&
         r.resultingStatus === "approved",
     );
@@ -175,7 +178,9 @@ export function FormulaGovernancePanel({
                               cell.key,
                               scenarioId,
                             );
-                            const isSelected = selectedCell === cell.key;
+                            const isSelected =
+                              selectedTarget?.cellKey === cell.key &&
+                              selectedTarget.scenarioId === scenarioId;
 
                             return (
                               <React.Fragment key={cell.key}>
@@ -209,8 +214,13 @@ export function FormulaGovernancePanel({
                                         type="button"
                                         className="button button-secondary button-small"
                                         onClick={() => {
-                                          setSelectedCell(
-                                            isSelected ? null : cell.key,
+                                          setSelectedTarget(
+                                            isSelected
+                                              ? null
+                                              : {
+                                                  cellKey: cell.key,
+                                                  scenarioId,
+                                                },
                                           );
                                         }}
                                       >
