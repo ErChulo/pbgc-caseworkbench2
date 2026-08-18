@@ -96,12 +96,27 @@ export function FormulaGovernancePanel({
     });
   };
 
+  // Progress counts (cell, scenario) pairs: every formula cell appears once
+  // per scenario run it participates in, and approval records are scoped to a
+  // single scenario, so totals and approvals stay comparable.
   const overallProgress = {
-    total: formulaCells.length,
+    total: [...groupedByScenario.values()].reduce(
+      (total, cells) => total + cells.length,
+      0,
+    ),
     approved: formulaApprovalRecords.filter(
       (r) => r.resultingStatus === "approved",
     ).length,
   };
+  const groupProgress = (
+    cells: readonly CellDescriptor[],
+    scenarioId: string,
+  ) => ({
+    total: cells.length,
+    approved: cells.filter(
+      (cell) => getApprovalStatus(cell.key, scenarioId) !== null,
+    ).length,
+  });
 
   return (
     <div
@@ -161,6 +176,17 @@ export function FormulaGovernancePanel({
                 ([scenarioId, cells]: [string, CellDescriptor[]]) => (
                   <div key={scenarioId} className="formula-scenario-group">
                     <h4>Scenario: {scenarioId}</h4>
+                    {(() => {
+                      const progress = groupProgress(cells, scenarioId);
+                      return (
+                        <div className="formula-group-progress">
+                          <span className="progress-label">
+                            {progress.approved}/{progress.total} formulas
+                            approved
+                          </span>
+                        </div>
+                      );
+                    })()}
                     <div className="formula-cells-table">
                       <table>
                         <thead>

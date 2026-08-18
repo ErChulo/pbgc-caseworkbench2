@@ -10,6 +10,16 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,
+  // Heavy file processing (PDF parsing, multi-megabyte archive expansion) can
+  // exceed the defaults when several workers contend for CPU, even though
+  // each test passes comfortably in isolation.
+  timeout: 60_000,
+  expect: {
+    // The default per-locator polling timeout (5s) is too tight for the
+    // "File inventory complete" banner after a PDF or large archive upload
+    // under parallel load; give all assertions consistent headroom.
+    timeout: 15_000,
+  },
   use: {
     baseURL: "http://127.0.0.1:4173",
     serviceWorkers: "block",

@@ -13,12 +13,25 @@ function cpuUsageMs(usage: NodeJS.CpuUsage): number {
 
 describe("formula compiler performance", () => {
   it("compiles 1,000 synthetic formulas within one CPU-second", async () => {
-    const formulas = Array.from({ length: 1_000 }, (_, index) => ({
-      id: `FORMULA-RETIREES-F${String(index)}-DOR`,
-      field: `F_${String(index)}`,
-      cell: `C${String(index + 1)}`,
-      text: "=COMP+1",
-    }));
+    const makeFormulas = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        id: `FORMULA-RETIREES-F${String(index)}-DOR`,
+        field: `F_${String(index)}`,
+        cell: `C${String(index + 1)}`,
+        text: "=COMP+1",
+      }));
+    // Warm up the JIT and module caches first. Without this, first-run
+    // compilation in a vitest worker that has handled earlier test files can
+    // spend most of its measured CPU on V8 warm-up and garbage collection,
+    // making the assertion flaky under the full parallel suite.
+    const warmupSpec = await buildSpecV2(makeFormulas(100));
+    await compileBuildSpec({
+      buildSpec: warmupSpec,
+      compilerVersion: "1.0.0",
+      clock: fixedClock,
+      uuid: fixedUuid,
+    });
+    const formulas = makeFormulas(1_000);
     const spec = await buildSpecV2(formulas);
     const started = cpuUsage();
     const result = await compileBuildSpec({

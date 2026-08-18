@@ -97,6 +97,6 @@ test("interrupts large-file hashing at a safe boundary without claiming completi
   await page.getByRole("button", { name: "Stop safely" }).click();
   await expect(page.getByText("File inventory interrupted")).toBeVisible();
   await expect(
-    page.getByText("Work stopped at a durable boundary."),
+    page.getByText("Work stopped at a durable boundary.").first(),
   ).toBeVisible();
 });

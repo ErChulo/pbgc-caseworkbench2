@@ -5,7 +5,8 @@ import {
   generateFormulaId,
 } from "../../../../src/domain/build-spec/formula-mapper";
 import { formulaApprovalContentHash } from "../../../../src/domain/build-spec/formula-approval";
-import { uuid } from "../../../fixtures/build-spec";
+import type { FormulaApprovalRecord } from "../../../../src/domain/build-spec/models";
+import { governedPlanRule, hash, uuid } from "../../../fixtures/build-spec";
 import {
   createGovernedArchitecture,
   formulaGovernance,
@@ -73,6 +74,92 @@ describe("formula mapper", () => {
     });
     expect(result.formulas).toEqual([]);
     expect(result.errors).toHaveLength(2);
+  });
+
+  it("accepts a case-control-justified run for formula governance", async () => {
+    const rule = governedPlanRule();
+    const architecture = createGovernedArchitecture(rule);
+    const singleRun = "Single Run";
+    const classification = (iob: "I" | "O" | "B", justification: string) =>
+      new Map([
+        [
+          singleRun,
+          { runId: singleRun, iob, justification, ruleVersion: "1.0.0" },
+        ],
+      ]);
+    // A Single Run aggregation scenario is justified by the authenticated case
+    // control alone; the governed formula still binds a governing plan rule.
+    const caseControlArchitecture = {
+      ...architecture,
+      runs: [
+        {
+          runId: singleRun,
+          runLabel: "Single Calculation Run",
+          effectiveDateRange: { startDate: "2000-01-01", endDate: null },
+          justifications: [
+            {
+              source: "case-control" as const,
+              referenceId: uuid("31"),
+              referenceContentSha256: hash("9"),
+            },
+          ],
+          applicableTabs: ["RETIREES"],
+        },
+      ],
+      cells: new Map(
+        [...architecture.cells.entries()].map(([key, cell]) => [
+          key,
+          {
+            ...cell,
+            perRunClassification: classification(
+              key.endsWith("C1") ? "O" : key.endsWith("D1") ? "B" : "I",
+              "Observed calculated output",
+            ),
+          },
+        ]),
+      ),
+    };
+    const governance = await formulaGovernance(rule);
+    const entry = governance.formulas[0];
+    const approved = entry?.approvalDecisions[0];
+    if (!entry || !approved) throw new Error("Missing approval fixture.");
+    const caseControlApproval = async (
+      record: FormulaApprovalRecord,
+    ): Promise<FormulaApprovalRecord> => {
+      const content = {
+        ...record,
+        decisionId: uuid(record.target.cellAddress === "C1" ? "711" : "712"),
+        appendOrdinal: 1,
+        priorDecisionId: null,
+        priorDecisionContentSha256: null,
+        scenarioId: singleRun,
+        decidedAt: "2026-07-28T12:00:00Z" as typeof record.decidedAt,
+      };
+      return {
+        ...content,
+        decisionContentSha256: await formulaApprovalContentHash(content),
+      };
+    };
+    const result = await generateFormulaDefinitions({
+      architecture: caseControlArchitecture,
+      governance: {
+        approvedPlanRules: governance.approvedPlanRules,
+        formulas: await Promise.all(
+          governance.formulas.map(async (item) => ({
+            ...item,
+            scenarioId: singleRun,
+            approvalDecisions: item.approvalDecisions[0]
+              ? [await caseControlApproval(item.approvalDecisions[0])]
+              : [],
+          })),
+        ),
+      },
+    });
+    expect(result.errors).toEqual([]);
+    expect(result.formulas.map((formula) => formula.scenarioId)).toEqual([
+      singleRun,
+      singleRun,
+    ]);
   });
 
   it("rejects tampered and revoked formula approval chains", async () => {

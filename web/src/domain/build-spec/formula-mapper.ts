@@ -213,14 +213,24 @@ async function resolveProvenance(
     new Set(approval.sourcePlanRules.map((source) => source.ruleId)).size !==
       approval.sourcePlanRules.length;
   const governingRule = governing[0]?.rule;
+  // A plan-rule-triggered run (e.g. ERD) must cite the governing rule in its
+  // justifications. A case-control-triggered run (the Single Run aggregation
+  // scenario, whose justification is the authenticated case control alone)
+  // is authorized by the case control: any human-approved governing rule that
+  // is effective across the run's date range may define the formula there.
+  const planRuleJustification = run.justifications.find(
+    (item) => item.source === "plan-rule",
+  );
+  const caseControlJustification = run.justifications.find(
+    (item) => item.source === "case-control",
+  );
   const justified =
-    governingRule &&
-    run.justifications.some(
-      (item) =>
-        item.source === "plan-rule" &&
-        item.referenceId === governingRule.ruleId &&
-        item.referenceContentSha256 === governingRule.ruleContentSha256,
-    );
+    governingRule !== undefined &&
+    (planRuleJustification !== undefined
+      ? planRuleJustification.referenceId === governingRule.ruleId &&
+        planRuleJustification.referenceContentSha256 ===
+          governingRule.ruleContentSha256
+      : caseControlJustification !== undefined);
   const overridesValid = resolved.every(
     ({ rule }) =>
       !rule?.authorityOverrideId ||
