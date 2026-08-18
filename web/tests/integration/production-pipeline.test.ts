@@ -15,7 +15,9 @@ import {
   architecturePolicyDecisionContentHash,
   type ArchitecturePolicyApproval,
 } from "../../src/domain/architecture/architecture-policy-approval";
+import type { V1Architecture } from "../../src/domain/architecture/models";
 import { authorRule } from "../../src/domain/plan-rules/rule-authoring";
+import type { PlanRuleRecord } from "../../src/domain/plan-rules/models";
 import {
   parseUtcTimestamp,
   type Sha256,
@@ -29,6 +31,8 @@ import {
 } from "../../src/domain/population/population-profile";
 import { workbookProfileContentHash } from "../../src/domain/population/workbook-adapter";
 import { buildSpecEngine } from "../../src/domain/build-spec/build-spec-engine";
+import { formulaApprovalContentHash } from "../../src/domain/build-spec/formula-approval";
+import type { FormulaGovernanceInput } from "../../src/domain/build-spec/models";
 import { compileBuildSpec } from "../../src/domain/formula-compiler/compiler";
 import { buildWorkbook } from "../../src/domain/workbook-builder/workbook-builder";
 import { buildXLSXSpec } from "../../src/domain/workbook-builder/serialization";
@@ -86,6 +90,22 @@ function erdScenarioRules(): readonly ScenarioSelectionRule[] {
       exclusionConditions: [],
       defaultEffectiveDateRange: { startDate: "1974-09-02", endDate: null },
     },
+    // The Single Run aggregation scenario is triggered by the authenticated
+    // case control alone; its run carries no plan-rule justification.
+    {
+      id: "Single Run",
+      label: "Single Calculation Run",
+      triggerConditions: [
+        {
+          dimension: "case-purpose",
+          operator: "equals",
+          value: "single-calculation",
+          source: "case-control",
+        },
+      ],
+      exclusionConditions: [],
+      defaultEffectiveDateRange: { startDate: "1974-09-02", endDate: null },
+    },
   ];
 }
 
@@ -110,13 +130,22 @@ async function approvedDefActPolicies(
     }),
     iobClassification: await approve({
       kind: "iob-classification",
-      rules: ["DOB", "BSEX", "COMP"].map((fieldPattern) => ({
-        fieldPattern,
-        runPattern: "*",
-        iob: "I" as const,
-        priority: 50,
-        justification: `${fieldPattern} is read from population data`,
-      })),
+      rules: [
+        ...["DOB", "BSEX", "COMP"].map((fieldPattern) => ({
+          fieldPattern,
+          runPattern: "*",
+          iob: "I" as const,
+          priority: 50,
+          justification: `${fieldPattern} is read from population data`,
+        })),
+        {
+          fieldPattern: "ACC_BEN",
+          runPattern: "*",
+          iob: "O" as const,
+          priority: 50,
+          justification: "Accrued benefit is a calculated result",
+        },
+      ],
     }),
     fieldNameGlossary: await approve({
       kind: "field-name-glossary",
@@ -139,6 +168,12 @@ async function approvedDefActPolicies(
           description: "Compensation",
           tabContext: null,
         },
+        {
+          workbookPattern: "ACC_BEN",
+          genericField: "ACC_BEN",
+          description: "Accrued benefit",
+          tabContext: null,
+        },
       ],
     }),
   };
@@ -146,7 +181,7 @@ async function approvedDefActPolicies(
 
 function defActCell(
   address: string,
-  storedValue: string | number,
+  storedValue: string | number | null,
   formulaText: string | null,
 ) {
   return {
@@ -193,10 +228,10 @@ async function governedDefActFixture() {
 
   const controlContent = {
     controlId: "00000000-0000-4000-8000-000000000507" as Uuid,
-    // No single-calculation purpose: the aggregation scenario has no
-    // plan-rule justification of its own, so the governed path uses the ERD
-    // plan-rule scenario only.
-    dimensions: {},
+    // The single-calculation case purpose triggers the Single Run aggregation
+    // scenario, whose run is justified by the authenticated case control
+    // alone (no plan-rule justification of its own).
+    dimensions: { "case-purpose": "single-calculation" },
     effectiveDateRange: { startDate: "2020-01-01", endDate: null },
     reviewStatus: "human-approved" as const,
     approvedBy: "Synthetic Reviewer",
@@ -228,7 +263,7 @@ async function governedDefActFixture() {
     detectorVersion: "1.0.0",
     confidence: 1,
     evidence: [observation],
-    observedFields: ["DOB", "BSEX", "COMP"],
+    observedFields: ["DOB", "BSEX", "COMP", "ACC_BEN"],
     recordCounts: [2],
     sensitivity: "synthetic-mock",
     correctionsOrImputationsApplied: false,
@@ -246,6 +281,10 @@ async function governedDefActFixture() {
           defActCell("A2", "1960-05-12", null),
           defActCell("B2", "M", null),
           defActCell("C2", 42000, null),
+          // ACC_BEN is an observed O/B field: a header label cell (D1) and a
+          // formula cell (D2) that derives from the COMP header cell.
+          defActCell("D1", "ACC_BEN", null),
+          defActCell("D2", null, "=C1*0.01"),
         ],
       },
     ],
@@ -349,6 +388,76 @@ async function approvePolicy(
   };
 }
 
+// The ACC_BEN formula cell (Def_Act Non-Vested::D2) is observed in both the
+// plan-rule-justified ERD run and the case-control-justified Single Run
+// aggregation scenario, so formula governance must bind a governing rule in
+// each run before BuildSpec accepts the formula.
+async function approvedFormulaGovernance(
+  rule: PlanRuleRecord | undefined,
+  architecture: V1Architecture,
+): Promise<FormulaGovernanceInput> {
+  if (rule === undefined) throw new Error("Missing governed plan rule.");
+  const cellKey = "Def_Act Non-Vested::D2";
+  const cell = architecture.cells.get(cellKey);
+  if (cell === undefined)
+    throw new Error("Formula cell missing from the architecture.");
+  const formulaText = cell.formulaText;
+  if (formulaText === null)
+    throw new Error("Formula cell missing from the architecture.");
+  const runs = [...architecture.runs].sort((left, right) =>
+    left.runId.localeCompare(right.runId),
+  );
+  const entries = await Promise.all(
+    runs.map(async (run, index) => {
+      const classification = cell.perRunClassification.get(run.runId);
+      const content = {
+        decisionId:
+          `00000000-0000-4000-8000-${String(711 + index).padStart(12, "0")}` as Uuid,
+        appendOrdinal: 1,
+        priorDecisionId: null,
+        priorDecisionContentSha256: null,
+        decisionType: "approve" as const,
+        resultingStatus: "approved" as const,
+        formulaText,
+        target: {
+          tabName: cell.sourceTab,
+          cellAddress: cell.cellAddress,
+          genericField: cell.genericField,
+        },
+        scenarioId: run.runId,
+        iobClassification:
+          classification?.iob === "B" ? ("B" as const) : ("O" as const),
+        sourcePlanRules: [
+          {
+            ruleId: rule.ruleId,
+            ruleContentSha256: rule.ruleContentSha256,
+            relationship: "governing" as const,
+          },
+        ],
+        derivationDescription: `Reviewed ${cell.genericField} derivation for ${run.runId}.`,
+        affectedTestIds: [`TEST-${run.runId}`],
+        regenerationImpact: "Regenerate compiler and workbook artifacts.",
+        validationOracleIds: [`ORACLE-${run.runId}`],
+        humanActor: human,
+        rationale: `Approved ${cell.genericField} formula for ${run.runId}.`,
+        decidedAt: builtAt,
+        schemaVersion: "1.0.0" as const,
+      };
+      return {
+        cellKey,
+        scenarioId: run.runId,
+        approvalDecisions: [
+          {
+            ...content,
+            decisionContentSha256: await formulaApprovalContentHash(content),
+          },
+        ],
+      };
+    }),
+  );
+  return { approvedPlanRules: [rule], formulas: entries };
+}
+
 describe("Feature 005/006/007 governed production pipeline integration", () => {
   it("completes the Def_Act Non-Vested production path to a compiled V1 workbook", async () => {
     const fixture = await governedDefActFixture();
@@ -363,6 +472,17 @@ describe("Feature 005/006/007 governed production pipeline integration", () => {
     );
     expect(architecture.runs.map((run) => run.runId)).toEqual([
       "ERD@2020-01-01..open",
+      "Single Run@2020-01-01..open",
+    ]);
+    const singleRun = architecture.runs.find(
+      (run) => run.runId === "Single Run@2020-01-01..open",
+    );
+    expect(singleRun?.justifications).toEqual([
+      {
+        source: "case-control",
+        referenceId: fixture.caseControls.controlId,
+        referenceContentSha256: fixture.caseControls.caseControlContentSha256,
+      },
     ]);
 
     const { dependencies: ignored, ...architectureGovernance } = fixture;
@@ -370,17 +490,40 @@ describe("Feature 005/006/007 governed production pipeline integration", () => {
     const buildSpecResult = await buildSpecEngine({
       architecture,
       architectureGovernance,
-      // No O/B fields in this profile, so no formula governance is required.
-      formulaGovernance: {
-        approvedPlanRules: fixture.planRules,
-        formulas: [],
-      },
+      formulaGovernance: await approvedFormulaGovernance(
+        fixture.planRules[0],
+        architecture,
+      ),
     });
     expect(buildSpecResult.ok).toBe(true);
     if (!buildSpecResult.ok) return;
     const buildSpec = buildSpecResult.buildSpec;
     expect(buildSpec.schemaVersion).toBe("2.0.0");
     expect(buildSpec.cellMappings.length).toBeGreaterThan(0);
+    // The ACC_BEN formula must be governed in both the plan-rule-justified
+    // ERD run and the case-control-justified Single Run aggregation scenario.
+    expect(
+      buildSpec.formulas.map((formula) => formula.scenarioId).sort(),
+    ).toEqual(["ERD@2020-01-01..open", "Single Run@2020-01-01..open"]);
+    expect(
+      buildSpec.formulas.every(
+        (formula) =>
+          formula.tabName === "Def_Act Non-Vested" &&
+          formula.genericField === "ACC_BEN" &&
+          formula.formulaText === "=C1*0.01",
+      ),
+    ).toBe(true);
+    // The D1 header label cell must not duplicate the D2 formula mapping for
+    // the ACC_BEN field (one mapping per scenario, formula-bearing).
+    const accrualMappings = buildSpec.cellMappings.filter(
+      (mapping) => mapping.field === "ACC_BEN",
+    );
+    expect(accrualMappings).toHaveLength(2);
+    expect(
+      accrualMappings.every(
+        (mapping) => mapping.cellAddress === "D2" && mapping.formulaId !== null,
+      ),
+    ).toBe(true);
 
     const compilation = await compileBuildSpec({
       buildSpec,

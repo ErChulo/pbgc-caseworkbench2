@@ -245,6 +245,10 @@ export function writeXLSXBuffer(spec: XLSXWorkbookSpec): Buffer {
     });
   }
 
+  // SheetJS writes with type "buffer" only when a Node runtime is detected;
+  // in the browser build the same call falls through to the "array" branch
+  // and returns a Uint8Array, so this function is safe in both runtimes even
+  // though the Node-side type is Buffer.
   const buffer = XLSX.write(workbook, { type: "buffer" }) as Buffer;
   return buffer;
 }
