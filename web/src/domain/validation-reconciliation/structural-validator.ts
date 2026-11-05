@@ -3,18 +3,42 @@ import type { Sha256 } from "../shared/types";
 import { normalizeCellAddress } from "../formula-compiler/reference-codec";
 import type {
   ValidationError,
-  ValidationResult,
+  WorkbookValidationEvidence,
   ValidationWarning,
   WorkbookValidationInput,
 } from "./models";
+import { computeWorkbookContentHash } from "../workbook-builder/workbook-hash";
 import { validatePopulationApplication } from "./population-validator";
 
 export async function validateWorkbook(
   input: WorkbookValidationInput,
-): Promise<ValidationResult> {
+): Promise<WorkbookValidationEvidence> {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
   const workbook = input.workbook;
+  const actualWorkbookHash = await computeWorkbookContentHash(workbook);
+  if (actualWorkbookHash !== workbook.workbookContentSha256) {
+    errors.push(
+      error(
+        "WORKBOOK_HASH_MISMATCH",
+        "The workbook content does not match its recorded hash.",
+        [],
+        [],
+        "Regenerate or restore the workbook before validation.",
+      ),
+    );
+  }
+  if (input.validatorVersion.trim() === "") {
+    errors.push(
+      error(
+        "MISSING_VALIDATOR_VERSION",
+        "The validator version is required.",
+        [],
+        [],
+        "Record the validator version and validate again.",
+      ),
+    );
+  }
   const canonicalSupportSheets = ["Summary", "Tables", "UD Table"];
   const sheetNames = workbook.sheets.map((sheet) => sheet.name);
 
@@ -69,6 +93,11 @@ export async function validateWorkbook(
 
   const deterministicPayload = {
     validationType: "workbook" as const,
+    workbookContentSha256: actualWorkbookHash,
+    buildSpecContentSha256: workbook.buildSpecContentSha256,
+    architectureContentSha256: workbook.architectureContentSha256,
+    populationProfileContentSha256: workbook.populationProfileContentSha256,
+    validatorVersion: input.validatorVersion,
     status:
       sortedErrors.length > 0
         ? "invalid"

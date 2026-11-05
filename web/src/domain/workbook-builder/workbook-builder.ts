@@ -1,5 +1,5 @@
 import { deterministicUuid } from "../build-spec/identity";
-import { hashTyped } from "../manifests/canonical-json";
+import { computeWorkbookContentHash } from "./workbook-hash";
 import { parseSha256, type Sha256 } from "../shared/types";
 import type {
   WorkbookGenerationInput,
@@ -227,12 +227,4 @@ function generateUDTableSheet(
       formulaId: cm.formulaId ?? null,
     })),
   };
-}
-
-async function computeWorkbookContentHash(
-  workbook: V1Workbook,
-): Promise<string> {
-  const { workbookContentSha256: omitted, ...content } = workbook;
-  void omitted;
-  return hashTyped({ workbook: content }, { typeName: "V1WorkbookContent" });
 }

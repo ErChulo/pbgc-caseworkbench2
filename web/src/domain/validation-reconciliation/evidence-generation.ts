@@ -28,6 +28,26 @@ export async function generateValidationEvidence(
   const evidence = {
     validationId: result.validationId,
     validationType: result.validationType,
+    ...(result.validationType === "workbook" &&
+    "workbookContentSha256" in result
+      ? {
+          workbookContentSha256: result.workbookContentSha256,
+          buildSpecContentSha256:
+            "buildSpecContentSha256" in result
+              ? result.buildSpecContentSha256
+              : null,
+          architectureContentSha256:
+            "architectureContentSha256" in result
+              ? result.architectureContentSha256
+              : null,
+          populationProfileContentSha256:
+            "populationProfileContentSha256" in result
+              ? result.populationProfileContentSha256
+              : null,
+          validatorVersion:
+            "validatorVersion" in result ? result.validatorVersion : null,
+        }
+      : {}),
     status: result.status,
     validatedAt: result.validatedAt,
     errorCount: result.errors.length,

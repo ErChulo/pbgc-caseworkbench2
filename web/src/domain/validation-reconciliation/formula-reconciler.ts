@@ -8,6 +8,7 @@ import type {
 } from "./models";
 import { validateToleranceProfile } from "./tolerance";
 import { validateOracleContract } from "./oracle-integration";
+import { validateWorkbook } from "./structural-validator";
 
 export async function reconcileWorkbook(
   input: ReconciliationInput,
@@ -29,6 +30,54 @@ export async function reconcileWorkbook(
     input.validation.validationType !== "workbook"
   ) {
     issues.push("A passing workbook validation is required.");
+  }
+  // Re-run validation rather than trusting an unkeyed hash or a status label.
+  // Legacy results without workbook-bound metadata cannot authorize reconciliation.
+  const candidate = input.validation as Partial<
+    import("./models").WorkbookValidationEvidence
+  >;
+  if (
+    typeof candidate.validatorVersion !== "string" ||
+    candidate.validatorVersion.trim() === ""
+  ) {
+    issues.push("Workbook-bound validation evidence is required.");
+  } else {
+    try {
+      const current = await validateWorkbook({
+        workbook: input.workbook,
+        validatorVersion: candidate.validatorVersion,
+        validatedAt: input.validation.validatedAt,
+      });
+      const evidenceHash = await hashTyped(
+        {
+          validationType: candidate.validationType,
+          workbookContentSha256: candidate.workbookContentSha256,
+          buildSpecContentSha256: candidate.buildSpecContentSha256,
+          architectureContentSha256: candidate.architectureContentSha256,
+          populationProfileContentSha256:
+            candidate.populationProfileContentSha256,
+          validatorVersion: candidate.validatorVersion,
+          status: candidate.status,
+          errors: candidate.errors,
+          warnings: candidate.warnings,
+          affectedComponentIds: candidate.affectedComponentIds,
+          schemaVersion: candidate.schemaVersion,
+        },
+        { typeName: "WorkbookValidationResult" },
+      );
+      if (
+        current.status === "invalid" ||
+        current.validationContentSha256 !== evidenceHash ||
+        evidenceHash !== input.validation.validationContentSha256 ||
+        evidenceHash !== input.validation.validationId
+      ) {
+        issues.push(
+          "Workbook validation evidence is stale, invalid, or does not match the current workbook.",
+        );
+      }
+    } catch {
+      issues.push("Workbook validation evidence could not be verified.");
+    }
   }
   if (
     input.oracle.populationSnapshot !==

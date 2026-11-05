@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import { computeWorkbookContentHash } from "../../../../src/domain/workbook-builder/workbook-hash";
+import { validateWorkbook } from "../../../../src/domain/validation-reconciliation/structural-validator";
 import { reconcileWorkbook } from "../../../../src/domain/validation-reconciliation/formula-reconciler";
 import { createDefaultToleranceProfile } from "../../../../src/domain/validation-reconciliation/tolerance";
 import type {
@@ -21,20 +23,40 @@ const formulas = ["f1", "f2"].map((formulaId, i) => ({
   executionOrder: i,
   executionLevel: 0,
 }));
-const workbook = {
-  workbookContentSha256: hash("a"),
-  populationProfileContentSha256: hash("b"),
-  buildSpecContentSha256: hash("c"),
-  formulaCells: formulas,
-} as unknown as V1Workbook;
-const validation = {
-  validationType: "workbook",
-  status: "valid",
-  errors: [],
-  warnings: [],
-  validationId: hash("d"),
-  validatedAt: time,
-} as unknown as ValidationResult;
+let workbook: V1Workbook;
+let validation: ValidationResult;
+beforeAll(async () => {
+  const draft = {
+    workbookContentSha256: hash("a"),
+    populationProfileContentSha256: hash("b"),
+    buildSpecContentSha256: hash("c"),
+    architectureContentSha256: hash("d"),
+    formulaCells: formulas,
+    sheets: ["Summary", "Tables", "UD Table", "Test"].map((name) => ({
+      name,
+      hidden: false,
+      cells: [],
+    })),
+    namedRanges: [],
+    cellMappings: formulas.map((formula) => ({
+      cellAddress: formula.cellAddress,
+      formulaId: formula.formulaId,
+      iobClassification: "O",
+      dataSource: null,
+    })),
+  } as unknown as V1Workbook;
+  workbook = {
+    ...draft,
+    workbookContentSha256: await computeWorkbookContentHash(draft),
+  };
+  validation = await validateWorkbook({
+    workbook,
+    validatorVersion: "test-validator-1",
+    validatedAt: time,
+  });
+  if (validation.status !== "valid")
+    throw new Error("Synthetic workbook must pass structural validation");
+});
 const oracle: ReconciliationOracle = {
   oracleId: "synthetic",
   oracleType: "reference-calculation",
@@ -144,6 +166,68 @@ describe("reconciliation coverage and integrity", () => {
       validation: { ...validation, status: "invalid" },
     });
     expect(result.reconciliationStatus).toBe("oracle-error");
+  });
+  it("rejects altered workbook content even when its old hash is retained", async () => {
+    const altered = {
+      ...workbook,
+      formulaCells: workbook.formulaCells.map((f, i) =>
+        i === 0 ? { ...f, formulaText: "=999" } : f,
+      ),
+    };
+    const result = await reconcileWorkbook({ ...input(), workbook: altered });
+    expect(result.reconciliationStatus).toBe("oracle-error");
+    expect(
+      result.mismatches.some((m) =>
+        m.diagnostics.some((d) => d.includes("validation evidence")),
+      ),
+    ).toBe(true);
+  });
+  it("rejects validation from a different, correctly rehashed workbook", async () => {
+    const changed = {
+      ...workbook,
+      formulaCells: workbook.formulaCells.map((f, i) =>
+        i === 0 ? { ...f, formulaText: "=999" } : f,
+      ),
+    };
+    const different = {
+      ...changed,
+      workbookContentSha256: await computeWorkbookContentHash(changed),
+    };
+    const result = await reconcileWorkbook({ ...input(), workbook: different });
+    expect(result.reconciliationStatus).toBe("oracle-error");
+  });
+  it("rejects a forged or legacy passing validation result", async () => {
+    for (const altered of [
+      { ...validation, status: "warnings" as const },
+      { ...validation, validationId: hash("e") },
+      { ...validation, validatorVersion: undefined },
+    ]) {
+      const result = await reconcileWorkbook({
+        ...input(),
+        validation: altered,
+      });
+      expect(result.reconciliationStatus).toBe("oracle-error");
+    }
+  });
+  it("binds validation hashes to the workbook and validator version, not the timestamp", async () => {
+    const original = await validateWorkbook({
+      workbook,
+      validatorVersion: "test-validator-1",
+      validatedAt: time,
+    });
+    const later = await validateWorkbook({
+      workbook,
+      validatorVersion: "test-validator-1",
+      validatedAt: "2026-01-02T00:00:00.000Z" as UtcTimestamp,
+    });
+    const versioned = await validateWorkbook({
+      workbook,
+      validatorVersion: "test-validator-2",
+      validatedAt: time,
+    });
+    expect(original.validationId).toBe(later.validationId);
+    expect(original.validationId).not.toBe(versioned.validationId);
+    expect(original.workbookContentSha256).toBe(workbook.workbookContentSha256);
   });
   it("does not accept incomplete, duplicate, or wrong-cell oracle results", async () => {
     const first = oracle.results[0];

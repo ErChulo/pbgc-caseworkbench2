@@ -56,6 +56,12 @@ describe("evidence generation", () => {
     const evidence1 = await generateValidationEvidence(validated);
     const evidence2 = await generateValidationEvidence(validated);
     expect(evidence1.hash).toBe(evidence2.hash);
+    const evidence = JSON.parse(evidence1.evidence) as Record<string, unknown>;
+    expect(evidence.workbookContentSha256).toBe(workbook.workbookContentSha256);
+    expect(evidence.buildSpecContentSha256).toBe(
+      workbook.buildSpecContentSha256,
+    );
+    expect(evidence.validatorVersion).toBe("1.0.0");
   });
 
   it("generates reconciliation evidence with oracle results", async () => {

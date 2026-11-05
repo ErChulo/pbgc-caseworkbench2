@@ -8,6 +8,16 @@ import type {
 
 export type { ValidationResult, ValidationError, ValidationWarning };
 
+/** Content-addressed structural validation of a specific generated workbook. */
+export interface WorkbookValidationEvidence extends ValidationResult {
+  readonly validationType: "workbook";
+  readonly workbookContentSha256: Sha256;
+  readonly buildSpecContentSha256: Sha256;
+  readonly architectureContentSha256: Sha256;
+  readonly populationProfileContentSha256: Sha256;
+  readonly validatorVersion: string;
+}
+
 export interface ReconciliationOracle {
   readonly oracleId: string;
   readonly oracleType:
