@@ -6,12 +6,59 @@ import type {
   ReconciliationMismatch,
   ReconciliationResult,
 } from "./models";
+import { validateToleranceProfile } from "./tolerance";
+import { validateOracleContract } from "./oracle-integration";
 
 export async function reconcileWorkbook(
   input: ReconciliationInput,
 ): Promise<ReconciliationResult> {
+  const toleranceErrors = validateToleranceProfile(input.tolerance);
+  if (toleranceErrors.length > 0) {
+    throw new Error(
+      `Invalid reconciliation tolerance: ${toleranceErrors.join(" ")}`,
+    );
+  }
   if (input.oracle === null) {
     return createResult(input, [], "oracle-unavailable", 0, 0, 1);
+  }
+  const issues: string[] = validateOracleContract(input.oracle);
+  if (
+    (input.validation.status !== "valid" &&
+      input.validation.status !== "warnings") ||
+    input.validation.errors.length > 0 ||
+    input.validation.validationType !== "workbook"
+  ) {
+    issues.push("A passing workbook validation is required.");
+  }
+  if (
+    input.oracle.populationSnapshot !==
+      input.workbook.populationProfileContentSha256 ||
+    input.oracle.buildSpecSnapshot !== input.workbook.buildSpecContentSha256
+  ) {
+    issues.push("Oracle snapshots do not match the workbook inputs.");
+  }
+  if (
+    input.oracle.reliability !== "trusted" ||
+    !input.oracle.executionEvidence?.trim()
+  ) {
+    issues.push("A trusted oracle with documented evidence is required.");
+  }
+  if (
+    !Array.isArray(input.oracle.results) ||
+    input.oracle.results.length === 0 ||
+    input.workbook.formulaCells.length === 0
+  ) {
+    issues.push("Formula results and workbook formulas are required.");
+  }
+  if (issues.length > 0) {
+    return createResult(
+      input,
+      issues.map(globalMismatch),
+      "oracle-error",
+      0,
+      issues.length,
+      issues.length,
+    );
   }
 
   const formulaById = new Map(
@@ -20,8 +67,25 @@ export async function reconcileWorkbook(
   const mismatches: ReconciliationMismatch[] = [];
   let matchCount = 0;
   let errorCount = 0;
+  const seen = new Set<string>();
+  if (formulaById.size !== input.workbook.formulaCells.length) {
+    mismatches.push(
+      globalMismatch("Workbook formula identifiers are not unique."),
+    );
+    errorCount += 1;
+  }
 
   for (const oracleResult of input.oracle.results) {
+    if (seen.has(oracleResult.formulaId)) {
+      mismatches.push(
+        globalMismatch(
+          `Duplicate oracle formula identifier: ${oracleResult.formulaId}.`,
+        ),
+      );
+      errorCount += 1;
+      continue;
+    }
+    seen.add(oracleResult.formulaId);
     const formula = formulaById.get(oracleResult.formulaId);
     if (!formula) {
       errorCount += 1;
@@ -29,7 +93,9 @@ export async function reconcileWorkbook(
         cellAddress: oracleResult.cellAddress,
         formulaId: oracleResult.formulaId,
         formulaText: "",
-        expectedValue: oracleResult.computedValue,
+        expectedValue: isComparableValue(oracleResult.computedValue)
+          ? oracleResult.computedValue
+          : null,
         actualValue: null,
         difference: "missing-formula",
         withinTolerance: false,
@@ -39,7 +105,44 @@ export async function reconcileWorkbook(
       continue;
     }
 
-    const actualValue = input.actualValues[formula.formulaId] ?? null;
+    if (oracleResult.cellAddress !== formula.cellAddress) {
+      mismatches.push(
+        globalMismatch(
+          `Oracle cell address does not match formula ${formula.formulaId}.`,
+        ),
+      );
+      errorCount += 1;
+      continue;
+    }
+    const hasActual = Object.prototype.hasOwnProperty.call(
+      input.actualValues,
+      formula.formulaId,
+    );
+    const actualValue = hasActual
+      ? input.actualValues[formula.formulaId]
+      : undefined;
+    if (
+      !isComparableValue(actualValue) ||
+      !isComparableValue(oracleResult.computedValue) ||
+      !oracleTypeMatches(oracleResult)
+    ) {
+      mismatches.push({
+        cellAddress: formula.cellAddress,
+        formulaId: formula.formulaId,
+        formulaText: formula.formulaText,
+        expectedValue: isComparableValue(oracleResult.computedValue)
+          ? oracleResult.computedValue
+          : null,
+        actualValue: isComparableValue(actualValue) ? actualValue : null,
+        difference: !hasActual ? "missing-actual" : "invalid-value",
+        withinTolerance: false,
+        severity: "error",
+        diagnostics: [
+          "Missing, blank, malformed, or non-finite values cannot be reconciled.",
+        ],
+      });
+      continue;
+    }
     const compared = compareValues(
       oracleResult,
       actualValue,
@@ -63,6 +166,24 @@ export async function reconcileWorkbook(
     }
   }
 
+  for (const formula of input.workbook.formulaCells) {
+    if (!seen.has(formula.formulaId)) {
+      mismatches.push({
+        cellAddress: formula.cellAddress,
+        formulaId: formula.formulaId,
+        formulaText: formula.formulaText,
+        expectedValue: null,
+        actualValue: null,
+        difference: "missing-oracle-result",
+        withinTolerance: false,
+        severity: "error",
+        diagnostics: [
+          "No oracle result was provided for this workbook formula.",
+        ],
+      });
+    }
+  }
+
   const status =
     errorCount > 0
       ? "oracle-error"
@@ -78,6 +199,42 @@ export async function reconcileWorkbook(
     mismatches.length,
     errorCount,
   );
+}
+
+function isComparableValue(value: unknown): value is string | number | boolean {
+  return (
+    (typeof value === "string" && value.trim() !== "") ||
+    (typeof value === "number" && Number.isFinite(value)) ||
+    typeof value === "boolean"
+  );
+}
+
+function oracleTypeMatches(oracle: OracleFormulaResult): boolean {
+  switch (oracle.computedType) {
+    case "number":
+      return typeof oracle.computedValue === "number";
+    case "boolean":
+      return typeof oracle.computedValue === "boolean";
+    case "text":
+    case "date":
+      return typeof oracle.computedValue === "string";
+    case "error":
+      return false;
+  }
+}
+
+function globalMismatch(message: string): ReconciliationMismatch {
+  return {
+    cellAddress: "",
+    formulaId: "",
+    formulaText: "",
+    expectedValue: null,
+    actualValue: null,
+    difference: "oracle-error",
+    withinTolerance: false,
+    severity: "error",
+    diagnostics: [message],
+  };
 }
 
 function compareValues(
@@ -106,6 +263,13 @@ function compareValues(
     typeof actualValue === "number"
   ) {
     const difference = Math.abs(oracle.computedValue - actualValue);
+    if (!Number.isFinite(difference)) {
+      return {
+        withinTolerance: false,
+        difference: "non-finite-difference",
+        diagnostics: ["Numeric difference is outside the supported range."],
+      };
+    }
     const relative =
       Math.abs(oracle.computedValue) > 0
         ? difference / Math.abs(oracle.computedValue)

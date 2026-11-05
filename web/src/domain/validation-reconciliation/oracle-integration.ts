@@ -45,11 +45,11 @@ export function validateOracleContract(
     errors.push("Execution version must not be empty.");
   }
 
-  if (oracle.populationSnapshot.length !== 64) {
+  if (!/^[a-f0-9]{64}$/u.test(oracle.populationSnapshot)) {
     errors.push("Population snapshot must be a valid SHA-256 hash.");
   }
 
-  if (oracle.buildSpecSnapshot.length !== 64) {
+  if (!/^[a-f0-9]{64}$/u.test(oracle.buildSpecSnapshot)) {
     errors.push("BuildSpec snapshot must be a valid SHA-256 hash.");
   }
 
@@ -61,9 +61,12 @@ export function validateOracleContract(
     errors.push(`Invalid reliability level: ${oracle.reliability}`);
   }
 
-  for (const [index, result] of oracle.results.entries()) {
-    const resultErrors = validateOracleFormulaResult(result, index);
-    errors.push(...resultErrors);
+  if (Array.isArray(oracle.results)) {
+    const results: readonly OracleFormulaResult[] = oracle.results;
+    for (const [index, result] of results.entries()) {
+      const resultErrors = validateOracleFormulaResult(result, index);
+      errors.push(...resultErrors);
+    }
   }
 
   return errors;

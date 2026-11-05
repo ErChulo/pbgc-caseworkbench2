@@ -81,7 +81,7 @@ describe("validation-reconciliation core", () => {
       },
       actualValues: {},
     });
-    expect(reconciled.reconciliationStatus).toBe("complete");
+    expect(reconciled.reconciliationStatus).toBe("oracle-error");
     expect(reconciled.reconciliationId).toHaveLength(64);
   });
 });

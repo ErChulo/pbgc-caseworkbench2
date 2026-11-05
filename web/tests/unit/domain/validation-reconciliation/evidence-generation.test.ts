@@ -104,13 +104,33 @@ describe("evidence generation", () => {
       tolerance,
       actualValues: {},
     });
-    const reviewed = recordHumanReview(
+    const reviewed = await recordHumanReview(
       reconciled,
       "reviewer@example.com",
       "Approved for production.",
     );
     expect(reviewed.reviewedBy).toBe("reviewer@example.com");
     expect(reviewed.reviewRationale).toBe("Approved for production.");
+    expect(reviewed.reconciliationStatus).toBe("oracle-unavailable");
+    expect(reviewed.reconciliationContentSha256).not.toBe(
+      reconciled.reconciliationContentSha256,
+    );
+    expect(reviewed.reconciliationId).toBe(
+      reviewed.reconciliationContentSha256,
+    );
+    await expect(
+      recordHumanReview(reconciled, " ", "rationale"),
+    ).rejects.toThrow();
+    await expect(
+      recordHumanReview(reconciled, "reviewer", " "),
+    ).rejects.toThrow();
+    await expect(
+      recordHumanReview(
+        { ...reconciled, matchCount: 42 },
+        "reviewer",
+        "reviewed",
+      ),
+    ).rejects.toThrow("integrity verification");
   });
 
   it("generates validation summary text", async () => {

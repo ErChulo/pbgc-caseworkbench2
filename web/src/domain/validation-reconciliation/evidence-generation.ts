@@ -80,15 +80,50 @@ export async function generateReconciliationEvidence(
   };
 }
 
-export function recordHumanReview(
+/** Records a review note; it does not change reconciliation status or approve output. */
+export async function recordHumanReview(
   result: ReconciliationResult,
   reviewedBy: string,
   rationale: string,
-): ReconciliationResult {
+): Promise<ReconciliationResult> {
+  if (!reviewedBy.trim() || !rationale.trim()) {
+    throw new Error("A reviewer and rationale are required.");
+  }
+  const reviewed = {
+    workbookContentSha256: result.workbookContentSha256,
+    validationId: result.validationId,
+    oracleId: result.oracleId,
+    oracleExecutedAt: result.oracleExecutedAt,
+    reconciliationStatus: result.reconciliationStatus,
+    mismatches: result.mismatches,
+    tolerance: result.tolerance,
+    matchCount: result.matchCount,
+    mismatchCount: result.mismatchCount,
+    errorCount: result.errorCount,
+    reviewedBy: reviewedBy.trim(),
+    reviewRationale: rationale.trim(),
+  };
+  const priorHash = await hashTyped(
+    {
+      ...reviewed,
+      reviewedBy: result.reviewedBy,
+      reviewRationale: result.reviewRationale,
+    },
+    { typeName: "WorkbookReconciliationResult" },
+  );
+  if (
+    priorHash !== result.reconciliationContentSha256 ||
+    priorHash !== result.reconciliationId
+  ) {
+    throw new Error("Reconciliation content failed integrity verification.");
+  }
+  const hash = (await hashTyped(reviewed, {
+    typeName: "WorkbookReconciliationResult",
+  })) as Sha256;
   return {
-    ...result,
-    reviewedBy,
-    reviewRationale: rationale,
+    reconciliationId: hash,
+    ...reviewed,
+    reconciliationContentSha256: hash,
   };
 }
 

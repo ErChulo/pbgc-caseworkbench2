@@ -14,11 +14,17 @@ export function createDefaultToleranceProfile(): ToleranceProfile {
 export function validateToleranceProfile(profile: ToleranceProfile): string[] {
   const errors: string[] = [];
 
-  if (profile.absoluteTolerance < 0) {
+  if (
+    !Number.isFinite(profile.absoluteTolerance) ||
+    profile.absoluteTolerance < 0
+  ) {
     errors.push("Absolute tolerance must be non-negative.");
   }
 
-  if (profile.relativeTolerance < 0) {
+  if (
+    !Number.isFinite(profile.relativeTolerance) ||
+    profile.relativeTolerance < 0
+  ) {
     errors.push("Relative tolerance must be non-negative.");
   }
 
@@ -31,7 +37,11 @@ export function validateToleranceProfile(profile: ToleranceProfile): string[] {
   for (const [cellAddress, override] of Object.entries(
     profile.cellLevelOverrides,
   )) {
-    if (typeof override !== "number" || override < 0) {
+    if (
+      typeof override !== "number" ||
+      !Number.isFinite(override) ||
+      override < 0
+    ) {
       errors.push(
         `Cell ${cellAddress} override must be a non-negative number, got ${String(override)}`,
       );

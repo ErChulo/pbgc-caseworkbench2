@@ -84,10 +84,7 @@ export class WorkbookReconciliationEngine {
   }
 
   isBlocked(result: ReconciliationResult): boolean {
-    return (
-      result.reconciliationStatus === "oracle-unavailable" ||
-      result.reconciliationStatus === "oracle-error"
-    );
+    return result.reconciliationStatus !== "complete";
   }
 }
 
@@ -133,7 +130,9 @@ export class ValidationOrchestrationEngine {
         return {
           validation,
           isValid,
-          blocksApproval,
+          blocksApproval:
+            blocksApproval ||
+            this.reconciliationEngine.isBlocked(reconciliation),
           reconciliation,
           isReconciled,
           hasMismatches,
@@ -146,7 +145,8 @@ export class ValidationOrchestrationEngine {
     return {
       validation,
       isValid,
-      blocksApproval,
+      // Validation alone cannot establish reconciliation readiness.
+      blocksApproval: true,
     };
   }
 }
