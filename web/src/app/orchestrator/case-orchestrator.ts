@@ -1,3 +1,7 @@
+import {
+  isCaseOutputPath,
+  verifyOutputArtifactReferences,
+} from "../../adapters/filesystem/output-artifact-verification";
 import { useMemo, useRef, useState } from "react";
 import scenarioSelectionYaml from "../../../../rules/scenario-selection.yaml?raw";
 import tabSelectionYaml from "../../../../rules/tab-selection.yaml?raw";
@@ -3341,7 +3345,19 @@ export function useCaseOrchestrator(
           await readAllBytes(opened.value),
         ),
       ) as unknown;
-      setCaseOutputArtifacts(parseCaseOutputArtifactReferences(value));
+      const references = parseCaseOutputArtifactReferences(value);
+      const checked = await verifyOutputArtifactReferences(
+        activeWorkspace,
+        caseRecord.caseId,
+        references,
+      );
+      if (activeCaseId.current !== caseRecord.caseId) return;
+      setCaseOutputArtifacts(checked.verified);
+      if (checked.rejected.length > 0) {
+        setCaseOutputLinkMessage(
+          `${String(checked.rejected.length)} linked artifact(s) could not be verified and were not restored. Check the file and link it again.`,
+        );
+      }
     } catch {
       setCaseOutputLinkMessage(
         "Existing final-output artifact references are not valid JSON and were ignored.",
@@ -4388,11 +4404,12 @@ export function useCaseOrchestrator(
     if (
       artifactId === "" ||
       storagePath === null ||
+      !isCaseOutputPath(storagePath, activeCase.caseId) ||
       mediaType === "" ||
       description === ""
     ) {
       setCaseOutputLinkMessage(
-        "Artifact type, ID, workspace path, media type, and description are required. Paths must be relative workspace paths without '..'.",
+        "Artifact type, ID, workspace path, media type, and description are required. Paths must be inside the active case folder and must not contain '..'.",
       );
       return;
     }
@@ -4408,6 +4425,7 @@ export function useCaseOrchestrator(
       setCaseOutputLinkMessage(hashed.error.safeMessage);
       return;
     }
+    if (activeCaseId.current !== activeCase.caseId) return;
     const linked: CaseworkOutputArtifactInput = {
       artifactType: draft.artifactType,
       artifactId,
@@ -4424,6 +4442,7 @@ export function useCaseOrchestrator(
       linked,
     ].sort(compareCaseOutputArtifacts);
     await persistCaseOutputArtifactReferences(activeCase.caseId, next);
+    if (activeCaseId.current !== activeCase.caseId) return;
     setCaseOutputArtifacts(next);
     setCaseOutputExportMessage(null);
     setCaseOutputLinkMessage(
@@ -5419,17 +5438,31 @@ export function useCaseOrchestrator(
     }
     const { createFinalCaseworkOutputPackage: createPackage } =
       await import("../../domain/case-output/package-builder");
+    const checked = await verifyOutputArtifactReferences(
+      activeWorkspace,
+      activeCase.caseId,
+      caseOutputArtifacts,
+    );
+    if (activeCaseId.current !== activeCase.caseId) return;
+    if (checked.rejected.length > 0) {
+      setCaseOutputArtifacts(checked.verified);
+      setCaseOutputExportMessage(
+        "Export stopped: one or more linked files are missing, changed, or outside this case. Check the files and link them again.",
+      );
+      return;
+    }
     const outputInput = createFinalOutputInput({
       caseRecord: activeCase,
       manifestSummary,
       previewRules,
       populationItems,
-      caseOutputArtifacts,
+      caseOutputArtifacts: checked.verified,
       unresolvedItems: evidenceUnresolvedItems,
       createdAt: dependencies.clock.now(),
       createdBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
     });
     const outputPackage = await createPackage(outputInput);
+    if (activeCaseId.current !== activeCase.caseId) return;
     await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/exports`);
     const saved = await activeWorkspace.writeAtomic(
       `cases/${activeCase.caseId}/exports/final-casework-output-package.json`,

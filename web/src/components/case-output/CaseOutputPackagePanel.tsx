@@ -133,7 +133,9 @@ export function CaseOutputPackagePanel({
         <p>
           Link artifacts that already exist in the selected local workspace. The
           app reads the file and computes its SHA-256 before adding it to the
-          final package.
+          final package. Use a file inside the active case folder. The app
+          checks linked bytes again when you reopen the case and before export.
+          A matching hash does not prove approval or validate the content.
         </p>
         <div className="case-output-link-grid">
           <label>
@@ -183,7 +185,7 @@ export function CaseOutputPackagePanel({
             />
           </label>
           <label>
-            Maturity
+            Unverified maturity label
             <select
               value={maturityLevel}
               onChange={(event) => {
