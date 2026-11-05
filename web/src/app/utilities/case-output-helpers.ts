@@ -60,9 +60,7 @@ export function createFinalOutputInput({
       storagePath: `cases/${caseRecord.caseId}/evidence/rule-records.jsonl`,
     })),
     populationProfileContentSha256:
-      approvedPopulationProfileHash(populationItems) ??
-      linked.get("population-profile")?.contentSha256 ??
-      null,
+      approvedPopulationProfileHash(populationItems),
     architecture: linked.get("v1-architecture") ?? null,
     buildSpec: linked.get("build-spec") ?? null,
     compiledFormulas: linked.get("compiled-formula-artifact") ?? null,

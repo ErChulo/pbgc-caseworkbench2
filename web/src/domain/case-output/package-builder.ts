@@ -2,7 +2,6 @@ import { hashTyped } from "../manifests/canonical-json";
 import { parseSha256 } from "../shared/types";
 import type { Sha256 } from "../shared/types";
 import type {
-  CaseworkLineageEdge,
   CaseworkMaturityClaim,
   CaseworkMaturityLevel,
   CaseworkOutputArtifactInput,
@@ -55,7 +54,8 @@ export function buildFinalCaseworkOutputPayload(
       left.itemId.localeCompare(right.itemId),
     ),
     maturityClaims: maturityClaims(stages),
-    lineage: lineageEdges(artifacts),
+    // References alone do not establish derivation. Do not invent lineage.
+    lineage: [],
   });
 }
 
@@ -108,7 +108,7 @@ function artifactReferences(
       contentSha256: rule.ruleContentSha256,
       mediaType: "application/jsonl",
       storagePath: rule.storagePath ?? null,
-      description: "Human-approved effective-dated plan rule record.",
+      description: "Referenced effective-dated plan rule record.",
     })),
   );
 
@@ -171,7 +171,7 @@ function buildStages(
       label,
       true,
       status,
-      status === "ready" ? maturityForStage(input, stageKey) : "specified",
+      status === "ready" ? "implemented" : "specified",
       matching.map((artifact) => artifact.contentSha256),
       blockers,
     );
@@ -217,6 +217,15 @@ function blockersForStage(
       ) {
         blockers.push("All plan-rule records must be human-approved.");
       }
+      if (
+        input.unresolvedItems.some(
+          (item) => item.status !== "resolved" && item.status !== "superseded",
+        )
+      ) {
+        blockers.push(
+          "Resolve or supersede all unresolved items before completing the package.",
+        );
+      }
       return blockers;
     }
     case "population-profile":
@@ -239,49 +248,23 @@ function blockersForStage(
       return input.workbook === null
         ? ["No generated V1 workbook artifact is available."]
         : [];
-    case "validation-reconciliation":
-      return input.validation === null
-        ? ["No validation or reconciliation evidence artifact is available."]
-        : [];
+    case "validation-reconciliation": {
+      const blockers: string[] = [];
+      if (input.validation === null)
+        blockers.push("No validation evidence artifact is available.");
+      if (input.reconciliation === null)
+        blockers.push("No reconciliation evidence artifact is available.");
+      // The current input contains references, not validated results, review decisions,
+      // or authenticated derivation links. Presence cannot prove readiness.
+      blockers.push(
+        "Referenced artifacts and their lineage have not been verified for final output.",
+      );
+      return blockers;
+    }
     case "section-436":
       return input.section436 === null
         ? ["Section 436 is required but no evaluation artifact is available."]
         : [];
-  }
-}
-
-function maturityForStage(
-  input: FinalCaseworkOutputInput,
-  stageKey: CaseworkOutputStageKey,
-): CaseworkMaturityLevel {
-  if (stageKey === "plan-rules") return "human-approved";
-  if (stageKey === "validation-reconciliation") return "tested";
-
-  const artifact = artifactInputForStage(input, stageKey);
-  return artifact?.maturityLevel ?? "implemented";
-}
-
-function artifactInputForStage(
-  input: FinalCaseworkOutputInput,
-  stageKey: CaseworkOutputStageKey,
-): CaseworkOutputArtifactInput | null {
-  switch (stageKey) {
-    case "v1-architecture":
-      return input.architecture;
-    case "build-spec":
-      return input.buildSpec;
-    case "compiled-formulas":
-      return input.compiledFormulas;
-    case "workbook":
-      return input.workbook;
-    case "validation-reconciliation":
-      return input.validation ?? input.reconciliation;
-    case "section-436":
-      return input.section436;
-    case "evidence":
-    case "plan-rules":
-    case "population-profile":
-      return null;
   }
 }
 
@@ -322,95 +305,12 @@ function maturityClaims(
     level: stage.maturityLevel,
     evidence:
       stage.status === "ready"
-        ? `${stage.label} has a referenced governed artifact in this package.`
+        ? `${stage.label} has a referenced artifact; verification is pending.`
         : stage.status === "not-required"
           ? `${stage.label} is not required for this package.`
           : `${stage.label} is blocked: ${stage.blockers.join(" ")}`,
     externalExecutionClaimed: stage.maturityLevel === "externally-executed",
   }));
-}
-
-function lineageEdges(
-  artifacts: readonly CaseworkOutputArtifactReference[],
-): readonly CaseworkLineageEdge[] {
-  const byType = new Map(
-    artifacts.map((artifact) => [
-      artifact.artifactType,
-      artifact.contentSha256,
-    ]),
-  );
-  const edges: CaseworkLineageEdge[] = [];
-  addEdge(
-    edges,
-    byType.get("evidence-manifest"),
-    byType.get("plan-rule-record"),
-    "supports-rule-authoring",
-  );
-  addEdge(
-    edges,
-    byType.get("plan-rule-record"),
-    byType.get("v1-architecture"),
-    "drives-architecture",
-  );
-  addEdge(
-    edges,
-    byType.get("population-profile"),
-    byType.get("v1-architecture"),
-    "drives-architecture",
-  );
-  addEdge(
-    edges,
-    byType.get("v1-architecture"),
-    byType.get("build-spec"),
-    "builds-specification",
-  );
-  addEdge(
-    edges,
-    byType.get("build-spec"),
-    byType.get("compiled-formula-artifact"),
-    "compiles-formulas",
-  );
-  addEdge(
-    edges,
-    byType.get("compiled-formula-artifact"),
-    byType.get("v1-workbook"),
-    "builds-workbook",
-  );
-  addEdge(
-    edges,
-    byType.get("v1-workbook"),
-    byType.get("validation-result"),
-    "validates-workbook",
-  );
-  addEdge(
-    edges,
-    byType.get("validation-result"),
-    byType.get("reconciliation-result"),
-    "reconciles-results",
-  );
-  addEdge(
-    edges,
-    byType.get("plan-rule-record"),
-    byType.get("section-436-evaluation"),
-    "supports-section-436",
-  );
-  return edges.sort(
-    (left, right) =>
-      left.relationship.localeCompare(right.relationship) ||
-      left.fromArtifactSha256.localeCompare(right.fromArtifactSha256) ||
-      left.toArtifactSha256.localeCompare(right.toArtifactSha256),
-  );
-}
-
-function addEdge(
-  edges: CaseworkLineageEdge[],
-  fromArtifactSha256: Sha256 | undefined,
-  toArtifactSha256: Sha256 | undefined,
-  relationship: string,
-): void {
-  if (fromArtifactSha256 === undefined || toArtifactSha256 === undefined)
-    return;
-  edges.push({ fromArtifactSha256, toArtifactSha256, relationship });
 }
 
 function compareArtifactReferences(

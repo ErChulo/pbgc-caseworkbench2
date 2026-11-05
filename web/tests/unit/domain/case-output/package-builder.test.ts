@@ -49,14 +49,66 @@ describe("final casework output package builder", () => {
     expect(first.operationalMetadata).not.toEqual(second.operationalMetadata);
   });
 
-  it("marks the package complete when all required references are supplied", () => {
-    const payload = buildFinalCaseworkOutputPayload(completeInput());
-
-    expect(payload.packageStatus).toBe("complete");
-    expect(stage(payload, "section-436")?.status).toBe("not-required");
-    expect(stage(payload, "validation-reconciliation")?.maturityLevel).toBe(
-      "tested",
+  it("does not treat references as validated final output or proven lineage", () => {
+    const input = completeInput();
+    const payload = buildFinalCaseworkOutputPayload({
+      ...input,
+      reconciliation: artifact("reconciliation-result", "reconciliation", "3"),
+      workbook: {
+        ...artifact("v1-workbook", "workbook", "1"),
+        maturityLevel: "externally-executed",
+      },
+    });
+    expect(payload.packageStatus).toBe("blocked");
+    expect(stage(payload, "validation-reconciliation")?.blockers).toContain(
+      "Referenced artifacts and their lineage have not been verified for final output.",
     );
+    expect(payload.lineage).toEqual([]);
+    expect(
+      payload.maturityClaims.some((claim) => claim.externalExecutionClaimed),
+    ).toBe(false);
+    expect(stage(payload, "workbook")?.maturityLevel).toBe("implemented");
+  });
+
+  it("requires both validation and reconciliation", () => {
+    const payload = buildFinalCaseworkOutputPayload(completeInput());
+    expect(stage(payload, "validation-reconciliation")?.blockers).toContain(
+      "No reconciliation evidence artifact is available.",
+    );
+    expect(stage(payload, "section-436")?.status).toBe("not-required");
+  });
+
+  it.each(["open", "assigned", "reopened", "unknown"])(
+    "blocks unresolved item status %s",
+    (status) => {
+      const payload = buildFinalCaseworkOutputPayload({
+        ...completeInput(),
+        unresolvedItems: [
+          {
+            itemId: "item",
+            scope: "plan",
+            downstreamConsequence: "review",
+            status,
+          },
+        ],
+      });
+      expect(stage(payload, "plan-rules")?.status).toBe("blocked");
+    },
+  );
+
+  it.each(["resolved", "superseded"])("does not block a %s item", (status) => {
+    const payload = buildFinalCaseworkOutputPayload({
+      ...completeInput(),
+      unresolvedItems: [
+        {
+          itemId: "item",
+          scope: "plan",
+          downstreamConsequence: "review",
+          status,
+        },
+      ],
+    });
+    expect(stage(payload, "plan-rules")?.status).toBe("ready");
   });
 });
 
