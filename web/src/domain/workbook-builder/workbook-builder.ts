@@ -1,5 +1,6 @@
 import { deterministicUuid } from "../build-spec/identity";
 import { computeWorkbookContentHash } from "./workbook-hash";
+import { validateCalculationSheetNames } from "./sheet-policy";
 import { parseSha256, type Sha256 } from "../shared/types";
 import type {
   WorkbookGenerationInput,
@@ -55,6 +56,36 @@ export async function buildWorkbook(
     return { ok: false, errors: validation.errors };
   }
 
+  const profileHash =
+    input.populationProfile.effectiveWorkbookProfileContentSha256;
+  const matchesLineage = input.buildSpec.architectureLineage.population.some(
+    (entry) =>
+      entry.workbookProfileContentSha256 === profileHash &&
+      entry.approvalDecisionId === input.populationProfile.effectiveDecisionId,
+  );
+  if (
+    profileHash === null ||
+    profileHash !== input.workbookProfileContentSha256 ||
+    !matchesLineage
+  ) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: "POPULATION_LINEAGE_MISMATCH",
+          severity: "error",
+          message: "Approved population does not match the BuildSpec lineage.",
+          affectedCells: [],
+          affectedNames: [],
+          detail:
+            "The selected population hash and approval decision must match the BuildSpec population lineage.",
+          remediation:
+            "Select the approved population and regenerate the BuildSpec.",
+        },
+      ],
+    };
+  }
+
   const zeroHashParsed = parseSha256("0".repeat(64));
   if (!zeroHashParsed.ok) {
     return {
@@ -107,6 +138,11 @@ export async function buildWorkbook(
       hidden: false,
       cells,
     }));
+
+  const sheetErrors = validateCalculationSheetNames(
+    sheets.map((sheet) => sheet.name),
+  );
+  if (sheetErrors.length > 0) return { ok: false, errors: sheetErrors };
 
   const workbookId = await deterministicUuid("V1Workbook", {
     buildSpecId: input.buildSpec.buildSpecId,

@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { hashTyped } from "../manifests/canonical-json";
 import type { Sha256 } from "../shared/types";
 import type { V1Workbook, WorkbookSheet, WorkbookCell } from "./models";
+import { validateCalculationSheetNames } from "./sheet-policy";
 
 export async function computeWorkbookHash(
   workbook: Omit<V1Workbook, "workbookContentSha256">,
@@ -31,6 +32,11 @@ export interface XLSXNamedRange {
 }
 
 export function buildXLSXSpec(workbook: V1Workbook): XLSXWorkbookSpec {
+  const sheetErrors = validateCalculationSheetNames(
+    workbook.sheets.map((sheet) => sheet.name),
+  );
+  if (sheetErrors.length > 0)
+    throw new Error("Workbook contains prohibited or conflicting sheet names.");
   const summarySheet = buildSummarySheet(workbook);
   const tablesSheet = buildTablesSheet(workbook);
   const udTableSheet = buildUDTableSheet(workbook);
@@ -131,7 +137,7 @@ function buildSummarySheet(workbook: V1Workbook): XLSXSheet {
     ["Population Profile Hash", summary.populationProfileContentSha256],
     ["Generated At", summary.generatedAt],
     ["Generator Version", summary.generatorVersion],
-    ["Workbook Content Hash", summary.workbookContentSha256],
+    ["Workbook Content Hash", workbook.workbookContentSha256],
   ];
   return {
     name: "Summary",

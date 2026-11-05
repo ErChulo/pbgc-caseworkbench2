@@ -32,11 +32,32 @@ beforeAll(async () => {
     buildSpecContentSha256: hash("c"),
     architectureContentSha256: hash("d"),
     formulaCells: formulas,
-    sheets: ["Summary", "Tables", "UD Table", "Test"].map((name) => ({
+    sheets: ["Test"].map((name) => ({
       name,
       hidden: false,
       cells: [],
     })),
+    caseId: "case",
+    buildSpecId: "spec",
+    architectureId: "architecture",
+    populationProfileDecisionId: "decision",
+    generatedAt: time,
+    support: {
+      summarySheet: {
+        caseId: "case",
+        buildSpecId: "spec",
+        architectureId: "architecture",
+        buildSpecContentSha256: hash("c"),
+        architectureContentSha256: hash("d"),
+        populationProfileContentSha256: hash("b"),
+        populationProfileDecisionId: "decision",
+        generatedAt: time,
+        generatorVersion: "test",
+        workbookContentSha256: hash("0"),
+      },
+      tablesSheet: { rules: [] },
+      udTableSheet: { namedRanges: [], cellMappings: [] },
+    },
     namedRanges: [],
     cellMappings: formulas.map((formula) => ({
       cellAddress: formula.cellAddress,

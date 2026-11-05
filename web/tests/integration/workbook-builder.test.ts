@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import * as XLSX from "xlsx";
+import { validateWorkbook } from "../../src/domain/validation-reconciliation/structural-validator";
 import { buildWorkbook } from "../../src/domain/workbook-builder/workbook-builder";
 import {
   buildXLSXSpec,
@@ -83,6 +85,68 @@ describe("Feature 007 workbook builder integration", () => {
     expect(buffer.length).toBeGreaterThan(100);
   });
 
+  it("validates generated support content and writes the canonical sheets and real workbook hash", async () => {
+    const fixture = await createFixture();
+    const result = await buildWorkbook({
+      ...fixture,
+      generatorVersion: "1.0.0",
+    });
+    if (!result.ok) throw new Error("workbook build failed");
+    const validation = await validateWorkbook({
+      workbook: result.workbook,
+      validatorVersion: "test-1",
+      validatedAt: result.workbook.generatedAt,
+    });
+    expect(
+      validation.errors.filter((item) => item.code === "MISSING_SUPPORT_SHEET"),
+    ).toEqual([]);
+    const bytes = writeXLSXBuffer(buildXLSXSpec(result.workbook));
+    const parsed = XLSX.read(bytes, { type: "buffer" });
+    expect(parsed.SheetNames.slice(0, 3)).toEqual([
+      "Summary",
+      "Tables",
+      "UD Table",
+    ]);
+    expect(parsed.SheetNames.map((name) => name.toLowerCase())).not.toContain(
+      "mysort",
+    );
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(
+      parsed.Sheets.Summary ?? {},
+      { header: 1 },
+    );
+    expect(rows.find((row) => row[0] === "Workbook Content Hash")?.[1]).toBe(
+      result.workbook.workbookContentSha256,
+    );
+  });
+
+  it.each(["Summary", "tables", "UD Table", "mySort", "MYSORT"])(
+    "rejects generated calculation sheet %s",
+    async (tabName) => {
+      const fixture = await createFixture();
+      const base = fixture.buildSpec;
+      const buildSpec = {
+        ...base,
+        formulas: base.formulas.map((formula) => ({ ...formula, tabName })),
+        cellMappings: base.cellMappings.map((mapping) => ({
+          ...mapping,
+          tabName,
+        })),
+      };
+      const result = await buildWorkbook({
+        ...fixture,
+        buildSpec,
+        generatorVersion: "1.0.0",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(
+          result.errors.some((error) =>
+            ["DUPLICATE_SHEET", "PROHIBITED_SHEET"].includes(error.code),
+          ),
+        ).toBe(true);
+    },
+  );
+
   it("computes deterministic XLSX content hash", async () => {
     const fixture = await createFixture();
     const result = await buildWorkbook({
@@ -123,6 +187,55 @@ describe("Feature 007 workbook builder integration", () => {
             e.code === "MISSING_POPULATION_DECISION",
         ),
       ).toBe(true);
+    }
+  });
+
+  it.each(["provisional", "rejected", "revoked", "superseded"] as const)(
+    "rejects %s population even if an old decision remains",
+    async (status) => {
+      const fixture = await createFixture();
+      const result = await buildWorkbook({
+        ...fixture,
+        populationProfile: { ...fixture.populationProfile, status },
+        generatorVersion: "1.0.0",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(
+          result.errors.some((item) => item.code === "POPULATION_UNAPPROVED"),
+        ).toBe(true);
+    },
+  );
+
+  it("rejects stale population hashes and approval decisions", async () => {
+    const fixture = await createFixture();
+    for (const overrides of [
+      { workbookProfileContentSha256: "a".repeat(64) as Sha256 },
+      {
+        populationProfile: {
+          ...fixture.populationProfile,
+          effectiveWorkbookProfileContentSha256: null,
+        },
+      },
+      {
+        populationProfile: {
+          ...fixture.populationProfile,
+          effectiveDecisionId: "different-decision",
+        },
+      },
+    ]) {
+      const result = await buildWorkbook({
+        ...fixture,
+        ...overrides,
+        generatorVersion: "1.0.0",
+      });
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(
+          result.errors.some(
+            (item) => item.code === "POPULATION_LINEAGE_MISMATCH",
+          ),
+        ).toBe(true);
     }
   });
 

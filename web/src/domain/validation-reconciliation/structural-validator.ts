@@ -8,6 +8,7 @@ import type {
   WorkbookValidationInput,
 } from "./models";
 import { computeWorkbookContentHash } from "../workbook-builder/workbook-hash";
+import { validateCalculationSheetNames } from "../workbook-builder/sheet-policy";
 import { validatePopulationApplication } from "./population-validator";
 
 export async function validateWorkbook(
@@ -39,22 +40,7 @@ export async function validateWorkbook(
       ),
     );
   }
-  const canonicalSupportSheets = ["Summary", "Tables", "UD Table"];
-  const sheetNames = workbook.sheets.map((sheet) => sheet.name);
-
-  for (const supportSheet of canonicalSupportSheets) {
-    if (!sheetNames.includes(supportSheet)) {
-      errors.push(
-        error(
-          "MISSING_SUPPORT_SHEET",
-          `Required support sheet ${supportSheet} is missing.`,
-          [],
-          [supportSheet],
-          "Regenerate the workbook after correcting the generator.",
-        ),
-      );
-    }
-  }
+  errors.push(...validateSupportSheets(workbook));
 
   const namedRangeErrors = validateNamedRanges(workbook);
   errors.push(...namedRangeErrors);
@@ -122,6 +108,77 @@ export async function validateWorkbook(
   };
 }
 
+function validateSupportSheets(
+  workbook: WorkbookValidationInput["workbook"],
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+  // Runtime workbooks can come from untrusted storage despite the static type.
+  const support = workbook.support as Partial<
+    WorkbookValidationInput["workbook"]["support"]
+  > | null;
+  const entries = [
+    { label: "Summary", present: support?.summarySheet != null },
+    {
+      label: "Tables",
+      present:
+        support?.tablesSheet != null &&
+        Array.isArray(support.tablesSheet.rules),
+    },
+    {
+      label: "UD Table",
+      present:
+        support?.udTableSheet != null &&
+        Array.isArray(support.udTableSheet.namedRanges) &&
+        Array.isArray(support.udTableSheet.cellMappings),
+    },
+  ];
+  for (const entry of entries) {
+    if (!entry.present)
+      errors.push(
+        error(
+          "MISSING_SUPPORT_SHEET",
+          `Required support sheet ${entry.label} has no valid support content.`,
+          [],
+          [entry.label],
+          "Regenerate the workbook after correcting the generator.",
+        ),
+      );
+  }
+  const summary = support?.summarySheet;
+  if (
+    summary != null &&
+    (summary.caseId !== workbook.caseId ||
+      summary.buildSpecId !== workbook.buildSpecId ||
+      summary.buildSpecContentSha256 !== workbook.buildSpecContentSha256 ||
+      summary.architectureId !== workbook.architectureId ||
+      summary.architectureContentSha256 !==
+        workbook.architectureContentSha256 ||
+      summary.populationProfileDecisionId !==
+        workbook.populationProfileDecisionId ||
+      summary.populationProfileContentSha256 !==
+        workbook.populationProfileContentSha256 ||
+      summary.generatedAt !== workbook.generatedAt ||
+      typeof summary.generatorVersion !== "string" ||
+      !summary.generatorVersion.trim())
+  ) {
+    errors.push(
+      error(
+        "SUPPORT_SUMMARY_MISMATCH",
+        "Summary metadata does not match the workbook.",
+        [],
+        ["Summary"],
+        "Regenerate the workbook with consistent lineage.",
+      ),
+    );
+  }
+  errors.push(
+    ...validateCalculationSheetNames(
+      workbook.sheets.map((sheet) => sheet.name),
+    ),
+  );
+  return errors;
+}
+
 function validateNamedRanges(
   workbook: Parameters<typeof validateWorkbook>[0]["workbook"],
 ): ValidationError[] {
@@ -169,7 +226,8 @@ function validateNamedRanges(
 
     if (
       range.scope === "sheet" &&
-      !workbook.sheets.some((s) => s.name === range.tabName)
+      !workbook.sheets.some((s) => s.name === range.tabName) &&
+      !["Summary", "Tables", "UD Table"].includes(range.tabName)
     ) {
       errors.push(
         error(

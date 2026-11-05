@@ -83,12 +83,7 @@ export function validatePopulationProfile(
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  if (
-    profile.status !== "approved" &&
-    profile.status !== "rejected" &&
-    profile.status !== "revoked" &&
-    profile.status !== "superseded"
-  ) {
+  if (profile.status !== "approved") {
     errors.push({
       code: "POPULATION_UNAPPROVED",
       message: "Population profile must have an approved decision",
@@ -98,11 +93,11 @@ export function validatePopulationProfile(
       detail:
         "Workbook generation requires a governed population decision status.",
       remediation:
-        "Approve, reject, revoke, or supersede the population profile explicitly.",
+        "Approve the population profile before generating a workbook.",
     });
   }
 
-  if (!profile.effectiveDecisionId) {
+  if (!profile.effectiveDecisionId?.trim()) {
     errors.push({
       code: "MISSING_POPULATION_DECISION",
       message: "Population profile must have an effective decision",

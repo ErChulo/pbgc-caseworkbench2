@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { Sha256 } from "../../../../src/domain/shared/types";
 import { buildWorkbook } from "../../../../src/domain/workbook-builder/workbook-builder";
+import { computeWorkbookContentHash } from "../../../../src/domain/workbook-builder/workbook-hash";
+import { buildXLSXSpec } from "../../../../src/domain/workbook-builder/serialization";
 import { validateWorkbook } from "../../../../src/domain/validation-reconciliation/structural-validator";
 import { validatePopulationApplication } from "../../../../src/domain/validation-reconciliation/population-validator";
 import { buildSpecV2 } from "../../../fixtures/formula-compiler";
@@ -45,10 +47,87 @@ describe("structural validation", () => {
       validatorVersion: "1.0.0",
       validatedAt: workbook.generatedAt,
     });
-    expect(validated.status).toBe("invalid");
+    expect(validated.status).toBe("valid");
     expect(validated.errors).toBeDefined();
     expect(validated.validationId).toHaveLength(64);
   });
+
+  it.each(["summarySheet", "tablesSheet", "udTableSheet"] as const)(
+    "rejects missing %s support content",
+    async (field) => {
+      const workbook = await fixtureWorkbook();
+      const changed = {
+        ...workbook,
+        support: { ...workbook.support, [field]: null },
+      };
+      const actual = {
+        ...changed,
+        workbookContentSha256: await computeWorkbookContentHash(changed),
+      } as typeof workbook;
+      const result = await validateWorkbook({
+        workbook: actual,
+        validatorVersion: "1",
+        validatedAt: workbook.generatedAt,
+      });
+      expect(
+        result.errors.some((item) => item.code === "MISSING_SUPPORT_SHEET"),
+      ).toBe(true);
+      expect(result.status).toBe("invalid");
+    },
+  );
+
+  it("rejects inconsistent summary lineage", async () => {
+    const workbook = await fixtureWorkbook();
+    const changed = {
+      ...workbook,
+      support: {
+        ...workbook.support,
+        summarySheet: {
+          ...workbook.support.summarySheet,
+          buildSpecContentSha256: "a".repeat(64) as Sha256,
+        },
+      },
+    };
+    const actual = {
+      ...changed,
+      workbookContentSha256: await computeWorkbookContentHash(changed),
+    };
+    const result = await validateWorkbook({
+      workbook: actual,
+      validatorVersion: "1",
+      validatedAt: workbook.generatedAt,
+    });
+    expect(
+      result.errors.some((item) => item.code === "SUPPORT_SUMMARY_MISMATCH"),
+    ).toBe(true);
+  });
+
+  it.each(["summary", "mySort"])(
+    "rejects a conflicting or prohibited %s calculation sheet",
+    async (name) => {
+      const workbook = await fixtureWorkbook();
+      const changed = {
+        ...workbook,
+        sheets: [...workbook.sheets, { name, hidden: false, cells: [] }],
+      };
+      const actual = {
+        ...changed,
+        workbookContentSha256: await computeWorkbookContentHash(changed),
+      };
+      const result = await validateWorkbook({
+        workbook: actual,
+        validatorVersion: "1",
+        validatedAt: workbook.generatedAt,
+      });
+      expect(result.status).toBe("invalid");
+      expect(
+        result.errors.some((item) =>
+          ["DUPLICATE_SHEET", "PROHIBITED_SHEET"].includes(item.code),
+        ),
+      ).toBe(true);
+      expect(() => buildXLSXSpec(actual)).toThrow();
+    },
+  );
 
   it("generates deterministic validation IDs", async () => {
     const workbook = await fixtureWorkbook();

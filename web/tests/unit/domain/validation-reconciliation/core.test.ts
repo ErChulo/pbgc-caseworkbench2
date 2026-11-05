@@ -45,7 +45,7 @@ describe("validation-reconciliation core", () => {
       validatorVersion: "1.0.0",
       validatedAt: workbook.generatedAt,
     });
-    expect(validated.status).toBe("invalid");
+    expect(validated.status).toBe("valid");
     expect(validated.validationId).toHaveLength(64);
   });
 
