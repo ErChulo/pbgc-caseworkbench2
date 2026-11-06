@@ -221,7 +221,6 @@ import {
   type PlanSummaryDecision,
 } from "../../domain/plan-summary";
 import type { FormulaApprovalRecord } from "../../domain/build-spec/models";
-import { formulaApprovalContentHash } from "../../domain/build-spec/formula-approval";
 import { bytesReader, readAllBytes } from "../utilities/file-readers";
 import {
   createFinalOutputInput,
@@ -3779,126 +3778,11 @@ export function useCaseOrchestrator(
     }
   };
 
-  const approveFormulaAction = async (
-    cellKey: string,
-    scenarioId: string,
-    formulaText: string,
-    sourcePlanRuleIds: readonly string[],
-    rationale: string,
-  ): Promise<void> => {
-    if (activeCase === null) {
-      setArchitectureBuildMessage(
-        "Select an active case before approving formulas.",
-      );
-      return;
-    }
-    setArchitectureBuildMessage(null);
-    try {
-      const parsedRuleIds = sourcePlanRuleIds.map((id) => parseUuid(id));
-      const invalidRule = parsedRuleIds.find((r) => !r.ok);
-      if (invalidRule) {
-        setArchitectureBuildMessage("Invalid plan rule ID provided.");
-        return;
-      }
-      const validRuleIds = parsedRuleIds
-        .filter((r) => r.ok)
-        .map((r) => r.value);
-
-      const cell = v1Architecture?.cells.get(cellKey);
-      if (cell === undefined) {
-        setArchitectureBuildMessage(
-          "Build the architecture before approving a formula cell.",
-        );
-        return;
-      }
-      const runClassification = cell.perRunClassification.get(scenarioId);
-      if (runClassification === undefined) {
-        setArchitectureBuildMessage(
-          `Cell ${cellKey} is not classified for scenario ${scenarioId}.`,
-        );
-        return;
-      }
-      if (runClassification.iob !== "O" && runClassification.iob !== "B") {
-        setArchitectureBuildMessage(
-          `Cell ${cellKey} is classified ${runClassification.iob}, not O or B; only O/B formula cells can be approved.`,
-        );
-        return;
-      }
-
-      const existingRecords = formulaApprovalRecords.filter(
-        (r) =>
-          formulaApprovalCellKey(r) === cellKey && r.scenarioId === scenarioId,
-      );
-      const nextOrdinal = existingRecords.length + 1;
-      const lastDecision = existingRecords[existingRecords.length - 1];
-
-      const sourcePlanRuleHashes = previewRules
-        .filter((rule) => validRuleIds.includes(rule.ruleId))
-        .map((rule) => ({
-          ruleId: rule.ruleId,
-          ruleContentSha256: rule.ruleContentSha256,
-          relationship: "governing" as const,
-        }));
-
-      const decisionId = dependencies.uuid.generate();
-      const recordWithoutHash: Omit<
-        FormulaApprovalRecord,
-        "decisionContentSha256"
-      > = {
-        decisionId,
-        appendOrdinal: nextOrdinal,
-        priorDecisionId: lastDecision?.decisionId ?? null,
-        priorDecisionContentSha256: lastDecision?.decisionContentSha256 ?? null,
-        decisionType: "approve",
-        resultingStatus: "approved",
-        formulaText,
-        target: {
-          tabName: cell.sourceTab,
-          cellAddress: cell.cellAddress,
-          genericField: cell.genericField,
-        },
-        scenarioId,
-        iobClassification: runClassification.iob,
-        sourcePlanRules: sourcePlanRuleHashes,
-        derivationDescription: `Formula approved for cell ${cellKey}`,
-        affectedTestIds: [`TEST-${cellKey}`],
-        regenerationImpact: "none",
-        validationOracleIds: [`ORACLE-${cellKey}`],
-        humanActor: {
-          actorType: "human",
-          actorKey:
-            sharedReviewer.trim() === "" ? "anonymous" : sharedReviewer.trim(),
-          displayName:
-            sharedReviewer.trim() === "" ? "Anonymous" : sharedReviewer.trim(),
-          authorityContext: "actuary",
-        },
-        rationale,
-        decidedAt: dependencies.clock.now(),
-        schemaVersion: "1.0.0",
-      };
-      const decisionContentSha256 =
-        await formulaApprovalContentHash(recordWithoutHash);
-      const newRecord: FormulaApprovalRecord = {
-        ...recordWithoutHash,
-        decisionContentSha256,
-      };
-
-      setFormulaApprovalRecords((prev) => [...prev, newRecord]);
-      // A formula decision changes the compiled output, not the selected cell inventory.
-      invalidateArchitectureBuild(true);
-      caseReviewState.current = {
-        ...caseReviewState.current,
-        formulaApprovalRecords: [
-          ...caseReviewState.current.formulaApprovalRecords,
-          newRecord,
-        ],
-      };
-      setArchitectureBuildMessage(`Formula approved for cell ${cellKey}.`);
-    } catch (error) {
-      setArchitectureBuildMessage(
-        error instanceof Error ? error.message : "Failed to approve formula.",
-      );
-    }
+  const approveFormulaAction = (): Promise<void> => {
+    setArchitectureBuildMessage(
+      "Formula approval is blocked until governed test and oracle evidence can be selected and verified.",
+    );
+    return Promise.resolve();
   };
 
   const recordArchitectureSelection = async (): Promise<void> => {

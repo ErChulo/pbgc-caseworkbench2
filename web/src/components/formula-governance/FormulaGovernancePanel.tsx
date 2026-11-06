@@ -166,6 +166,11 @@ export function FormulaGovernancePanel({
 
       {enabled && architecture && (
         <>
+          <p className="notice">
+            Formula approval is blocked until governed test and oracle evidence
+            can be selected and verified. No test or oracle identifiers are
+            created automatically.
+          </p>
           {formulaCells.length === 0 ? (
             <div className="empty-formulas">
               <p>No formula cells identified in the architecture.</p>
@@ -239,6 +244,7 @@ export function FormulaGovernancePanel({
                                       <button
                                         type="button"
                                         className="button button-secondary button-small"
+                                        disabled
                                         onClick={() => {
                                           setSelectedTarget(
                                             isSelected

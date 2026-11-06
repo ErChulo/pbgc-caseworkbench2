@@ -234,44 +234,20 @@ test("governed production path exposes unresolved workbook blockers", async ({
     architecture.getByText(/O\/B mapping lacks its exact formula/u),
   ).toBeVisible();
 
-  // 7c. Formula governance: approve the O-classified FV formula and the
-  // B-classified CALC_INDICATOR formula in each governed scenario group
-  // (ERD, justified by the authored early-retirement-provision rule; Single
-  // Run, justified by the recorded case control), then rebuild.
+  // Formula approval cannot invent test and oracle references.
   const formulaPanel = page.getByRole("region", { name: "Formula Governance" });
-  const formulaGroups = formulaPanel.locator(".formula-scenario-group");
-  await expect(formulaGroups).toHaveCount(2);
-  for (const group of await formulaGroups.all()) {
-    await expect(group.locator(".formula-row")).toHaveCount(2);
-    for (const row of await group.locator(".formula-row").all()) {
-      await row.getByRole("button", { name: "Approve", exact: true }).click();
-      await group
-        .locator(".plan-rule-checkbox input[type='checkbox']")
-        .first()
-        .check();
-      await group
-        .locator(".rationale-input textarea")
-        .first()
-        .fill("E2E approved formula governance.");
-      await group.getByRole("button", { name: "Confirm Approval" }).click();
-      await expect(row.getByText("Approved", { exact: true })).toBeVisible();
-    }
-    await expect(
-      group.getByText("2/2 formulas approved", { exact: true }),
-    ).toBeVisible();
-  }
   await expect(
-    formulaPanel.getByText("4/4 formulas approved", { exact: true }),
-  ).toBeVisible();
-
-  await architecture
-    .getByRole("button", { name: "Build proposed architecture" })
-    .click();
-  await expect(
-    architecture.getByText(
-      /More than one scenario writes to the same workbook cell/u,
+    formulaPanel.getByText(
+      /Formula approval is blocked until governed test and oracle evidence/u,
     ),
   ).toBeVisible();
+  const formulaButtons = formulaPanel.getByRole("button", {
+    name: "Approve",
+    exact: true,
+  });
+  await expect(formulaButtons).toHaveCount(4);
+  for (const button of await formulaButtons.all())
+    await expect(button).toBeDisabled();
   await expect(
     page.getByRole("button", { name: "Download V1 Workbook (.xlsx)" }),
   ).not.toBeVisible();
@@ -319,9 +295,7 @@ test("governed production path exposes unresolved workbook blockers", async ({
     .getByRole("button", { name: "Build proposed architecture" })
     .click();
   await expect(
-    architecture.getByText(
-      /More than one scenario writes to the same workbook cell/u,
-    ),
+    architecture.getByText(/O\/B mapping lacks its exact formula/u),
   ).toBeVisible();
   await populationCandidate
     .getByRole("button", { name: "Withdraw approval" })
