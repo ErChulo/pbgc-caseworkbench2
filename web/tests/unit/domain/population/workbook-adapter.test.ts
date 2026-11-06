@@ -5,6 +5,7 @@ import { parseWorkbookPassive } from "../../../../src/adapters/parsers/workbook-
 import { failedPassiveExtraction } from "../../../../src/adapters/parsers/passive-result";
 import {
   adaptWorkbookExtraction,
+  adaptWorkbookNamedRanges,
   workbookProfileContentHash,
 } from "../../../../src/domain/population/workbook-adapter";
 import { syntheticPopulationWorkbook } from "../../../fixtures/generators/populations";
@@ -134,6 +135,73 @@ describe("T092 population workbook adapter", () => {
         ],
       }).status,
     ).toBe("blocked");
+  });
+
+  it("preserves exact workbook and sheet-scoped single-cell names", () => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ["DOB", "AGE"],
+        ["synthetic", 7],
+      ]),
+      "Owner's sheet",
+    );
+    workbook.Workbook = {
+      Sheets: [{ Hidden: 0 }],
+      Names: [
+        { Name: "Birth_Date", Ref: "'Owner''s sheet'!$A$1" },
+        { Name: "Age_Name", Ref: "'Owner''s sheet'!$B$2", Sheet: 0 },
+      ],
+    };
+    const bytes = XLSX.write(workbook, {
+      type: "array",
+      bookType: "xlsx",
+    }) as ArrayBuffer;
+    const extraction = parseWorkbookPassive(new Uint8Array(bytes));
+    expect(adaptWorkbookExtraction(extraction).status).toBe("profiled");
+    expect(adaptWorkbookNamedRanges(extraction)).toEqual({
+      ok: true,
+      ranges: [
+        {
+          name: "Birth_Date",
+          sourceTab: "Owner's sheet",
+          cellAddress: "A1",
+          definitionSheet: null,
+        },
+        {
+          name: "Age_Name",
+          sourceTab: "Owner's sheet",
+          cellAddress: "B2",
+          definitionSheet: "Owner's sheet",
+        },
+      ],
+    });
+  });
+
+  it("blocks unsupported, ambiguous and unobserved defined names rather than dropping them", () => {
+    const extraction = parseWorkbookPassive(syntheticPopulationWorkbook());
+    const entry = {
+      name: "TEST_NAME",
+      reference: "'Population'!$A$1",
+      scopeIndex: null,
+    };
+    const cases = [
+      null,
+      "invalid",
+      JSON.stringify([{ ...entry, reference: "'Population'!$A$1:$A$2" }]),
+      JSON.stringify([{ ...entry, reference: "[external]Population!$A$1" }]),
+      JSON.stringify([{ ...entry, reference: "'Population'!$Z$99" }]),
+      JSON.stringify([{ ...entry, scopeIndex: 1 }]),
+      JSON.stringify([{ ...entry }, { ...entry, name: "test_name" }]),
+    ];
+    for (const definedNamesJson of cases) {
+      const modified = {
+        ...extraction,
+        metadata: { ...extraction.metadata, definedNamesJson },
+      };
+      expect(adaptWorkbookExtraction(modified).status).toBe("blocked");
+    }
   });
 
   it("fails closed on unsuccessful parser output", () => {

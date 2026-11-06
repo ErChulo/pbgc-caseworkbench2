@@ -71,7 +71,7 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
     ).length;
     return Object.freeze({
       parserId: "workbook-passive",
-      parserVersion: "1.1.0",
+      parserVersion: "1.2.0",
       status: risk.blocked ? "partial" : "success",
       mediaType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -80,6 +80,13 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
         sheetCount: workbook.SheetNames.length,
         formulaCount,
         sheetInventoryJson: JSON.stringify(sheetInventory),
+        definedNamesJson: JSON.stringify(
+          (workbook.Workbook?.Names ?? []).map((name) => ({
+            name: name.Name,
+            reference: name.Ref,
+            scopeIndex: name.Sheet ?? null,
+          })),
+        ),
         hiddenSheetCount: (workbook.Workbook?.Sheets ?? []).filter(
           (sheet) => (sheet.Hidden ?? 0) !== 0,
         ).length,

@@ -1,4 +1,11 @@
 import { describe, expect, it } from "vitest";
+import * as XLSX from "xlsx";
+import { parseWorkbookPassive } from "../../../../src/adapters/parsers/workbook-parser";
+import {
+  adaptWorkbookExtraction,
+  adaptWorkbookNamedRanges,
+  workbookProfileContentHash,
+} from "../../../../src/domain/population/workbook-adapter";
 
 import { createFieldNameGlossary } from "../../../../src/domain/architecture/field-name-glossary";
 import { extractNamedRanges } from "../../../../src/domain/architecture/field-inventory";
@@ -48,6 +55,57 @@ describe("T037-T039 named ranges", () => {
       },
     ]);
     expect(result.some((range) => range.name === "Invented_Name")).toBe(false);
+  });
+
+  it("carries a passively observed workbook name into the architecture inventory", async () => {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      book,
+      XLSX.utils.aoa_to_sheet([["Parameter"], ["synthetic"]]),
+      "Tables",
+    );
+    book.Workbook = {
+      Sheets: [{ Hidden: 0 }],
+      Names: [{ Name: "Freeze_Date", Ref: "Tables!$A$2" }],
+    };
+    const bytes = XLSX.write(book, {
+      type: "array",
+      bookType: "xlsx",
+    }) as ArrayBuffer;
+    const extraction = parseWorkbookPassive(new Uint8Array(bytes));
+    const workbook = adaptWorkbookExtraction(extraction);
+    const names = adaptWorkbookNamedRanges(extraction);
+    if (!names.ok || workbook.status !== "profiled")
+      throw new Error("Workbook inspection blocked");
+    const profileHash = await workbookProfileContentHash(
+      workbook,
+      names.ranges,
+    );
+    const source = population().candidates[0];
+    if (!source) throw new Error("Missing candidate fixture");
+    const result = extractNamedRanges(
+      [{ ...tab, workbookProfileContentSha256: profileHash }],
+      {
+        candidates: [
+          {
+            ...source,
+            workbook,
+            namedRanges: names.ranges,
+            workbookProfileContentSha256: profileHash,
+          },
+        ],
+      },
+      createFieldNameGlossary([]),
+    );
+    expect(result).toEqual([
+      {
+        name: "Freeze_Date",
+        sourceTab: "Tables",
+        cellAddress: "A2",
+        scope: "workbook",
+        genericField: null,
+      },
+    ]);
   });
 
   it("is deterministic", () => {

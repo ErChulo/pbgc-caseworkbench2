@@ -1,6 +1,9 @@
 import type { PassiveExtraction } from "../../adapters/parsers/passive-result";
 import type { WorkbookCellObservation } from "../../adapters/parsers/workbook-parser";
-import { normalizeCellAddress } from "../formula-compiler/reference-codec";
+import {
+  isValidName,
+  normalizeCellAddress,
+} from "../formula-compiler/reference-codec";
 import { hashTyped } from "../manifests/canonical-json";
 import { parseSha256, type Sha256 } from "../shared/types";
 import { classifyRawValue, type RawValueKind } from "./tabular-adapter";
@@ -92,6 +95,28 @@ export function adaptWorkbookExtraction(
       ]),
     });
   }
+  const namedRanges = adaptWorkbookNamedRanges(extraction);
+  if (
+    !namedRanges.ok ||
+    namedRanges.ranges.some(
+      (range) =>
+        !cells.some(
+          (cell) =>
+            cell.sheet === range.sourceTab &&
+            cell.address === range.cellAddress,
+        ),
+    )
+  ) {
+    return Object.freeze({
+      status: "blocked",
+      sheets: Object.freeze([]),
+      formulaExecutionCount: 0,
+      limitations: Object.freeze([
+        ...extraction.limitations,
+        "Workbook defined names are missing, unsupported, ambiguous, or target unobserved cells; review the source workbook.",
+      ]),
+    });
+  }
   return Object.freeze({
     status: "profiled",
     sheets: Object.freeze(
@@ -118,6 +143,82 @@ export function adaptWorkbookExtraction(
     formulaExecutionCount: 0,
     limitations: Object.freeze([...extraction.limitations]),
   });
+}
+
+/** Only direct, observed single-cell names can enter the current architecture model. */
+export function adaptWorkbookNamedRanges(extraction: PassiveExtraction):
+  | {
+      readonly ok: true;
+      readonly ranges: readonly WorkbookNamedRangeObservation[];
+    }
+  | { readonly ok: false } {
+  if (
+    extraction.parserId !== "workbook-passive" ||
+    extraction.status !== "success"
+  )
+    return { ok: false };
+  const sheets = readSheetInventory(extraction.metadata.sheetInventoryJson);
+  const raw = extraction.metadata.definedNamesJson;
+  if (sheets === null || typeof raw !== "string") return { ok: false };
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return { ok: false };
+    const ranges: WorkbookNamedRangeObservation[] = [];
+    const seen = new Set<string>();
+    for (const value of parsed as unknown[]) {
+      if (value === null || typeof value !== "object" || Array.isArray(value))
+        return { ok: false };
+      const entry = value as Record<string, unknown>;
+      if (
+        typeof entry.name !== "string" ||
+        !isValidName(entry.name) ||
+        typeof entry.reference !== "string"
+      )
+        return { ok: false };
+      const match = /^=?('(?:[^']|'')+'|[^'![\]]+)!([A-Za-z$]+[0-9$]+)$/u.exec(
+        entry.reference,
+      );
+      if (!match) return { ok: false };
+      const refSheet = match[1];
+      const address = normalizeCellAddress(match[2] ?? "")?.replaceAll("$", "");
+      if (!refSheet || !address) return { ok: false };
+      const rawName = refSheet.startsWith("'")
+        ? refSheet.slice(1, -1).replaceAll("''", "'")
+        : refSheet;
+      const target = sheets.find(
+        (sheet) => sheet.name.toUpperCase() === rawName.toUpperCase(),
+      );
+      if (!target) return { ok: false };
+      let definitionSheet: string | null = null;
+      if (entry.scopeIndex !== null) {
+        if (
+          typeof entry.scopeIndex !== "number" ||
+          !Number.isInteger(entry.scopeIndex) ||
+          entry.scopeIndex < 0
+        )
+          return { ok: false };
+        definitionSheet = sheets[entry.scopeIndex]?.name ?? null;
+        if (definitionSheet === null || definitionSheet !== target.name)
+          return { ok: false };
+      }
+      const scope =
+        definitionSheet === null
+          ? "workbook"
+          : `sheet:${definitionSheet.toUpperCase()}`;
+      const key = `${scope}\u0000${entry.name.toUpperCase()}`;
+      if (seen.has(key)) return { ok: false };
+      seen.add(key);
+      ranges.push({
+        name: entry.name,
+        sourceTab: target.name,
+        cellAddress: address,
+        definitionSheet,
+      });
+    }
+    return { ok: true, ranges };
+  } catch {
+    return { ok: false };
+  }
 }
 
 function readSheetInventory(

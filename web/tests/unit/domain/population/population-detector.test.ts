@@ -231,6 +231,17 @@ describe("T093 population candidate identity and governance", () => {
     expect(approval).toMatchObject({ ok: true, value: { status: "approved" } });
   });
 
+  it("versions workbook candidate identities when named-range inspection changes", async () => {
+    const detected = await workbookDetection([
+      {
+        name: "Synthetic",
+        hidden: false,
+        cells: [workbookCell("A1", "DOB"), workbookCell("B1", "BSEX")],
+      },
+    ]);
+    expect(detected.candidate.detectorVersion).toBe("1.1.0");
+  });
+
   it("emits participant-group characteristics from recognizable workbook sheet names", async () => {
     const detected = await workbookDetection([
       {

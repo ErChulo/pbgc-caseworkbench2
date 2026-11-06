@@ -1,3 +1,4 @@
+import { populationReviewBlocker } from "../utilities/population-review-guard";
 import {
   isCaseOutputPath,
   verifyOutputArtifactReferences,
@@ -48,6 +49,7 @@ import { extractDateCandidates } from "../../domain/classification/date-candidat
 import { adaptTabularExtraction } from "../../domain/population/tabular-adapter";
 import {
   adaptWorkbookExtraction,
+  adaptWorkbookNamedRanges,
   workbookProfileContentHash,
 } from "../../domain/population/workbook-adapter";
 import {
@@ -2265,6 +2267,8 @@ export function useCaseOrchestrator(
     if (activeCase === null || priorSnapshot.current === null) {
       throw new Error("Active evidence checkpoint is unavailable.");
     }
+    const blocker = populationReviewBlocker(item, action);
+    if (blocker !== null) throw new Error(blocker);
     const key = item.candidate.candidateKey;
     const history = populationHistory.current.get(key) ?? [];
     const prior = history.at(-1) ?? null;
@@ -3865,6 +3869,18 @@ export function useCaseOrchestrator(
       const overrides: readonly AuthorityOverride[] = [];
 
       const populationItems = caseReviewState.current.populationItems;
+      if (
+        populationItems.some(
+          (item) =>
+            item.projection.status === "approved" &&
+            item.workbook &&
+            item.namedRanges === undefined,
+        )
+      ) {
+        throw new Error(
+          "An approved workbook population was inspected without defined-name inventory. Re-inspect and review the updated candidate, and supersede the outdated approval.",
+        );
+      }
       const populationCandidates = populationItems.flatMap((item) =>
         item.projection.status === "approved" && item.workbook
           ? [
@@ -4929,6 +4945,11 @@ export function useCaseOrchestrator(
           passive.parserId === "workbook-passive"
             ? adaptWorkbookExtraction(passive)
             : null;
+        const namedRangeResult =
+          workbookProfile === null ? null : adaptWorkbookNamedRanges(passive);
+        const workbookNamedRanges = namedRangeResult?.ok
+          ? namedRangeResult.ranges
+          : [];
         const population =
           workbookProfile !== null
             ? await detectWorkbookPopulation(
@@ -4950,7 +4971,10 @@ export function useCaseOrchestrator(
           const workbookProfileContentSha256 =
             workbookProfile === null
               ? population.candidate.candidateKey
-              : await workbookProfileContentHash(workbookProfile, []);
+              : await workbookProfileContentHash(
+                  workbookProfile,
+                  workbookNamedRanges,
+                );
           const existingPopulationItem =
             caseReviewState.current.populationItems.find(
               (candidate) =>
@@ -4960,7 +4984,8 @@ export function useCaseOrchestrator(
           storePopulationItems([
             ...caseReviewState.current.populationItems.filter(
               (candidate) =>
-                candidate.candidate.artifactSha256 !== hashed.value.sha256,
+                candidate.candidate.candidateKey !==
+                population.candidate.candidateKey,
             ),
             existingPopulationItem ?? {
               displayName: item.path,
@@ -4973,13 +4998,18 @@ export function useCaseOrchestrator(
                 provenance: [],
               },
               structuralFinding:
-                population.candidate.candidateStatus === "proposed"
-                  ? "Likely population structure detected; governed use remains blocked pending human review."
-                  : "Structure is ambiguous or incomplete; route to unresolved review.",
+                workbookProfile?.status === "blocked"
+                  ? "Workbook inspection is blocked. Review its sheet and defined-name findings before approval."
+                  : population.candidate.candidateStatus === "proposed"
+                    ? "Likely population structure detected; governed use remains blocked pending human review."
+                    : "Structure is ambiguous or incomplete; route to unresolved review.",
               evidenceObservations: population.observations,
               ...(workbookProfile === null
                 ? {}
-                : { workbook: workbookProfile }),
+                : {
+                    workbook: workbookProfile,
+                    namedRanges: workbookNamedRanges,
+                  }),
             },
           ]);
         }
