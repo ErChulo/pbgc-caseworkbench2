@@ -19,23 +19,37 @@ export const requiredSection436FactKeys = [
 export async function evaluateSection436(
   input: Section436EvaluationInput,
 ): Promise<Section436Evaluation> {
-  const facts = sortFacts(input.facts);
-  const rules = sortRules(input.rules);
+  // Snapshot inputs before awaiting hashing; never freeze or retain caller-owned objects.
+  const facts = sortFacts(structuredClone(input.facts));
+  const rules = sortRules(structuredClone(input.rules));
   const missingRequiredFacts = missingFacts(facts);
   const blockedReasons = blockingReasons(facts, rules, missingRequiredFacts);
   const aftap = factValue(facts, "aftap-percentage");
-  const aftapPercent = aftap === null ? null : Number(aftap);
   const matchedRules =
-    blockedReasons.length > 0 || aftapPercent === null
+    blockedReasons.length > 0 || aftap === null
       ? []
-      : rules.filter((rule) => ruleMatches(rule, aftapPercent));
+      : rules.filter((rule) => ruleMatches(rule, aftap));
   const governingRule = matchedRules[0] ?? null;
+  if (
+    governingRule &&
+    matchedRules.some(
+      (rule) =>
+        rule.priority === governingRule.priority &&
+        (rule.conclusionCode !== governingRule.conclusionCode ||
+          rule.limitationEffect !== governingRule.limitationEffect),
+    )
+  ) {
+    blockedReasons.push(
+      "Matching Section 436 rules at the same priority conflict; review is required.",
+    );
+  }
   const planYearStart = factValue(facts, "plan-year-start");
   const planYearEnd = factValue(facts, "plan-year-end");
   const evaluationStatus =
     blockedReasons.length > 0
       ? "blocked"
-      : governingRule === null
+      : governingRule === null ||
+          governingRule.conclusionCode === "additional-review-required"
         ? "inconclusive"
         : "completed";
 
@@ -137,7 +151,7 @@ function blockingReasons(
   facts: readonly Section436Fact[],
   rules: readonly Section436Rule[],
   missingRequiredFacts: readonly string[],
-): readonly string[] {
+): string[] {
   const reasons: string[] = [];
   for (const factKey of missingRequiredFacts) {
     reasons.push(`Missing human-approved Section 436 fact: ${factKey}.`);
@@ -161,6 +175,100 @@ function blockingReasons(
   if (facts.some((fact) => fact.citations.length === 0)) {
     reasons.push(
       "Every supplied Section 436 fact must retain at least one citation.",
+    );
+  }
+  for (const factKey of requiredSection436FactKeys) {
+    const matching = facts.filter((fact) => fact.factKey === factKey);
+    if (matching.length > 1) {
+      reasons.push(
+        `Multiple Section 436 facts supplied for ${factKey}; review is required.`,
+      );
+    }
+    const expectedKind =
+      factKey === "aftap-percentage" ? "decimal-percentage" : "date";
+    if (matching.some((fact) => fact.valueKind !== expectedKind)) {
+      reasons.push(`Section 436 fact ${factKey} has an invalid value kind.`);
+    }
+  }
+  if (new Set(rules.map((rule) => rule.ruleId)).size !== rules.length) {
+    reasons.push("Section 436 rule IDs must be unique.");
+  }
+  if (
+    rules.some(
+      (rule) =>
+        !rule.ruleId.trim() ||
+        !rule.description.trim() ||
+        !rule.limitationEffect.trim() ||
+        ![
+          "less-than",
+          "less-than-or-equal",
+          "greater-than-or-equal",
+          "equal",
+        ].includes(rule.operator) ||
+        ![
+          "restriction-applies",
+          "no-restriction-identified",
+          "additional-review-required",
+        ].includes(rule.conclusionCode),
+    )
+  ) {
+    reasons.push(
+      "Every Section 436 rule must have valid identity, operation, and conclusion details.",
+    );
+  }
+  if (facts.some((fact) => !fact.factKey.trim() || !fact.value.trim())) {
+    reasons.push("Every Section 436 fact must have a nonblank key and value.");
+  }
+  if (
+    rules.some(
+      (rule) => !Number.isSafeInteger(rule.priority) || rule.priority < 1,
+    )
+  ) {
+    reasons.push(
+      "Every Section 436 rule priority must be a positive safe integer.",
+    );
+  }
+  if (
+    [
+      ...facts.flatMap((fact) => fact.citations),
+      ...rules.flatMap((rule) => rule.citations),
+    ].some(
+      (citation) =>
+        !parseSha256(citation.artifactSha256).ok ||
+        !citation.sourceLocator.trim() ||
+        !citation.description.trim(),
+    )
+  ) {
+    reasons.push(
+      "Every Section 436 citation must have a valid hash, locator, and description.",
+    );
+  }
+  const planStart = factValue(facts, "plan-year-start");
+  const planEnd = factValue(facts, "plan-year-end");
+  if (
+    planStart &&
+    planEnd &&
+    validIsoDate(planStart) &&
+    validIsoDate(planEnd) &&
+    planStart > planEnd
+  ) {
+    reasons.push("Section 436 plan year start must not be after its end.");
+  }
+  if (rules.some((rule) => !validIsoDate(rule.effectiveDate))) {
+    reasons.push(
+      "Every Section 436 rule effective date must be a real ISO date.",
+    );
+  }
+  if (
+    planStart &&
+    validIsoDate(planStart) &&
+    rules.some(
+      (rule) =>
+        validIsoDate(rule.effectiveDate) && rule.effectiveDate > planStart,
+    )
+  ) {
+    reasons.push(
+      "Section 436 rule applicability after plan year start requires review.",
     );
   }
   const aftap = factValue(facts, "aftap-percentage");
@@ -192,25 +300,42 @@ function factValue(
   );
 }
 
-function ruleMatches(rule: Section436Rule, aftapPercent: number): boolean {
-  const threshold = Number(rule.aftapPercentageThreshold);
-  if (!Number.isFinite(threshold)) return false;
+function ruleMatches(rule: Section436Rule, aftapPercent: string): boolean {
+  const comparison = compareDecimal(
+    aftapPercent,
+    rule.aftapPercentageThreshold,
+  );
   switch (rule.operator) {
     case "less-than":
-      return aftapPercent < threshold;
+      return comparison < 0;
     case "less-than-or-equal":
-      return aftapPercent <= threshold;
+      return comparison <= 0;
     case "greater-than-or-equal":
-      return aftapPercent >= threshold;
+      return comparison >= 0;
     case "equal":
-      return aftapPercent === threshold;
+      return comparison === 0;
   }
 }
 
+// Compare bounded plain decimals exactly; Number would collapse distinct values.
+function compareDecimal(left: string, right: string): number {
+  const parts = (value: string): { integer: bigint; scale: number } => {
+    const negative = value.startsWith("-");
+    const unsigned = negative || value.startsWith("+") ? value.slice(1) : value;
+    const [whole = "", fraction = ""] = unsigned.split(".");
+    const integer = BigInt(`${whole}${fraction}`);
+    return { integer: negative ? -integer : integer, scale: fraction.length };
+  };
+  const a = parts(left);
+  const b = parts(right);
+  const scale = Math.max(a.scale, b.scale);
+  const x = a.integer * 10n ** BigInt(scale - a.scale);
+  const y = b.integer * 10n ** BigInt(scale - b.scale);
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 function validDecimalPercentage(value: string): boolean {
-  return (
-    value.trim() === value && value !== "" && Number.isFinite(Number(value))
-  );
+  return value.length <= 128 && /^[+-]?\d+(?:\.\d+)?$/u.test(value);
 }
 
 function validIsoDate(value: string): boolean {
