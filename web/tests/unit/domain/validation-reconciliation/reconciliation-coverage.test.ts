@@ -135,6 +135,73 @@ describe("reconciliation coverage and integrity", () => {
     expect(result.reconciliationStatus).toBe("complete");
     expect(result.matchCount).toBe(2);
   });
+  it("binds the exact oracle and actual inputs even when comparisons both pass", async () => {
+    const original = await reconcileWorkbook(input());
+    const actualChanged = await reconcileWorkbook({
+      ...input(),
+      actualValues: { f1: 0, f2: 100 },
+    });
+    const first = oracle.results[0];
+    if (!first) throw new Error("missing fixture");
+    const oracleChanged = await reconcileWorkbook({
+      ...input(),
+      oracle: {
+        ...oracle,
+        executionVersion: "2",
+        results: [{ ...first }, ...oracle.results.slice(1)],
+      },
+    });
+    expect(
+      [original, actualChanged, oracleChanged].every(
+        (r) => r.reconciliationStatus === "complete",
+      ),
+    ).toBe(true);
+    expect(original.actualValuesContentSha256).not.toBe(
+      actualChanged.actualValuesContentSha256,
+    );
+    expect(original.reconciliationId).not.toBe(actualChanged.reconciliationId);
+    expect(original.oracleContentSha256).not.toBe(
+      oracleChanged.oracleContentSha256,
+    );
+    expect(original.reconciliationId).not.toBe(oracleChanged.reconciliationId);
+  });
+
+  it("uses one snapshot when caller data changes during asynchronous validation", async () => {
+    const mutable = structuredClone(input());
+    const expected = await reconcileWorkbook(mutable);
+    const pending = reconcileWorkbook(mutable);
+    (mutable.actualValues as Record<string, unknown>).f1 = 1234;
+    if (!mutable.oracle) throw new Error("missing oracle");
+    (mutable.oracle.results[0] as { computedValue: unknown }).computedValue =
+      1234;
+    const result = await pending;
+    expect(result).toEqual(expected);
+  });
+
+  it("blocks unhashable extra actual values rather than reporting complete", async () => {
+    await expect(
+      reconcileWorkbook({
+        ...input(),
+        actualValues: { f1: 0, f2: 100, extra: NaN },
+      }),
+    ).rejects.toThrow("hashable exact input evidence");
+  });
+
+  it("rejects non-finite oracle precision", async () => {
+    const first = oracle.results[0];
+    if (!first) throw new Error("missing fixture");
+    for (const precision of [NaN, Infinity]) {
+      const result = await reconcileWorkbook({
+        ...input(),
+        oracle: {
+          ...oracle,
+          results: [{ ...first, precision }, ...oracle.results.slice(1)],
+        },
+      });
+      expect(result.reconciliationStatus).toBe("oracle-error");
+    }
+  });
+
   it("records a tolerance mismatch outside the threshold", async () => {
     const result = await reconcileWorkbook({
       ...input(),

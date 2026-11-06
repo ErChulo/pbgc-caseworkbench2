@@ -93,6 +93,19 @@ describe("evidence generation", () => {
     const evidence = await generateReconciliationEvidence(reconciled);
     expect(evidence.hash).toHaveLength(64);
     expect(JSON.parse(evidence.evidence)).toHaveProperty("reconciliationId");
+    await expect(
+      generateReconciliationEvidence({ ...reconciled, matchCount: 42 }),
+    ).rejects.toThrow("integrity verification");
+    const body = JSON.parse(evidence.evidence) as Record<string, unknown>;
+    expect(body).toHaveProperty(
+      "oracleContentSha256",
+      reconciled.oracleContentSha256,
+    );
+    expect(body).toHaveProperty(
+      "actualValuesContentSha256",
+      reconciled.actualValuesContentSha256,
+    );
+    expect(body).toHaveProperty("tolerance", reconciled.tolerance);
   });
 
   it("records human review on reconciliation results", async () => {
@@ -118,6 +131,15 @@ describe("evidence generation", () => {
     expect(reviewed.reviewedBy).toBe("reviewer@example.com");
     expect(reviewed.reviewRationale).toBe("Approved for production.");
     expect(reviewed.reconciliationStatus).toBe("oracle-unavailable");
+    await expect(
+      recordHumanReview(reviewed, "reviewer", "replacement"),
+    ).rejects.toThrow("review history");
+    await expect(
+      generateReconciliationEvidence({
+        ...reconciled,
+        oracleContentSha256: undefined,
+      } as unknown as typeof reconciled),
+    ).rejects.toThrow("integrity verification");
     expect(reviewed.reconciliationContentSha256).not.toBe(
       reconciled.reconciliationContentSha256,
     );

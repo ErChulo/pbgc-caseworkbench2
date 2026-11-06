@@ -11,8 +11,11 @@ import { validateOracleContract } from "./oracle-integration";
 import { validateWorkbook } from "./structural-validator";
 
 export async function reconcileWorkbook(
-  input: ReconciliationInput,
+  suppliedInput: ReconciliationInput,
 ): Promise<ReconciliationResult> {
+  // Capture all values before the first await; caller mutations cannot change a
+  // partially validated workbook or oracle while the result is being built.
+  const input = structuredClone(suppliedInput);
   const toleranceErrors = validateToleranceProfile(input.tolerance);
   if (toleranceErrors.length > 0) {
     throw new Error(
@@ -353,11 +356,28 @@ async function createResult(
   mismatchCount: number,
   errorCount: number,
 ): Promise<ReconciliationResult> {
+  const oracleContentSha256 =
+    input.oracle === null
+      ? null
+      : await hashInput(input.oracle, "ReconciliationOracleInput");
+  const actualValuesContentSha256 = await hashInput(
+    input.actualValues,
+    "ReconciliationActualValues",
+  );
+  if (
+    reconciliationStatus === "complete" &&
+    (oracleContentSha256 === null || actualValuesContentSha256 === null)
+  )
+    throw new Error(
+      "Complete reconciliation requires hashable exact input evidence.",
+    );
   const deterministicPayload = {
     workbookContentSha256: input.workbook.workbookContentSha256,
     validationId: input.validation.validationId,
     oracleId: input.oracle?.oracleId ?? "oracle-unavailable",
     oracleExecutedAt: input.oracle?.executedAt ?? input.validation.validatedAt,
+    oracleContentSha256,
+    actualValuesContentSha256,
     reconciliationStatus,
     mismatches,
     tolerance: input.tolerance,
@@ -375,6 +395,17 @@ async function createResult(
     ...deterministicPayload,
     reconciliationContentSha256,
   };
+}
+
+async function hashInput(
+  value: unknown,
+  typeName: string,
+): Promise<Sha256 | null> {
+  try {
+    return (await hashTyped(value, { typeName })) as Sha256;
+  } catch {
+    return null;
+  }
 }
 
 function compareMismatch(

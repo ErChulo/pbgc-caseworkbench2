@@ -1,5 +1,5 @@
 import { hashTyped } from "../manifests/canonical-json";
-import type { Sha256 } from "../shared/types";
+import { parseSha256, type Sha256 } from "../shared/types";
 import type {
   ValidationResult,
   ReconciliationResult,
@@ -67,22 +67,22 @@ export async function generateValidationEvidence(
 }
 
 export async function generateReconciliationEvidence(
-  result: ReconciliationResult,
+  suppliedResult: ReconciliationResult,
 ): Promise<{ readonly evidence: string; readonly hash: Sha256 }> {
+  const result = structuredClone(suppliedResult);
+  await requireReconciliationIntegrity(result);
   const evidence = {
     reconciliationId: result.reconciliationId,
     validationId: result.validationId,
     oracleId: result.oracleId,
+    oracleContentSha256: result.oracleContentSha256,
+    actualValuesContentSha256: result.actualValuesContentSha256,
     reconciliationStatus: result.reconciliationStatus,
     oracleExecutedAt: result.oracleExecutedAt,
     matchCount: result.matchCount,
     mismatchCount: result.mismatchCount,
     errorCount: result.errorCount,
-    tolerance: {
-      profileId: result.tolerance.profileId,
-      absoluteTolerance: result.tolerance.absoluteTolerance,
-      relativeTolerance: result.tolerance.relativeTolerance,
-    },
+    tolerance: result.tolerance,
     mismatches: sortMismatchesByFormula(result.mismatches),
     reviewMetadata: {
       reviewedBy: result.reviewedBy,
@@ -102,18 +102,26 @@ export async function generateReconciliationEvidence(
 
 /** Records a review note; it does not change reconciliation status or approve output. */
 export async function recordHumanReview(
-  result: ReconciliationResult,
+  suppliedResult: ReconciliationResult,
   reviewedBy: string,
   rationale: string,
 ): Promise<ReconciliationResult> {
+  const result = structuredClone(suppliedResult);
   if (!reviewedBy.trim() || !rationale.trim()) {
     throw new Error("A reviewer and rationale are required.");
   }
+  await requireReconciliationIntegrity(result);
+  if (result.reviewedBy !== null || result.reviewRationale !== null)
+    throw new Error(
+      "A review note already exists; a review history is required to change it.",
+    );
   const reviewed = {
     workbookContentSha256: result.workbookContentSha256,
     validationId: result.validationId,
     oracleId: result.oracleId,
     oracleExecutedAt: result.oracleExecutedAt,
+    oracleContentSha256: result.oracleContentSha256,
+    actualValuesContentSha256: result.actualValuesContentSha256,
     reconciliationStatus: result.reconciliationStatus,
     mismatches: result.mismatches,
     tolerance: result.tolerance,
@@ -123,20 +131,6 @@ export async function recordHumanReview(
     reviewedBy: reviewedBy.trim(),
     reviewRationale: rationale.trim(),
   };
-  const priorHash = await hashTyped(
-    {
-      ...reviewed,
-      reviewedBy: result.reviewedBy,
-      reviewRationale: result.reviewRationale,
-    },
-    { typeName: "WorkbookReconciliationResult" },
-  );
-  if (
-    priorHash !== result.reconciliationContentSha256 ||
-    priorHash !== result.reconciliationId
-  ) {
-    throw new Error("Reconciliation content failed integrity verification.");
-  }
   const hash = (await hashTyped(reviewed, {
     typeName: "WorkbookReconciliationResult",
   })) as Sha256;
@@ -145,6 +139,35 @@ export async function recordHumanReview(
     ...reviewed,
     reconciliationContentSha256: hash,
   };
+}
+
+async function requireReconciliationIntegrity(
+  result: ReconciliationResult,
+): Promise<void> {
+  try {
+    const validDigest = (value: unknown) =>
+      value === null || (typeof value === "string" && parseSha256(value).ok);
+    if (
+      !validDigest(result.oracleContentSha256) ||
+      !validDigest(result.actualValuesContentSha256)
+    )
+      throw new Error("Invalid input digests.");
+    if (
+      result.reconciliationStatus === "complete" &&
+      (result.oracleContentSha256 === null ||
+        result.actualValuesContentSha256 === null)
+    )
+      throw new Error("Missing input digests.");
+    const { reconciliationId, reconciliationContentSha256, ...content } =
+      result;
+    const hash = await hashTyped(content, {
+      typeName: "WorkbookReconciliationResult",
+    });
+    if (hash !== reconciliationId || hash !== reconciliationContentSha256)
+      throw new Error("Invalid hash.");
+  } catch {
+    throw new Error("Reconciliation content failed integrity verification.");
+  }
 }
 
 export function generateValidationSummary(result: ValidationResult): string {

@@ -1,3 +1,4 @@
+import { roundValue } from "../../../../src/domain/validation-reconciliation/tolerance";
 import { describe, expect, it } from "vitest";
 import type { Sha256 } from "../../../../src/domain/shared/types";
 import { buildWorkbook } from "../../../../src/domain/workbook-builder/workbook-builder";
@@ -38,6 +39,21 @@ async function fixtureWorkbook() {
 }
 
 describe("validation-reconciliation core", () => {
+  it("rounds exact binary half-integers to even in both directions", () => {
+    for (const [value, expected] of [
+      [0.5, 0],
+      [1.5, 2],
+      [2.5, 2],
+      [-0.5, 0],
+      [-1.5, -2],
+      [-2.5, -2],
+      [1.4, 1],
+      [-1.4, -1],
+    ] as const)
+      expect(roundValue(value, "banker's")).toBe(expected);
+    expect(() => roundValue(NaN, "banker's")).toThrow();
+  });
+
   it("validates workbook deterministically", async () => {
     const workbook = await fixtureWorkbook();
     const validated = await validateWorkbook({

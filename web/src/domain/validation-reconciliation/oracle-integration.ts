@@ -104,7 +104,9 @@ function validateOracleFormulaResult(
 
   if (
     result.precision !== null &&
-    (typeof result.precision !== "number" || result.precision < 0)
+    (typeof result.precision !== "number" ||
+      !Number.isFinite(result.precision) ||
+      result.precision < 0)
   ) {
     errors.push(
       `Result[${String(index)}]: Precision must be null or a non-negative number.`,

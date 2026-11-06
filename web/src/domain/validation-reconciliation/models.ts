@@ -71,6 +71,9 @@ export interface ReconciliationResult {
   readonly validationId: Sha256;
   readonly oracleId: string;
   readonly oracleExecutedAt: UtcTimestamp;
+  /** Content consistency only; these digests do not authenticate evidence. */
+  readonly oracleContentSha256: Sha256 | null;
+  readonly actualValuesContentSha256: Sha256 | null;
   readonly reconciliationStatus:
     "complete" | "mismatches" | "oracle-unavailable" | "oracle-error";
   readonly mismatches: readonly ReconciliationMismatch[];

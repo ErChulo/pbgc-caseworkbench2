@@ -85,11 +85,18 @@ export function roundValue(
   value: number,
   method: ToleranceProfile["roundingMethod"],
 ): number {
+  if (!Number.isFinite(value))
+    throw new Error("Cannot round a non-finite value.");
   if (method === "banker's") {
-    return Math.round(value);
+    const lower = Math.floor(value);
+    const fraction = value - lower;
+    if (fraction < 0.5) return lower;
+    if (fraction > 0.5) return lower + 1;
+    return lower % 2 === 0 ? lower : lower + 1;
   }
   if (method === "away-from-zero") {
     return value >= 0 ? Math.ceil(value) : Math.floor(value);
   }
-  return Math.floor(value);
+  if ((method as string) === "down") return Math.floor(value);
+  throw new Error("Unknown rounding method.");
 }
