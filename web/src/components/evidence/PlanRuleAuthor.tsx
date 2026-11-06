@@ -1,3 +1,4 @@
+import planRuleSchema from "../../contracts/schemas/plan-rule-record.schema.json";
 import { useState, type SyntheticEvent } from "react";
 
 import type {
@@ -24,6 +25,12 @@ export interface RuleAuthorCandidate {
   readonly candidate: ProvisionCandidate;
   readonly citation: RuleCitation;
 }
+
+// These values are the only applicability dimensions in the approved
+// plan-rule contract. Other scenario dimensions remain visible as blocked.
+const contractDimensions = new Set<string>(
+  planRuleSchema.$defs.applicabilityCondition.properties.dimension.enum,
+);
 
 const dimensions: readonly ApplicabilityDimension[] = [
   "participant-group",
@@ -86,6 +93,7 @@ export function PlanRuleAuthor({
   );
   const ready =
     blockingItems.length === 0 &&
+    (!production || contractDimensions.has(dimension)) &&
     selectedIds.length > 0 &&
     primary !== undefined &&
     restatement.trim() !== "" &&
@@ -231,6 +239,12 @@ export function PlanRuleAuthor({
         </label>
         <fieldset>
           <legend>Applicability condition</legend>
+          {production ? (
+            <p className="form-guidance">
+              Scenario-specific dimensions are unavailable until the approved
+              rule contract and scenario model are reconciled.
+            </p>
+          ) : null}
           <div className="form-grid">
             <label htmlFor="applicability-dimension">
               Dimension
@@ -244,8 +258,15 @@ export function PlanRuleAuthor({
                 }}
               >
                 {dimensions.map((value) => (
-                  <option key={value} value={value}>
+                  <option
+                    key={value}
+                    value={value}
+                    disabled={production && !contractDimensions.has(value)}
+                  >
                     {plainStatus(value)}
+                    {production && !contractDimensions.has(value)
+                      ? " (contract update required)"
+                      : ""}
                   </option>
                 ))}
               </select>

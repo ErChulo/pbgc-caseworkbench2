@@ -14,6 +14,21 @@ export function createDefaultToleranceProfile(): ToleranceProfile {
 export function validateToleranceProfile(profile: ToleranceProfile): string[] {
   const errors: string[] = [];
 
+  if (typeof profile.profileId !== "string" || profile.profileId.trim() === "")
+    errors.push("Tolerance profile ID must not be empty.");
+  const effectiveDate = profile.effectiveDate;
+  const date =
+    typeof effectiveDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/u.test(effectiveDate)
+      ? new Date(`${effectiveDate}T00:00:00.000Z`)
+      : null;
+  if (
+    date === null ||
+    Number.isNaN(date.valueOf()) ||
+    date.toISOString().slice(0, 10) !== effectiveDate
+  )
+    errors.push("Tolerance effective date must be a real ISO date.");
+
   if (
     !Number.isFinite(profile.absoluteTolerance) ||
     profile.absoluteTolerance < 0
@@ -66,14 +81,22 @@ export function evaluateNumericTolerance(
   relativeTolerance: number,
 ): { readonly withinTolerance: boolean; readonly difference: number } {
   const absoluteDifference = Math.abs(expectedValue - actualValue);
-  const relativeDifference =
-    Math.abs(expectedValue) > 0
-      ? absoluteDifference / Math.abs(expectedValue)
-      : absoluteDifference;
-
+  if (
+    !Number.isFinite(expectedValue) ||
+    !Number.isFinite(actualValue) ||
+    !Number.isFinite(absoluteDifference) ||
+    !Number.isFinite(absoluteTolerance) ||
+    absoluteTolerance < 0 ||
+    !Number.isFinite(relativeTolerance) ||
+    relativeTolerance < 0
+  )
+    return { withinTolerance: false, difference: absoluteDifference };
+  // A relative difference has no denominator when the expected value is zero.
+  // Only the absolute threshold can accept that case.
   const withinTolerance =
     absoluteDifference <= absoluteTolerance ||
-    relativeDifference <= relativeTolerance;
+    (expectedValue !== 0 &&
+      absoluteDifference / Math.abs(expectedValue) <= relativeTolerance);
 
   return {
     withinTolerance,

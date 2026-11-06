@@ -1,3 +1,4 @@
+import { parseUtcTimestamp } from "../shared/types";
 import type { ReconciliationOracle, OracleFormulaResult } from "./models";
 
 export interface OracleIntegrationContract {
@@ -18,7 +19,7 @@ export function validateOracleContract(
 ): string[] {
   const errors: string[] = [];
 
-  if (!oracle.oracleId || oracle.oracleId.trim() === "") {
+  if (typeof oracle.oracleId !== "string" || oracle.oracleId.trim() === "") {
     errors.push("Oracle ID must not be empty.");
   }
 
@@ -33,23 +34,40 @@ export function validateOracleContract(
     errors.push(`Invalid oracle type: ${oracle.oracleType}`);
   }
 
+  if (
+    oracle.toolName !== null &&
+    !["ValTool", "Runtime", "ATPBGC", "BCV", "Custom"].includes(oracle.toolName)
+  )
+    errors.push("Oracle tool name is invalid.");
   if (oracle.oracleType === "external-execution" && oracle.toolName === null) {
     errors.push("External execution oracles must specify a tool name.");
   }
 
-  if (!oracle.executedAt || isNaN(new Date(oracle.executedAt).getTime())) {
-    errors.push("Oracle execution timestamp must be a valid ISO 8601 date.");
+  if (
+    typeof oracle.executedAt !== "string" ||
+    !parseUtcTimestamp(oracle.executedAt).ok
+  ) {
+    errors.push("Oracle execution timestamp must be a valid UTC timestamp.");
   }
 
-  if (!oracle.executionVersion || oracle.executionVersion.trim() === "") {
+  if (
+    typeof oracle.executionVersion !== "string" ||
+    oracle.executionVersion.trim() === ""
+  ) {
     errors.push("Execution version must not be empty.");
   }
 
-  if (!/^[a-f0-9]{64}$/u.test(oracle.populationSnapshot)) {
+  if (
+    typeof oracle.populationSnapshot !== "string" ||
+    !/^[a-f0-9]{64}$/u.test(oracle.populationSnapshot)
+  ) {
     errors.push("Population snapshot must be a valid SHA-256 hash.");
   }
 
-  if (!/^[a-f0-9]{64}$/u.test(oracle.buildSpecSnapshot)) {
+  if (
+    typeof oracle.buildSpecSnapshot !== "string" ||
+    !/^[a-f0-9]{64}$/u.test(oracle.buildSpecSnapshot)
+  ) {
     errors.push("BuildSpec snapshot must be a valid SHA-256 hash.");
   }
 
@@ -60,6 +78,12 @@ export function validateOracleContract(
   if (!["trusted", "provisional", "unknown"].includes(oracle.reliability)) {
     errors.push(`Invalid reliability level: ${oracle.reliability}`);
   }
+
+  if (
+    oracle.executionEvidence !== null &&
+    typeof oracle.executionEvidence !== "string"
+  )
+    errors.push("Execution evidence must be null or a string.");
 
   if (Array.isArray(oracle.results)) {
     const results: readonly OracleFormulaResult[] = oracle.results;
@@ -73,16 +97,26 @@ export function validateOracleContract(
 }
 
 function validateOracleFormulaResult(
-  result: OracleFormulaResult,
+  supplied: unknown,
   index: number,
 ): string[] {
   const errors: string[] = [];
+  if (!isRecord(supplied))
+    return [`Result[${String(index)}]: Result must be an object.`];
+  const result = supplied as unknown as OracleFormulaResult;
 
-  if (!result.formulaId || result.formulaId.trim() === "") {
+  if (
+    typeof result.formulaId !== "string" ||
+    !result.formulaId ||
+    result.formulaId.trim() === ""
+  ) {
     errors.push(`Result[${String(index)}]: Formula ID must not be empty.`);
   }
 
-  if (!result.cellAddress || result.cellAddress.trim() === "") {
+  if (
+    typeof result.cellAddress !== "string" ||
+    result.cellAddress.trim() === ""
+  ) {
     errors.push(`Result[${String(index)}]: Cell address must not be empty.`);
   }
 
@@ -116,87 +150,128 @@ function validateOracleFormulaResult(
   return errors;
 }
 
+/** Parses the project's provisional JSONL interchange, not a verified vendor format.
+ * Malformed records abort the whole import; none may be silently discarded. */
 export function parseValToolResults(rawOutput: string): OracleFormulaResult[] {
   const results: OracleFormulaResult[] = [];
-  const lines = rawOutput.split("\n");
-
-  for (const line of lines) {
+  const seen = new Set<string>();
+  for (const [index, line] of rawOutput.split("\n").entries()) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
-
+    let raw: unknown;
     try {
-      const record = JSON.parse(trimmed) as Record<string, unknown>;
-      if (
-        typeof record.formulaId === "string" &&
-        record.cellAddress !== undefined &&
-        typeof record.cellAddress === "string"
-      ) {
-        results.push({
-          formulaId: record.formulaId,
-          cellAddress: record.cellAddress,
-          computedValue: record.value ?? null,
-          computedType: classifyType(record.value),
-          error: typeof record.error === "string" ? record.error : null,
-          precision:
-            typeof record.precision === "number" ? record.precision : null,
-        });
-      }
+      raw = JSON.parse(trimmed) as unknown;
     } catch {
-      continue;
+      throw new Error(`Oracle JSONL line ${String(index + 1)} is invalid.`);
     }
+    const result = parseInterchangeRecord(
+      raw,
+      "value",
+      "error",
+      "precision",
+      `line ${String(index + 1)}`,
+    );
+    if (seen.has(result.formulaId))
+      throw new Error("Oracle input contains duplicate formula identifiers.");
+    seen.add(result.formulaId);
+    results.push(result);
   }
-
   return results;
 }
 
+/** Parses the project's provisional JSON interchange, not a verified vendor format. */
 export function parseRuntimeResults(rawOutput: string): OracleFormulaResult[] {
-  const results: OracleFormulaResult[] = [];
-
+  let raw: unknown;
   try {
-    const parsed = JSON.parse(rawOutput) as Record<string, unknown>;
-    if (Array.isArray(parsed.calculations)) {
-      for (const calc of parsed.calculations) {
-        const calculation = calc as Record<string, unknown>;
-        if (
-          typeof calculation.formulaId === "string" &&
-          calculation.cellAddress !== undefined &&
-          typeof calculation.cellAddress === "string"
-        ) {
-          results.push({
-            formulaId: calculation.formulaId,
-            cellAddress: calculation.cellAddress,
-            computedValue: calculation.result ?? null,
-            computedType: classifyType(calculation.result),
-            error:
-              typeof calculation.executionError === "string"
-                ? calculation.executionError
-                : null,
-            precision:
-              typeof calculation.decimalPlaces === "number"
-                ? calculation.decimalPlaces
-                : null,
-          });
-        }
-      }
-    }
+    raw = JSON.parse(rawOutput) as unknown;
   } catch {
-    return [];
+    throw new Error("Oracle JSON is invalid.");
   }
-
-  return results;
+  if (!isRecord(raw) || !Array.isArray(raw.calculations))
+    throw new Error("Oracle calculations must be an array.");
+  const seen = new Set<string>();
+  return (raw.calculations as readonly unknown[]).map((item, index) => {
+    const result = parseInterchangeRecord(
+      item,
+      "result",
+      "executionError",
+      "decimalPlaces",
+      `result ${String(index + 1)}`,
+    );
+    if (seen.has(result.formulaId))
+      throw new Error("Oracle input contains duplicate formula identifiers.");
+    seen.add(result.formulaId);
+    return result;
+  });
 }
 
-function classifyType(
-  value: unknown,
-): "number" | "text" | "date" | "boolean" | "error" {
-  if (value === null || value === undefined) return "text";
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseInterchangeRecord(
+  raw: unknown,
+  valueKey: string,
+  errorKey: string,
+  precisionKey: string,
+  label: string,
+): OracleFormulaResult {
+  if (
+    !isRecord(raw) ||
+    typeof raw.formulaId !== "string" ||
+    raw.formulaId.trim() === "" ||
+    typeof raw.cellAddress !== "string" ||
+    raw.cellAddress.trim() === "" ||
+    !Object.prototype.hasOwnProperty.call(raw, valueKey)
+  )
+    throw new Error(`Oracle ${label} is missing required fields.`);
+  const value = raw[valueKey];
+  const error = raw[errorKey] ?? null;
+  const precision = raw[precisionKey] ?? null;
+  if (
+    (error !== null && (typeof error !== "string" || error.trim() === "")) ||
+    (precision !== null &&
+      (typeof precision !== "number" ||
+        !Number.isFinite(precision) ||
+        precision < 0))
+  )
+    throw new Error(`Oracle ${label} has invalid error or precision metadata.`);
+  if (
+    !(typeof value === "number" && Number.isFinite(value)) &&
+    typeof value !== "string" &&
+    typeof value !== "boolean" &&
+    !(value === null && typeof error === "string")
+  )
+    throw new Error(`Oracle ${label} has an unsupported value.`);
+  if (typeof value === "string" && value.trim() === "" && error === null)
+    throw new Error(`Oracle ${label} has an empty value.`);
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    const date = new Date(`${value}T00:00:00.000Z`);
+    if (
+      Number.isNaN(date.valueOf()) ||
+      date.toISOString().slice(0, 10) !== value
+    )
+      throw new Error(`Oracle ${label} has an invalid date.`);
+  }
+  const computedType: OracleFormulaResult["computedType"] =
+    typeof error === "string" ? "error" : classifyType(value);
+  return {
+    formulaId: raw.formulaId,
+    cellAddress: raw.cellAddress,
+    computedValue: value,
+    computedType,
+    error,
+    precision,
+  };
+}
+
+function classifyType(value: unknown): OracleFormulaResult["computedType"] {
   if (typeof value === "number") return "number";
   if (typeof value === "boolean") return "boolean";
   if (typeof value === "string") {
     if (value.toLowerCase() === "error" || value.startsWith("#"))
       return "error";
-    if (/^\d{4}-\d{2}-\d{2}/.test(value)) return "date";
-    return "text";
+    if (/^\d{4}-\d{2}-\d{2}$/u.test(value)) return "date";
   }
   return "text";
 }

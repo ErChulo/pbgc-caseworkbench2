@@ -1,3 +1,4 @@
+import { ProvisionalOraclePanel } from "../components/formula-governance/ProvisionalOraclePanel";
 import {
   CaseCreation,
   type CaseCreationView,
@@ -317,6 +318,15 @@ export function App({
           planRules={orchestrator.previewRules}
           message={orchestrator.architectureBuildMessage}
           onApproveFormula={orchestrator.approveFormula}
+        />
+        <ProvisionalOraclePanel
+          key={`${orchestrator.activeCase?.caseId ?? "none"}:${orchestrator.v1Workbook?.workbookContentSha256 ?? "none"}`}
+          enabled={
+            orchestrator.workspaceReady && orchestrator.activeCase !== null
+          }
+          workbookAvailable={orchestrator.v1Workbook !== null}
+          formulaCells={orchestrator.v1Workbook?.formulaCells ?? []}
+          onImport={orchestrator.importProvisionalOracle}
         />
         <QuarantineQueue
           items={orchestrator.quarantineItems}

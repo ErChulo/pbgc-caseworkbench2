@@ -1,3 +1,8 @@
+import { preserveProvisionalOracle } from "../../adapters/filesystem/provisional-oracle-workspace";
+import type {
+  ProvisionalOracleEvidence,
+  ProvisionalOracleFormat,
+} from "../../domain/validation-reconciliation/provisional-oracle-intake";
 import { readPlanRuleHistory } from "../../adapters/filesystem/plan-rule-history";
 import { verifyRuleCandidatesInWorkspace } from "../../adapters/filesystem/verified-rule-candidates";
 import {
@@ -982,6 +987,10 @@ export interface CaseOrchestrator {
   readonly v1BuildSpec: BuildSpecV2 | null;
   readonly v1CompilationResult: CompilationResult | null;
   readonly v1Workbook: V1Workbook | null;
+  readonly importProvisionalOracle: (
+    file: File,
+    format: ProvisionalOracleFormat,
+  ) => Promise<ProvisionalOracleEvidence>;
   readonly v1XlsxBytes: Uint8Array | null;
   readonly v1OutputMessage: string | null;
   readonly downloadV1Workbook: () => void;
@@ -1240,6 +1249,11 @@ export function useCaseOrchestrator(
   const [v1CompilationResult, setV1CompilationResult] =
     useState<CompilationResult | null>(null);
   const [v1Workbook, setV1Workbook] = useState<V1Workbook | null>(null);
+  const v1WorkbookRef = useRef<V1Workbook | null>(null);
+  const setCurrentV1Workbook = (workbook: V1Workbook | null): void => {
+    v1WorkbookRef.current = workbook;
+    setV1Workbook(workbook);
+  };
   const [v1XlsxBytes, setV1XlsxBytes] = useState<Uint8Array | null>(null);
   const [v1OutputMessage, setV1OutputMessage] = useState<string | null>(null);
   const [planSummaryRecord, setPlanSummaryRecord] =
@@ -1277,7 +1291,7 @@ export function useCaseOrchestrator(
         setV1CompilationResult(null);
       },
       clearWorkbook: () => {
-        setV1Workbook(null);
+        setCurrentV1Workbook(null);
       },
       clearWorkbookBytes: () => {
         setV1XlsxBytes(null);
@@ -1289,6 +1303,53 @@ export function useCaseOrchestrator(
         setArchitectureBuildMessage(null);
       },
     });
+  };
+
+  const importProvisionalOracle = async (
+    file: File,
+    format: ProvisionalOracleFormat,
+  ): Promise<ProvisionalOracleEvidence> => {
+    const currentWorkspace = workspace.current;
+    const currentCaseId = activeCaseId.current;
+    const currentWorkbook = v1WorkbookRef.current;
+    const sequence = architectureBuildSequence.current;
+    const isCurrent = (): boolean =>
+      currentWorkspace !== null &&
+      currentCaseId !== null &&
+      currentWorkbook !== null &&
+      workspace.current === currentWorkspace &&
+      activeCaseId.current === currentCaseId &&
+      v1WorkbookRef.current === currentWorkbook &&
+      architectureBuildSequence.current === sequence;
+    if (
+      !isCurrent() ||
+      currentWorkspace === null ||
+      currentCaseId === null ||
+      currentWorkbook === null
+    )
+      throw new Error(
+        "Select an active case and generate its current V1 workbook first.",
+      );
+    if (file.size === 0 || file.size > 8 * 1024 * 1024)
+      throw new Error("Oracle input is empty or exceeds 8 MiB.");
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.length !== file.size || !isCurrent())
+      throw new Error(
+        "The case or workbook changed while reading the input. Select the file again.",
+      );
+    const saved = await preserveProvisionalOracle({
+      workspace: currentWorkspace,
+      caseId: currentCaseId,
+      workbook: currentWorkbook,
+      sourceBytes: bytes,
+      format,
+    });
+    if (!isCurrent())
+      throw new Error(
+        "The case or workbook changed during import. A local proposal may have been saved under the earlier case; inspect it before retrying.",
+      );
+    if (!saved.ok) throw new Error(saved.message);
+    return saved.evidence;
   };
 
   const storeQuarantineItems = (
@@ -1409,7 +1470,7 @@ export function useCaseOrchestrator(
     setCaseControlsMessage(null);
     setV1BuildSpec(null);
     setV1CompilationResult(null);
-    setV1Workbook(null);
+    setCurrentV1Workbook(null);
     setV1XlsxBytes(null);
     setV1OutputMessage(null);
     setPlanSummaryRecord(null);
@@ -4150,7 +4211,7 @@ export function useCaseOrchestrator(
     setV1Architecture(null);
     setV1BuildSpec(null);
     setV1CompilationResult(null);
-    setV1Workbook(null);
+    setCurrentV1Workbook(null);
     setV1XlsxBytes(null);
     setV1OutputMessage(null);
     try {
@@ -4433,7 +4494,7 @@ export function useCaseOrchestrator(
       const workbook = workbookResult.workbook;
       const xlsxSpec = buildXLSXSpec(workbook);
       const xlsxBytes = writeXLSXBytes(xlsxSpec);
-      setV1Workbook(workbook);
+      setCurrentV1Workbook(workbook);
       setV1XlsxBytes(xlsxBytes);
 
       setArchitectureBuildMessage(
@@ -4448,7 +4509,7 @@ export function useCaseOrchestrator(
       setV1Architecture(null);
       setV1BuildSpec(null);
       setV1CompilationResult(null);
-      setV1Workbook(null);
+      setCurrentV1Workbook(null);
       setV1XlsxBytes(null);
       setArchitectureBuildMessage(
         error instanceof Error ? error.message : "Architecture build failed.",
@@ -5944,6 +6005,7 @@ export function useCaseOrchestrator(
     v1BuildSpec,
     v1CompilationResult,
     v1Workbook,
+    importProvisionalOracle,
     v1XlsxBytes,
     v1OutputMessage,
     downloadV1Workbook,

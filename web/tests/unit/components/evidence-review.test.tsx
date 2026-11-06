@@ -50,6 +50,29 @@ describe("Feature 001 evidence reviewer UI", () => {
     ).toBeVisible();
   });
 
+  it("shows unsupported production dimensions as blocked by the approved contract", () => {
+    render(
+      <PlanRuleAuthor
+        candidates={evidenceReviewDemo.candidates}
+        unresolvedItems={[]}
+        existingRules={[]}
+        production
+        onAuthor={() => Promise.resolve()}
+      />,
+    );
+    expect(
+      screen.getByRole("option", { name: "Participant group" }),
+    ).toBeEnabled();
+    expect(
+      screen.getByRole("option", {
+        name: "Early retirement provision (contract update required)",
+      }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText(/Scenario-specific dimensions are unavailable/),
+    ).toBeVisible();
+  });
+
   it("filters catalog artifacts and keeps quarantine exclusions visible", async () => {
     const user = userEvent.setup();
     render(<EvidenceCatalogReview catalog={evidenceReviewDemo.catalog} />);

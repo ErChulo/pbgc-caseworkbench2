@@ -1,12 +1,15 @@
 import { hashTyped } from "../manifests/canonical-json";
-import type { Sha256 } from "../shared/types";
+import { parseUtcTimestamp, type Sha256 } from "../shared/types";
 import type {
   OracleFormulaResult,
   ReconciliationInput,
   ReconciliationMismatch,
   ReconciliationResult,
 } from "./models";
-import { validateToleranceProfile } from "./tolerance";
+import {
+  evaluateNumericTolerance,
+  validateToleranceProfile,
+} from "./tolerance";
 import { validateOracleContract } from "./oracle-integration";
 import { validateWorkbook } from "./structural-validator";
 
@@ -91,7 +94,8 @@ export async function reconcileWorkbook(
   }
   if (
     input.oracle.reliability !== "trusted" ||
-    !input.oracle.executionEvidence?.trim()
+    typeof input.oracle.executionEvidence !== "string" ||
+    !input.oracle.executionEvidence.trim()
   ) {
     issues.push("A trusted oracle with documented evidence is required.");
   }
@@ -102,6 +106,27 @@ export async function reconcileWorkbook(
   ) {
     issues.push("Formula results and workbook formulas are required.");
   }
+  const formulaCells = input.workbook.formulaCells;
+  const overrideTargets = new Set<string>();
+  for (const key of Object.keys(input.tolerance.cellLevelOverrides)) {
+    const targets = formulaCells.filter(
+      (formula) => formula.formulaId === key || formula.cellAddress === key,
+    );
+    if (
+      targets.length !== 1 ||
+      targets[0] === undefined ||
+      overrideTargets.has(targets[0].formulaId)
+    ) {
+      issues.push(
+        "Tolerance override must identify one unique workbook formula without duplicate aliases.",
+      );
+    } else {
+      overrideTargets.add(targets[0].formulaId);
+    }
+  }
+  const formulaIds = new Set(formulaCells.map((formula) => formula.formulaId));
+  if (Object.keys(input.actualValues).some((key) => !formulaIds.has(key)))
+    issues.push("Actual values contain unknown formula identifiers.");
   if (issues.length > 0) {
     return createResult(
       input,
@@ -200,6 +225,7 @@ export async function reconcileWorkbook(
       actualValue,
       input.tolerance,
       formula.cellAddress,
+      formula.formulaId,
     );
     if (compared.withinTolerance) {
       matchCount += 1;
@@ -268,8 +294,17 @@ function oracleTypeMatches(oracle: OracleFormulaResult): boolean {
     case "boolean":
       return typeof oracle.computedValue === "boolean";
     case "text":
-    case "date":
       return typeof oracle.computedValue === "string";
+    case "date": {
+      const value = oracle.computedValue;
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/u.test(value))
+        return false;
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return (
+        !Number.isNaN(date.valueOf()) &&
+        date.toISOString().slice(0, 10) === value
+      );
+    }
     case "error":
       return false;
   }
@@ -294,6 +329,7 @@ function compareValues(
   actualValue: unknown,
   tolerance: ReconciliationInput["tolerance"],
   cellAddress: string,
+  formulaId: string,
 ): {
   readonly withinTolerance: boolean;
   readonly difference: number | string;
@@ -307,7 +343,9 @@ function compareValues(
     };
   }
 
-  const override = tolerance.cellLevelOverrides[cellAddress];
+  const override =
+    tolerance.cellLevelOverrides[formulaId] ??
+    tolerance.cellLevelOverrides[cellAddress];
   const absoluteTolerance = override ?? tolerance.absoluteTolerance;
 
   if (
@@ -322,13 +360,12 @@ function compareValues(
         diagnostics: ["Numeric difference is outside the supported range."],
       };
     }
-    const relative =
-      Math.abs(oracle.computedValue) > 0
-        ? difference / Math.abs(oracle.computedValue)
-        : difference;
-    const withinTolerance =
-      difference <= absoluteTolerance ||
-      relative <= tolerance.relativeTolerance;
+    const { withinTolerance } = evaluateNumericTolerance(
+      oracle.computedValue,
+      actualValue,
+      absoluteTolerance,
+      tolerance.relativeTolerance,
+    );
     return {
       withinTolerance,
       difference,
@@ -374,8 +411,16 @@ async function createResult(
   const deterministicPayload = {
     workbookContentSha256: input.workbook.workbookContentSha256,
     validationId: input.validation.validationId,
-    oracleId: input.oracle?.oracleId ?? "oracle-unavailable",
-    oracleExecutedAt: input.oracle?.executedAt ?? input.validation.validatedAt,
+    oracleId:
+      typeof input.oracle?.oracleId === "string" &&
+      input.oracle.oracleId.trim() !== ""
+        ? input.oracle.oracleId
+        : "oracle-unavailable",
+    oracleExecutedAt:
+      typeof input.oracle?.executedAt === "string" &&
+      parseUtcTimestamp(input.oracle.executedAt).ok
+        ? input.oracle.executedAt
+        : input.validation.validatedAt,
     oracleContentSha256,
     actualValuesContentSha256,
     reconciliationStatus,

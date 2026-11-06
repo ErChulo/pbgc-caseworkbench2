@@ -54,6 +54,16 @@ test("governed production path exposes unresolved workbook blockers", async ({
 }) => {
   test.setTimeout(120_000);
   await createSyntheticCase(page, "PBGC-V1-PRODUCTION-001");
+  const oraclePanel = page.getByRole("region", {
+    name: "Provisional oracle evidence",
+  });
+  await expect(
+    oraclePanel.getByText(/Generate the current V1 workbook/),
+  ).toBeVisible();
+  await expect(oraclePanel.getByLabel("Local oracle input")).toBeDisabled();
+  await expect(
+    oraclePanel.getByRole("button", { name: "Save provisional evidence" }),
+  ).toBeDisabled();
 
   const workbookBytes = populationWorkbook();
   const workbookHash = createHash("sha256").update(workbookBytes).digest("hex");
@@ -154,10 +164,12 @@ test("governed production path exposes unresolved workbook blockers", async ({
   });
   // The scenario-specific dimension is not in the approved plan-rule schema.
   // Verify it is blocked before persistence, then use a supported dimension.
-  await page.getByLabel("Dimension").selectOption({
-    label: "Early retirement provision",
-  });
-  await page.getByLabel("Condition value").fill("true");
+  const dimension = page.getByLabel("Dimension");
+  const unsupported = dimension.locator(
+    'option[value="early-retirement-provision"]',
+  );
+  await expect(unsupported).toHaveAttribute("disabled", "");
+  await page.getByLabel("Condition value").fill("all synthetic participants");
   await expect(submitRule).toBeEnabled();
   const planHash = createHash("sha256").update(PLAN_TEXT).digest("hex");
   await page.evaluate((sha) => {
@@ -190,12 +202,12 @@ test("governed production path exposes unresolved workbook blockers", async ({
     },
     { sha: planHash, text: PLAN_TEXT },
   );
-  await submitRule.click();
-  await expect(
-    page.getByRole("alert").filter({
-      hasText: "Plan-rule record does not match the approved contract",
-    }),
-  ).toBeVisible();
+  // Manipulating the option cannot enable the submit action either.
+  await unsupported.evaluate((option) => {
+    (option as HTMLOptionElement).disabled = false;
+  });
+  await dimension.selectOption("early-retirement-provision");
+  await expect(submitRule).toBeDisabled();
   const savedBeforeValidRule = await page.evaluate(() => {
     const files = (
       globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }

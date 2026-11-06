@@ -179,12 +179,12 @@ describe("reconciliation coverage and integrity", () => {
   });
 
   it("blocks unhashable extra actual values rather than reporting complete", async () => {
-    await expect(
-      reconcileWorkbook({
-        ...input(),
-        actualValues: { f1: 0, f2: 100, extra: NaN },
-      }),
-    ).rejects.toThrow("hashable exact input evidence");
+    const result = await reconcileWorkbook({
+      ...input(),
+      actualValues: { f1: 0, f2: 100, extra: NaN },
+    });
+    expect(result.reconciliationStatus).toBe("oracle-error");
+    expect(result.actualValuesContentSha256).toBeNull();
   });
 
   it("rejects non-finite oracle precision", async () => {
@@ -200,6 +200,98 @@ describe("reconciliation coverage and integrity", () => {
       });
       expect(result.reconciliationStatus).toBe("oracle-error");
     }
+  });
+
+  it("requires absolute tolerance when the expected value is zero", async () => {
+    const result = await reconcileWorkbook({
+      ...input(),
+      actualValues: { f1: 0.05, f2: 100 },
+      tolerance: {
+        ...input().tolerance,
+        absoluteTolerance: 0.01,
+        relativeTolerance: 0.1,
+      },
+    });
+    expect(result.reconciliationStatus).toBe("mismatches");
+    expect(result.mismatches[0]?.formulaId).toBe("f1");
+  });
+
+  it("rejects extra actual values and unresolvable or duplicate tolerance overrides", async () => {
+    const unexpected = await reconcileWorkbook({
+      ...input(),
+      actualValues: { f1: 0, f2: 100, other: 0 },
+    });
+    expect(unexpected.reconciliationStatus).toBe("oracle-error");
+    const overrides: readonly Readonly<Record<string, number>>[] = [
+      { Z99: 1 },
+      { f1: 1, A1: 1 },
+    ];
+    for (const cellLevelOverrides of overrides) {
+      const result = await reconcileWorkbook({
+        ...input(),
+        tolerance: { ...input().tolerance, cellLevelOverrides },
+      });
+      expect(result.reconciliationStatus).toBe("oracle-error");
+    }
+    const valid = await reconcileWorkbook({
+      ...input(),
+      tolerance: {
+        ...input().tolerance,
+        absoluteTolerance: 0,
+        cellLevelOverrides: { f2: 0.125 },
+      },
+    });
+    expect(valid.reconciliationStatus).toBe("complete");
+  });
+
+  it("rejects a cell override that matches formulas on two sheets", async () => {
+    const second = workbook.formulaCells[1];
+    const sourceSheet = workbook.sheets[0];
+    if (!second || !sourceSheet) throw new Error("Missing fixture");
+    const updatedFormula = { ...second, tabName: "Other", cellAddress: "A1" };
+    const draft = {
+      ...workbook,
+      formulaCells: [workbook.formulaCells[0], updatedFormula],
+      sheets: [
+        {
+          ...sourceSheet,
+          cells: sourceSheet.cells.filter((cell) => cell.address === "A1"),
+        },
+        {
+          name: "Other",
+          hidden: false,
+          cells: [{ ...sourceSheet.cells[1], address: "A1" }],
+        },
+      ],
+      cellMappings: [
+        workbook.cellMappings[0],
+        { ...workbook.cellMappings[1], tabName: "Other", cellAddress: "A1" },
+      ],
+    } as V1Workbook;
+    const other = {
+      ...draft,
+      workbookContentSha256: await computeWorkbookContentHash(draft),
+    };
+    const valid = await validateWorkbook({
+      workbook: other,
+      validatorVersion: "test-validator-1",
+      validatedAt: time,
+    });
+    expect(valid.status).toBe("valid");
+    const result = await reconcileWorkbook({
+      ...input(),
+      workbook: other,
+      validation: valid,
+      oracle: {
+        ...oracle,
+        results: [
+          oracle.results[0],
+          { ...oracle.results[1], cellAddress: "A1" },
+        ],
+      } as ReconciliationOracle,
+      tolerance: { ...input().tolerance, cellLevelOverrides: { A1: 1 } },
+    });
+    expect(result.reconciliationStatus).toBe("oracle-error");
   });
 
   it("records a tolerance mismatch outside the threshold", async () => {
@@ -239,6 +331,37 @@ describe("reconciliation coverage and integrity", () => {
       expect(result.reconciliationStatus).toBe("oracle-error");
     }
   });
+  it("rejects malformed oracle metadata and impossible dates without reporting complete", async () => {
+    const first = oracle.results[0];
+    if (!first) throw new Error("Missing fixture");
+    for (const modified of [
+      { executionEvidence: 42 },
+      { results: [null] },
+      { executedAt: "2026-02-30T00:00:00Z" },
+      { toolName: "Unapproved tool" },
+    ]) {
+      const invalid = {
+        ...oracle,
+        ...modified,
+      } as unknown as ReconciliationOracle;
+      expect(
+        (await reconcileWorkbook({ ...input(), oracle: invalid }))
+          .reconciliationStatus,
+      ).toBe("oracle-error");
+    }
+    const badDate = {
+      ...first,
+      computedType: "date" as const,
+      computedValue: "2026-02-30",
+    };
+    const result = await reconcileWorkbook({
+      ...input(),
+      actualValues: { f1: "2026-02-30", f2: 100 },
+      oracle: { ...oracle, results: [badDate, ...oracle.results.slice(1)] },
+    });
+    expect(result.reconciliationStatus).toBe("mismatches");
+  });
+
   it("never emits a numeric infinity when the difference overflows", async () => {
     const first = oracle.results[0];
     if (!first) throw new Error("missing fixture");
@@ -373,6 +496,29 @@ describe("reconciliation coverage and integrity", () => {
         tolerance: { ...input().tolerance, absoluteTolerance: NaN },
       }),
     ).rejects.toThrow("Invalid reconciliation tolerance");
+  });
+  it("rejects tolerance profiles without a real effective date or identity", async () => {
+    for (const patch of [
+      { effectiveDate: "2026-02-30" },
+      { effectiveDate: "" },
+      { profileId: "  " },
+    ]) {
+      await expect(
+        reconcileWorkbook({
+          ...input(),
+          tolerance: { ...input().tolerance, ...patch },
+        }),
+      ).rejects.toThrow("Invalid reconciliation tolerance");
+    }
+  });
+  it("does not treat inherited actual values as submitted formula results", async () => {
+    const inherited = Object.create({ f1: 100 }) as Record<string, number>;
+    const result = await reconcileWorkbook({
+      ...input(),
+      actualValues: inherited,
+    });
+    expect(result.mismatches[0]?.formulaId).toBe("f1");
+    expect(result.mismatches[0]?.actualValue).toBeNull();
   });
   it("rejects an oracle error value even when the actual value matches it", async () => {
     const first = oracle.results[0];
