@@ -1,3 +1,6 @@
+import { computeContentHash } from "../build-spec/serialization";
+import { hashTyped } from "../manifests/canonical-json";
+import type { Sha256 } from "../shared/types";
 import type { V1Workbook } from "../workbook-builder/models";
 import type { BuildSpecV2 } from "../build-spec/models";
 import type { PopulationDecisionProjection } from "../population/population-profile";
@@ -41,7 +44,69 @@ export class WorkbookValidationEngine {
     };
 
     const result = await validateWorkbook(validationInput);
-    return result;
+    const { workbook, buildSpec, population } = input;
+    let sourceValid = false;
+    try {
+      sourceValid =
+        (await computeContentHash(buildSpec)) ===
+          buildSpec.buildSpecContentSha256 &&
+        buildSpec.buildSpecId === workbook.buildSpecId &&
+        buildSpec.buildSpecContentSha256 === workbook.buildSpecContentSha256 &&
+        buildSpec.architectureId === workbook.architectureId &&
+        buildSpec.architectureContentSha256 ===
+          workbook.architectureContentSha256 &&
+        buildSpec.caseId === workbook.caseId &&
+        buildSpec.validation.isValid &&
+        population.status === "approved" &&
+        !!population.effectiveDecisionId?.trim() &&
+        population.effectiveDecisionId ===
+          workbook.populationProfileDecisionId &&
+        population.effectiveWorkbookProfileContentSha256 ===
+          workbook.populationProfileContentSha256 &&
+        buildSpec.architectureLineage.population.some(
+          (entry) =>
+            entry.workbookProfileContentSha256 ===
+              workbook.populationProfileContentSha256 &&
+            entry.approvalDecisionId === workbook.populationProfileDecisionId,
+        );
+    } catch {
+      sourceValid = false;
+    }
+    if (sourceValid) return result;
+    const finding = {
+      code: "VALIDATION_SOURCE_LINEAGE_MISMATCH",
+      severity: "error" as const,
+      affectedCells: [],
+      affectedNames: [],
+      message:
+        "The workbook does not match the supplied BuildSpec and approved population.",
+      detail:
+        "Recompute and verify BuildSpec content and population decision lineage before validation.",
+      remediation:
+        "Select the matching approved sources and regenerate the workbook.",
+    };
+    const errors = [...result.errors, finding].sort(
+      (a, b) =>
+        a.code.localeCompare(b.code) || a.message.localeCompare(b.message),
+    );
+    const {
+      validationId: oldId,
+      validationContentSha256: oldHash,
+      validatedAt: timestamp,
+      ...content
+    } = result;
+    void oldId;
+    void oldHash;
+    const payload = { ...content, status: "invalid" as const, errors };
+    const hash = (await hashTyped(payload, {
+      typeName: "WorkbookValidationResult",
+    })) as Sha256;
+    return {
+      validationId: hash,
+      ...payload,
+      validatedAt: timestamp,
+      validationContentSha256: hash,
+    };
   }
 
   isValid(result: ValidationResult): boolean {

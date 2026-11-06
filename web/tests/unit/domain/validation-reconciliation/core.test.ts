@@ -45,7 +45,10 @@ describe("validation-reconciliation core", () => {
       validatorVersion: "1.0.0",
       validatedAt: workbook.generatedAt,
     });
-    expect(validated.status).toBe("valid");
+    expect(validated.status).toBe("invalid");
+    expect(validated.errors.map((item) => item.code)).toContain(
+      "POPULATION_ROUTING_UNVERIFIED",
+    );
     expect(validated.validationId).toHaveLength(64);
   });
 

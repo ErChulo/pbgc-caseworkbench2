@@ -47,7 +47,10 @@ describe("structural validation", () => {
       validatorVersion: "1.0.0",
       validatedAt: workbook.generatedAt,
     });
-    expect(validated.status).toBe("valid");
+    expect(validated.status).toBe("invalid");
+    expect(validated.errors.map((item) => item.code)).toContain(
+      "POPULATION_ROUTING_UNVERIFIED",
+    );
     expect(validated.errors).toBeDefined();
     expect(validated.validationId).toHaveLength(64);
   });
@@ -364,6 +367,27 @@ describe("structural validation", () => {
 });
 
 describe("population validation", () => {
+  it("blocks I/B population routing even when a value is present", async () => {
+    const workbook = await fixtureWorkbook();
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("Missing sheet");
+    const changed = {
+      ...workbook,
+      sheets: [
+        {
+          ...sheet,
+          cells: sheet.cells.map((cell) =>
+            cell.kind === "input" ? { ...cell, value: 0 } : cell,
+          ),
+        },
+      ],
+    };
+    const errors = validatePopulationApplication(changed);
+    expect(errors.map((item) => item.code)).toContain(
+      "POPULATION_ROUTING_UNVERIFIED",
+    );
+  });
+
   it("validates population data completeness", async () => {
     const workbook = await fixtureWorkbook();
     const populationErrors = validatePopulationApplication(workbook);

@@ -6,6 +6,25 @@ export function validatePopulationApplication(
 ): ValidationError[] {
   const errors: ValidationError[] = [];
 
+  // The current workbook model cannot yet prove participant-to-row routing.
+  for (const mapping of workbook.cellMappings) {
+    if (
+      mapping.iobClassification === "I" ||
+      mapping.iobClassification === "B"
+    ) {
+      errors.push({
+        code: "POPULATION_ROUTING_UNVERIFIED",
+        severity: "error",
+        affectedCells: [mapping.cellAddress],
+        affectedNames: [],
+        message: "Participant input routing is not verified.",
+        detail:
+          "The workbook does not yet bind this input to an approved participant row and source record.",
+        remediation:
+          "Implement and review participant-level population routing before validating this workbook.",
+      });
+    }
+  }
   errors.push(...validatePopulationDataCompleteness(workbook));
   errors.push(...validatePopulationDataCardinality(workbook));
   errors.push(...validatePopulationDataTypes(workbook));
@@ -97,13 +116,18 @@ function validatePopulationDataTypes(workbook: V1Workbook): ValidationError[] {
   const cellClassifications = new Map<string, string>();
   for (const sheet of workbook.sheets) {
     for (const cell of sheet.cells) {
-      cellClassifications.set(cell.address, cell.kind);
+      cellClassifications.set(
+        `${sheet.name.toUpperCase()}\u0000${cell.address.toUpperCase().replaceAll("$", "")}`,
+        cell.kind,
+      );
     }
   }
 
   for (const mapping of workbook.cellMappings) {
     if (mapping.dataSource && mapping.iobClassification === "I") {
-      const cellKind = cellClassifications.get(mapping.cellAddress);
+      const cellKind = cellClassifications.get(
+        `${mapping.tabName.toUpperCase()}\u0000${mapping.cellAddress.toUpperCase().replaceAll("$", "")}`,
+      );
       if (cellKind && cellKind !== "input") {
         errors.push({
           code: "CELL_CLASSIFICATION_MISMATCH",
@@ -119,7 +143,9 @@ function validatePopulationDataTypes(workbook: V1Workbook): ValidationError[] {
     }
 
     if (mapping.dataSource && mapping.iobClassification === "B") {
-      const cellKind = cellClassifications.get(mapping.cellAddress);
+      const cellKind = cellClassifications.get(
+        `${mapping.tabName.toUpperCase()}\u0000${mapping.cellAddress.toUpperCase().replaceAll("$", "")}`,
+      );
       if (cellKind && cellKind === "label") {
         errors.push({
           code: "INVALID_BIFEED_CELL",
