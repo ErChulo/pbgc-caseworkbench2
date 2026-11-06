@@ -1,4 +1,7 @@
-import { architectureBuildIsCurrent } from "../utilities/architecture-build-freshness";
+import {
+  architectureBuildIsCurrent,
+  invalidateDerivedBuildOutputs,
+} from "../utilities/architecture-build-freshness";
 import { verifyPopulationSourceInWorkspace } from "../../adapters/filesystem/verified-population-source";
 import { populationReviewBlocker } from "../utilities/population-review-guard";
 import {
@@ -1252,9 +1255,42 @@ export function useCaseOrchestrator(
   const activeGovernanceDependencies =
     evidenceGovernanceDependencies ?? sessionGovernanceDependencies;
 
+  // Any change to build inputs invalidates derived in-memory outputs and any
+  // asynchronous build that captured the previous case state.
+  const invalidateArchitectureBuild = (preserveArchitecture = false): void => {
+    invalidateDerivedBuildOutputs({
+      preserveArchitecture,
+      supersedeBuild: () => {
+        architectureBuildSequence.current += 1;
+      },
+      clearArchitecture: () => {
+        setV1Architecture(null);
+      },
+      clearBuildSpec: () => {
+        setV1BuildSpec(null);
+      },
+      clearCompilation: () => {
+        setV1CompilationResult(null);
+      },
+      clearWorkbook: () => {
+        setV1Workbook(null);
+      },
+      clearWorkbookBytes: () => {
+        setV1XlsxBytes(null);
+      },
+      clearOutputMessage: () => {
+        setV1OutputMessage(null);
+      },
+      clearBuildMessage: () => {
+        setArchitectureBuildMessage(null);
+      },
+    });
+  };
+
   const storeQuarantineItems = (
     items: readonly QuarantineQueueItem[],
   ): void => {
+    invalidateArchitectureBuild();
     caseReviewState.current = {
       ...caseReviewState.current,
       quarantineItems: items,
@@ -1264,6 +1300,7 @@ export function useCaseOrchestrator(
   const storeEligibilityItems = (
     items: readonly ArtifactEligibilityReviewItem[],
   ): void => {
+    invalidateArchitectureBuild();
     caseReviewState.current = {
       ...caseReviewState.current,
       eligibilityItems: items,
@@ -1273,6 +1310,7 @@ export function useCaseOrchestrator(
   const storeClassificationItems = (
     items: readonly ClassificationReviewItem[],
   ): void => {
+    invalidateArchitectureBuild();
     caseReviewState.current = {
       ...caseReviewState.current,
       classificationItems: items,
@@ -1282,6 +1320,7 @@ export function useCaseOrchestrator(
   const storeDateCandidateItems = (
     items: readonly DateCandidateReviewItem[],
   ): void => {
+    invalidateArchitectureBuild();
     caseReviewState.current = {
       ...caseReviewState.current,
       dateCandidateItems: items,
@@ -1291,6 +1330,7 @@ export function useCaseOrchestrator(
   const storeRelationshipItems = (
     items: readonly RelationshipReviewItem[],
   ): void => {
+    invalidateArchitectureBuild();
     caseReviewState.current = {
       ...caseReviewState.current,
       relationshipItems: items,
@@ -1300,6 +1340,7 @@ export function useCaseOrchestrator(
   const storePopulationItems = (
     items: readonly PopulationReviewItem[],
   ): void => {
+    invalidateArchitectureBuild();
     caseReviewState.current = {
       ...caseReviewState.current,
       populationItems: items,
@@ -1308,7 +1349,6 @@ export function useCaseOrchestrator(
   };
 
   const resetCaseScopedState = (previewMode: boolean): void => {
-    architectureBuildSequence.current += 1;
     priorSnapshot.current = null;
     inventoryCheckpoints.current.clear();
     lastCheckpoint.current = null;
@@ -1317,6 +1357,7 @@ export function useCaseOrchestrator(
     classificationHistory.current.clear();
     relationshipHistory.current.clear();
     populationHistory.current.clear();
+    invalidateArchitectureBuild();
     caseReviewState.current = createEmptyCaseReviewState();
     setQuarantineItems([]);
     setEligibilityItems([]);
@@ -1346,7 +1387,7 @@ export function useCaseOrchestrator(
     setEvidenceUnresolvedRecords(
       previewMode ? evidenceReviewDemo.unresolvedItems : [],
     );
-    architectureBuildSequence.current += 1;
+    invalidateArchitectureBuild();
     setPreviewRules([]);
     setRuleAuthoringOutcome(null);
     setRuleAuthoringBusy(false);
@@ -1777,7 +1818,7 @@ export function useCaseOrchestrator(
       return;
     }
     const persisted = await persistPlanRuleRecord(result.value);
-    architectureBuildSequence.current += 1;
+    invalidateArchitectureBuild();
     setPreviewRules((current) => [...current, result.value]);
     setRuleAuthoringOutcome({
       kind: "success",
@@ -1795,7 +1836,7 @@ export function useCaseOrchestrator(
     }
     setEvidenceUnresolvedItems(evidenceReviewDemo.unresolvedItems);
     setEvidenceUnresolvedRecords(evidenceReviewDemo.unresolvedItems);
-    architectureBuildSequence.current += 1;
+    invalidateArchitectureBuild();
     setPreviewRules([]);
     setRuleAuthoringOutcome(null);
     setRuleAuthoringBusy(false);
@@ -1903,6 +1944,7 @@ export function useCaseOrchestrator(
       nextState,
     );
     quarantineHistory.current.set(item.artifactSha256, nextHistory);
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setQuarantineItems(nextItems);
     setEligibilityItems(nextEligibilityItems);
@@ -2027,6 +2069,7 @@ export function useCaseOrchestrator(
       nextState,
     );
     eligibilityHistory.current.set(item.artifactSha256, nextHistory);
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setQuarantineItems(nextQuarantineItems);
     setEligibilityItems(nextItems);
@@ -2110,6 +2153,7 @@ export function useCaseOrchestrator(
       nextState,
     );
     classificationHistory.current.set(item.proposal.proposalKey, nextHistory);
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setClassificationItems(nextItems);
     await refreshGovernedEvidenceRecords(activeCase.caseId);
@@ -2201,6 +2245,7 @@ export function useCaseOrchestrator(
       nextState,
     );
     relationshipHistory.current.set(key, nextHistory);
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setRelationshipItems(nextItems);
   };
@@ -2261,6 +2306,7 @@ export function useCaseOrchestrator(
       priorSnapshot.current.snapshotId,
       nextState,
     );
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setDateCandidateItems(nextItems);
   };
@@ -2339,6 +2385,7 @@ export function useCaseOrchestrator(
       nextState,
     );
     populationHistory.current.set(key, nextHistory);
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setPopulationItems(nextItems);
   };
@@ -2887,6 +2934,7 @@ export function useCaseOrchestrator(
         relationshipItems: projectedRelationshipItems,
         populationItems: projectedPopulationItems,
       };
+      invalidateArchitectureBuild();
       caseReviewState.current = projectedState;
       quarantineHistory.current = restoredQuarantineHistory;
       eligibilityHistory.current = restoredEligibilityHistory;
@@ -2907,6 +2955,7 @@ export function useCaseOrchestrator(
   };
 
   const clearGovernedEvidenceRecords = (message: string): void => {
+    invalidateArchitectureBuild();
     evidenceCatalogRef.current = null;
     setEvidenceCatalog(null);
     setArchitecturePolicyItems([]);
@@ -3041,6 +3090,7 @@ export function useCaseOrchestrator(
     }
     const latestUnresolved = latestUnresolvedItems(unresolved.value);
     if (activeCaseId.current !== caseRecord.caseId) return;
+    invalidateArchitectureBuild();
     evidenceCatalogRef.current = catalogResult.value;
     setEvidenceCatalog(catalogResult.value);
     await refreshArchitecturePolicyItems(
@@ -3305,6 +3355,7 @@ export function useCaseOrchestrator(
       return;
     }
     if (activeCaseId.current !== caseId) return;
+    invalidateArchitectureBuild();
     evidenceCatalogRef.current = built.value.catalog;
     setEvidenceCatalog(built.value.catalog);
     await applyProvisionCandidateState(orderedCandidates);
@@ -3483,6 +3534,7 @@ export function useCaseOrchestrator(
       }
     }
     if (activeCaseId.current !== caseRecord.caseId) return;
+    invalidateArchitectureBuild();
     priorSnapshot.current = current.snapshot;
     lastCheckpoint.current = {
       attemptId: current.attemptId,
@@ -3658,6 +3710,7 @@ export function useCaseOrchestrator(
         clock: { now: () => dependencies.clock.now() },
       });
       setPlanSummaryRecord(record);
+      invalidateArchitectureBuild();
       caseReviewState.current = {
         ...caseReviewState.current,
         planSummaryRecord: record,
@@ -3711,6 +3764,7 @@ export function useCaseOrchestrator(
       );
       setPlanSummaryRecord(result.record);
       setPlanSummaryDecisions((prev) => [...prev, result.decision]);
+      invalidateArchitectureBuild();
       caseReviewState.current = {
         ...caseReviewState.current,
         planSummaryRecord: result.record,
@@ -3832,6 +3886,8 @@ export function useCaseOrchestrator(
       };
 
       setFormulaApprovalRecords((prev) => [...prev, newRecord]);
+      // A formula decision changes the compiled output, not the selected cell inventory.
+      invalidateArchitectureBuild(true);
       caseReviewState.current = {
         ...caseReviewState.current,
         formulaApprovalRecords: [
@@ -4316,6 +4372,7 @@ export function useCaseOrchestrator(
           left.appendOrdinal - right.appendOrdinal,
       );
       setArchitecturePolicyApprovals(nextApprovals);
+      invalidateArchitectureBuild();
       caseReviewState.current = {
         ...caseReviewState.current,
         architecturePolicyApprovals: nextApprovals,
@@ -4380,6 +4437,7 @@ export function useCaseOrchestrator(
           await caseControlContentHash(controlWithoutHash),
       };
       setCaseControls(control);
+      invalidateArchitectureBuild();
       caseReviewState.current = {
         ...caseReviewState.current,
         authenticatedCaseControls: control,
@@ -4801,6 +4859,7 @@ export function useCaseOrchestrator(
       nextState,
     );
     if (activeCaseId.current !== selectedCase.caseId) return;
+    invalidateArchitectureBuild();
     caseReviewState.current = nextState;
     setClassificationItems(nextClassificationItems);
     setDateCandidateItems(nextDateItems);
@@ -5477,6 +5536,7 @@ export function useCaseOrchestrator(
       caseReviewState.current,
     );
 
+    invalidateArchitectureBuild();
     priorSnapshot.current = checkpointReference.snapshot;
     inventoryCheckpoints.current.set(
       checkpointReference.snapshot.snapshotId,

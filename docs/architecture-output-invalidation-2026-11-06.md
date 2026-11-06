@@ -1,0 +1,5 @@
+# Invalidate derived outputs when case inputs change
+
+The case orchestrator clears in-memory architecture and downstream build outputs and supersedes in-flight builds when its evidence snapshot, catalog, review state, or authored rules are replaced. Switching cases also clears the in-memory architecture. Formula approvals invalidate compilation and workbook outputs while preserving the selected architecture cell inventory, so a reviewer can approve additional formulas. This reduces the risk of presenting a previous build after a committed review change.
+
+The invalidation is local UI lifecycle behavior, not transactional artifact revocation or authenticated release. A review operation can still be in progress before its state replacement is committed, and an already written immutable architecture file is not removed or revoked. Durable lineage, concurrent review/write serialization and independent approval authentication remain open. There is no end-to-end browser verification of this behavior in the current environment.

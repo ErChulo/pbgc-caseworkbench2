@@ -22,3 +22,25 @@ export function architectureBuildIsCurrent(input: {
     input.catalog === input.currentCatalog
   );
 }
+
+/** Clear derived output while retaining the cell inventory for formula review when requested. */
+export function invalidateDerivedBuildOutputs(input: {
+  readonly preserveArchitecture: boolean;
+  readonly supersedeBuild: () => void;
+  readonly clearArchitecture: () => void;
+  readonly clearBuildSpec: () => void;
+  readonly clearCompilation: () => void;
+  readonly clearWorkbook: () => void;
+  readonly clearWorkbookBytes: () => void;
+  readonly clearOutputMessage: () => void;
+  readonly clearBuildMessage: () => void;
+}): void {
+  input.supersedeBuild();
+  if (!input.preserveArchitecture) input.clearArchitecture();
+  input.clearBuildSpec();
+  input.clearCompilation();
+  input.clearWorkbook();
+  input.clearWorkbookBytes();
+  input.clearOutputMessage();
+  input.clearBuildMessage();
+}

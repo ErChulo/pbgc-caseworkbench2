@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { architectureBuildIsCurrent } from "../../../src/app/utilities/architecture-build-freshness";
+import { describe, expect, it, vi } from "vitest";
+import {
+  architectureBuildIsCurrent,
+  invalidateDerivedBuildOutputs,
+} from "../../../src/app/utilities/architecture-build-freshness";
 
 describe("architecture build freshness", () => {
   it("rejects a changed case, workspace, snapshot, review, catalog, or build", () => {
@@ -31,5 +34,27 @@ describe("architecture build freshness", () => {
       { currentCatalog: {} },
     ])
       expect(architectureBuildIsCurrent({ ...current, ...change })).toBe(false);
+  });
+  it("clears derived outputs, preserving cell inventory only for formula review", () => {
+    const calls = {
+      supersedeBuild: vi.fn(),
+      clearArchitecture: vi.fn(),
+      clearBuildSpec: vi.fn(),
+      clearCompilation: vi.fn(),
+      clearWorkbook: vi.fn(),
+      clearWorkbookBytes: vi.fn(),
+      clearOutputMessage: vi.fn(),
+      clearBuildMessage: vi.fn(),
+    };
+    invalidateDerivedBuildOutputs({ ...calls, preserveArchitecture: true });
+    expect(calls.clearArchitecture).not.toHaveBeenCalled();
+    for (const [name, callback] of Object.entries(calls))
+      if (name !== "clearArchitecture")
+        expect(callback).toHaveBeenCalledTimes(1);
+    invalidateDerivedBuildOutputs({ ...calls, preserveArchitecture: false });
+    expect(calls.clearArchitecture).toHaveBeenCalledTimes(1);
+    for (const [name, callback] of Object.entries(calls))
+      if (name !== "clearArchitecture")
+        expect(callback).toHaveBeenCalledTimes(2);
   });
 });
