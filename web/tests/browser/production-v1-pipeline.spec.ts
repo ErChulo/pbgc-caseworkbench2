@@ -197,10 +197,10 @@ test("governed production path exposes unresolved workbook blockers", async ({
 
   // 6. Case controls: bind the single-calculation purpose and date range. The
   // single-calculation purpose creates the "Single Run" aggregation scenario,
-  // whose formula governance is justified by the authenticated case control
+  // whose formula governance is justified by the recorded case control
   // (the checkbox defaults to checked, so it stays on).
   const controls = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "Authenticated case controls" }),
+    has: page.getByRole("heading", { name: "Case controls" }),
   });
   await controls
     .locator("label")
@@ -215,7 +215,13 @@ test("governed production path exposes unresolved workbook blockers", async ({
     .getByLabel("Case-controls approval rationale")
     .fill("E2E approved single-calculation controls.");
   await controls.getByRole("button", { name: "Approve case controls" }).click();
-  await expect(controls.getByText("Human approved")).toBeVisible();
+  await expect(controls.getByText("Approval recorded")).toBeVisible();
+  await expect(
+    controls.getByText(/does not authenticate the reviewer/u),
+  ).toBeVisible();
+  await expect(
+    controls.getByText(/Effective dates: 2020-01-01/u),
+  ).toBeVisible();
 
   // 7. Build a proposed architecture, then review its formula cells.
   const architecture = page.locator("section").filter({
@@ -231,7 +237,7 @@ test("governed production path exposes unresolved workbook blockers", async ({
   // 7c. Formula governance: approve the O-classified FV formula and the
   // B-classified CALC_INDICATOR formula in each governed scenario group
   // (ERD, justified by the authored early-retirement-provision rule; Single
-  // Run, justified by the authenticated case control), then rebuild.
+  // Run, justified by the recorded case control), then rebuild.
   const formulaPanel = page.getByRole("region", { name: "Formula Governance" });
   const formulaGroups = formulaPanel.locator(".formula-scenario-group");
   await expect(formulaGroups).toHaveCount(2);

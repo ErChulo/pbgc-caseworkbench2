@@ -58,11 +58,11 @@ export function CaseControlsReview({
       <div className="panel-heading">
         <div>
           <p className="section-label">Case control governance</p>
-          <h2 id="case-controls-title">Authenticated case controls</h2>
+          <h2 id="case-controls-title">Case controls</h2>
         </div>
         {approved ? (
           <span className="status-chip status-chip-success">
-            Human approved
+            Approval recorded
           </span>
         ) : (
           <span className="status-chip status-chip-warning">
@@ -76,8 +76,9 @@ export function CaseControlsReview({
         </p>
       ) : null}
       <p>
-        Authenticated case controls bind the effective date range and purpose to
-        explicit human approval.
+        Record the effective date range, purpose, reviewer, and rationale. The
+        application does not authenticate the reviewer or verify their
+        authority. Independent verification is required before release.
       </p>
       <div className="form-group">
         <label>
@@ -140,12 +141,10 @@ export function CaseControlsReview({
       {approved ? (
         <div className="notice">
           <p>
-            <strong>Approved</strong> by {approved.approvedBy} at{" "}
-            {new Date(
-              approved.effectiveDateRange.startDate,
-            ).toLocaleDateString()}
+            <strong>Recorded reviewer:</strong> {approved.approvedBy}. Effective
+            dates: {approved.effectiveDateRange.startDate}
             {approved.effectiveDateRange.endDate
-              ? ` – ${new Date(approved.effectiveDateRange.endDate).toLocaleDateString()}`
+              ? ` – ${approved.effectiveDateRange.endDate}`
               : " (open-ended)"}
           </p>
           <p>Rationale: {approved.approvalRationale}</p>
