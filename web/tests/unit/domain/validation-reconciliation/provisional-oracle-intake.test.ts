@@ -1,3 +1,4 @@
+import { createProvisionalOracleTemplate } from "../../../../src/components/formula-governance/provisional-oracle-template";
 import { describe, expect, it } from "vitest";
 import {
   createProvisionalOracleEvidence,
@@ -79,6 +80,61 @@ describe("case-scoped provisional oracle intake", () => {
     expect(result.evidence.status).toBe("incomplete-proposal");
     expect(result.evidence.missingFormulaIds).toEqual(["f2"]);
     expect(result.evidence.failedFormulaIds).toEqual(["f1"]);
+  });
+  it("imports a blank template only as incomplete and accepts completed replacement values", async () => {
+    const input = await fixture();
+    const template = createProvisionalOracleTemplate(
+      input.workbook.formulaCells,
+    );
+    const blank = await createProvisionalOracleEvidence({
+      ...input,
+      sourceBytes: new TextEncoder().encode(template),
+    });
+    if (!blank.ok) throw new Error(blank.message);
+    expect(blank.evidence.status).toBe("incomplete-proposal");
+    expect(blank.evidence.failedFormulaIds).toEqual(["f1", "f2"]);
+    const completed = template
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const { formulaId, cellAddress } = JSON.parse(line) as {
+          formulaId: string;
+          cellAddress: string;
+        };
+        return JSON.stringify({ formulaId, cellAddress, value: 0 });
+      })
+      .join("\n");
+    const proposal = await createProvisionalOracleEvidence({
+      ...input,
+      sourceBytes: new TextEncoder().encode(completed),
+    });
+    if (!proposal.ok) throw new Error(proposal.message);
+    expect(proposal.evidence.status).toBe("complete-proposal");
+  });
+  it("accepts the documented JSON calculations format without claiming execution", async () => {
+    const input = await fixture();
+    const sourceBytes = new TextEncoder().encode(
+      JSON.stringify({
+        calculations: [
+          { formulaId: "f1", cellAddress: "A1", result: 0 },
+          {
+            formulaId: "f2",
+            cellAddress: "B1",
+            result: null,
+            executionError: "No result supplied",
+          },
+        ],
+      }),
+    );
+    const proposal = await createProvisionalOracleEvidence({
+      ...input,
+      format: "workbench-json-v1",
+      sourceBytes,
+    });
+    if (!proposal.ok) throw new Error(proposal.message);
+    expect(proposal.evidence.status).toBe("incomplete-proposal");
+    expect(proposal.evidence.failedFormulaIds).toEqual(["f2"]);
+    expect("executedAt" in proposal.evidence).toBe(false);
   });
   it("rejects unknown, duplicate, wrong-cell or malformed results", async () => {
     const input = await fixture();

@@ -1,4 +1,7 @@
-import { preserveProvisionalOracle } from "../../adapters/filesystem/provisional-oracle-workspace";
+import {
+  preserveProvisionalOracle,
+  readProvisionalOracle,
+} from "../../adapters/filesystem/provisional-oracle-workspace";
 import type {
   ProvisionalOracleEvidence,
   ProvisionalOracleFormat,
@@ -991,6 +994,9 @@ export interface CaseOrchestrator {
     file: File,
     format: ProvisionalOracleFormat,
   ) => Promise<ProvisionalOracleEvidence>;
+  readonly restoreProvisionalOracle: (
+    evidenceHash: string,
+  ) => Promise<ProvisionalOracleEvidence>;
   readonly v1XlsxBytes: Uint8Array | null;
   readonly v1OutputMessage: string | null;
   readonly downloadV1Workbook: () => void;
@@ -1350,6 +1356,43 @@ export function useCaseOrchestrator(
       );
     if (!saved.ok) throw new Error(saved.message);
     return saved.evidence;
+  };
+
+  const restoreProvisionalOracle = async (
+    evidenceHash: string,
+  ): Promise<ProvisionalOracleEvidence> => {
+    const parsed = parseSha256(evidenceHash);
+    if (!parsed.ok)
+      throw new Error("Enter a valid lowercase proposal SHA-256 hash.");
+    const currentWorkspace = workspace.current;
+    const currentCaseId = activeCaseId.current;
+    const currentWorkbook = v1WorkbookRef.current;
+    const sequence = architectureBuildSequence.current;
+    if (
+      currentWorkspace === null ||
+      currentCaseId === null ||
+      currentWorkbook === null
+    )
+      throw new Error(
+        "Select an active case and generate its current V1 workbook first.",
+      );
+    const restored = await readProvisionalOracle(
+      currentWorkspace,
+      currentCaseId,
+      parsed.value,
+      currentWorkbook,
+    );
+    if (
+      workspace.current !== currentWorkspace ||
+      activeCaseId.current !== currentCaseId ||
+      v1WorkbookRef.current !== currentWorkbook ||
+      architectureBuildSequence.current !== sequence
+    )
+      throw new Error(
+        "The case or workbook changed while opening the proposal. Try again.",
+      );
+    if (!restored.ok) throw new Error(restored.message);
+    return restored.evidence;
   };
 
   const storeQuarantineItems = (
@@ -6006,6 +6049,7 @@ export function useCaseOrchestrator(
     v1CompilationResult,
     v1Workbook,
     importProvisionalOracle,
+    restoreProvisionalOracle,
     v1XlsxBytes,
     v1OutputMessage,
     downloadV1Workbook,

@@ -62,6 +62,14 @@ test("governed production path exposes unresolved workbook blockers", async ({
   ).toBeVisible();
   await expect(oraclePanel.getByLabel("Local oracle input")).toBeDisabled();
   await expect(
+    oraclePanel.getByLabel("Saved proposal SHA-256 hash"),
+  ).toBeDisabled();
+  await expect(
+    oraclePanel.getByRole("button", { name: "Open saved proposal" }),
+  ).toBeDisabled();
+  await oraclePanel.getByText("View interchange requirements").click();
+  await expect(oraclePanel.getByText(/JSON: an object with a/)).toBeVisible();
+  await expect(
     oraclePanel.getByRole("button", { name: "Save provisional evidence" }),
   ).toBeDisabled();
 

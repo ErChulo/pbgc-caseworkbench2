@@ -152,6 +152,22 @@ export async function readProvisionalOracle<StorageError>(
       return failure(
         "Oracle proposal or source does not match the case workbook.",
       );
+    // A second bounded read catches changes made during reconstruction. It
+    // cannot make the workspace a cross-window transaction.
+    const latestProposal = await readBytes(
+      workspace,
+      proposalPath,
+      MAX_PROPOSAL,
+    );
+    const latestSource = await readBytes(workspace, sourcePath, MAX_SOURCE);
+    if (
+      !sameBytes(proposalBytes, latestProposal) ||
+      !sameBytes(sourceBytes, latestSource) ||
+      !(await matchingCase(workspace, caseId, false))
+    )
+      return failure(
+        "The case, proposal, or source changed during verification.",
+      );
     for (const result of evidence.results) Object.freeze(result);
     Object.freeze(evidence.results);
     Object.freeze(evidence.missingFormulaIds);
@@ -258,6 +274,14 @@ async function writeVerified<StorageError>(
     restored !== null &&
     restored.length === bytes.length &&
     restored.every((byte, index) => byte === bytes[index])
+  );
+}
+
+function sameBytes(expected: Uint8Array, actual: Uint8Array | null): boolean {
+  return (
+    actual !== null &&
+    expected.length === actual.length &&
+    expected.every((byte, index) => byte === actual[index])
   );
 }
 

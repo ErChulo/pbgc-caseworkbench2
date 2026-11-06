@@ -18,7 +18,9 @@ describe("provisional oracle panel", () => {
       createProvisionalOracleTemplate([
         { formulaId: "synthetic-f", cellAddress: "A1" },
       ]),
-    ).toBe('{"formulaId":"synthetic-f","cellAddress":"A1","value":null}\n');
+    ).toBe(
+      '{"formulaId":"synthetic-f","cellAddress":"A1","value":null,"error":"No result supplied"}\n',
+    );
   });
   it("shows the workbook blocker and keeps local import unavailable", () => {
     render(
@@ -27,6 +29,7 @@ describe("provisional oracle panel", () => {
         enabled
         workbookAvailable={false}
         onImport={vi.fn()}
+        onRestore={vi.fn()}
       />,
     );
     expect(screen.getByText(/Generate the current V1 workbook/)).toBeVisible();
@@ -41,6 +44,7 @@ describe("provisional oracle panel", () => {
   it("imports a local file as a proposal and never calls it approval", async () => {
     const evidence = {
       status: "complete-proposal",
+      evidenceContentSha256: "b".repeat(64),
       sourceBytesSha256: "a".repeat(64),
       missingFormulaIds: [],
       failedFormulaIds: [],
@@ -52,6 +56,7 @@ describe("provisional oracle panel", () => {
         enabled
         workbookAvailable
         onImport={onImport}
+        onRestore={vi.fn()}
       />,
     );
     const file = new File(["synthetic"], "results.jsonl", {
@@ -71,6 +76,47 @@ describe("provisional oracle panel", () => {
     ).toBeVisible();
     expect(screen.getByText(/Formula approval stays blocked/)).toBeVisible();
   });
+  it("reopens only the selected proposal and clears the result on verification failure", async () => {
+    const hash = "c".repeat(64);
+    const evidence = {
+      status: "incomplete-proposal",
+      evidenceContentSha256: hash,
+      sourceBytesSha256: "d".repeat(64),
+      missingFormulaIds: ["f2"],
+      failedFormulaIds: ["f1"],
+    } as unknown as ProvisionalOracleEvidence;
+    const onRestore = vi
+      .fn()
+      .mockResolvedValueOnce(evidence)
+      .mockRejectedValueOnce(new Error("Saved source failed verification."));
+    render(
+      <ProvisionalOraclePanel
+        formulaCells={[]}
+        enabled
+        workbookAvailable
+        onImport={vi.fn()}
+        onRestore={onRestore}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Saved proposal SHA-256 hash"), {
+      target: { value: hash },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open saved proposal" }),
+    );
+    expect(await screen.findByText(/Local proposal restored/)).toBeVisible();
+    expect(onRestore).toHaveBeenCalledWith(hash);
+    expect(screen.getByText(/Formula approval stays blocked/)).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open saved proposal" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Saved source failed verification.",
+    );
+    expect(
+      screen.queryByText(/Local proposal restored/),
+    ).not.toBeInTheDocument();
+  });
   it("surfaces import errors and clears prior proposals", async () => {
     const onImport = vi
       .fn()
@@ -81,6 +127,7 @@ describe("provisional oracle panel", () => {
         enabled
         workbookAvailable
         onImport={onImport}
+        onRestore={vi.fn()}
       />,
     );
     fireEvent.change(screen.getByLabelText("Local oracle input"), {

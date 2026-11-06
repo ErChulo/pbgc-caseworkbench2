@@ -10,6 +10,7 @@ export function ProvisionalOraclePanel({
   workbookAvailable,
   formulaCells,
   onImport,
+  onRestore,
 }: {
   readonly enabled: boolean;
   readonly workbookAvailable: boolean;
@@ -17,12 +18,17 @@ export function ProvisionalOraclePanel({
     readonly formulaId: string;
     readonly cellAddress: string;
   }[];
+  readonly onRestore: (
+    evidenceHash: string,
+  ) => Promise<ProvisionalOracleEvidence>;
   readonly onImport: (
     file: File,
     format: ProvisionalOracleFormat,
   ) => Promise<ProvisionalOracleEvidence>;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [restoreHash, setRestoreHash] = useState("");
+  const [origin, setOrigin] = useState<"saved" | "restored">("saved");
   const [format, setFormat] =
     useState<ProvisionalOracleFormat>("workbench-jsonl-v1");
   const [busy, setBusy] = useState(false);
@@ -37,12 +43,33 @@ export function ProvisionalOraclePanel({
     setMessage(null);
     setProposal(null);
     try {
-      setProposal(await onImport(file, format));
+      const imported = await onImport(file, format);
+      setProposal(imported);
+      setRestoreHash(imported.evidenceContentSha256);
+      setOrigin("saved");
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : "Oracle proposal could not be imported.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleRestore() {
+    if (!workbookAvailable || busy || restoreHash.trim() === "") return;
+    setBusy(true);
+    setMessage(null);
+    setProposal(null);
+    try {
+      setProposal(await onRestore(restoreHash.trim()));
+      setOrigin("restored");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Oracle proposal could not be opened.",
       );
     } finally {
       setBusy(false);
@@ -95,9 +122,11 @@ export function ProvisionalOraclePanel({
           <code>{'{"formulaId":"f1","cellAddress":"A1","value":0}'}</code>.
         </p>
         <p>
-          JSON: an object with an <code>oracleId</code>, a <code>version</code>,
-          a UTC <code>executedAt</code>, and a <code>results</code> array of
-          those objects. These fields are assertions, not proof.
+          JSON: an object with a <code>calculations</code> array. Each entry has{" "}
+          <code>formulaId</code>, <code>cellAddress</code>, and
+          <code>result</code>. Optional <code>executionError</code> and
+          <code>decimalPlaces</code> fields describe errors and precision. The
+          file does not prove an execution.
         </p>
       </details>
       {!workbookAvailable ? (
@@ -110,7 +139,9 @@ export function ProvisionalOraclePanel({
       <p>
         The blank JSON Lines template contains the workbook model’s formula IDs
         and cell addresses. Add independently obtained results before import.
-        Blank values are incomplete, not execution evidence.
+        Each blank value has a “No result supplied” error. Replace the value and
+        remove that error only when you have a result. Blank entries are
+        incomplete, not execution evidence.
       </p>
       <button
         type="button"
@@ -155,6 +186,34 @@ export function ProvisionalOraclePanel({
       >
         {busy ? "Checking local input…" : "Save provisional evidence"}
       </button>
+      <label>
+        Saved proposal SHA-256 hash
+        <input
+          type="text"
+          value={restoreHash}
+          maxLength={64}
+          autoComplete="off"
+          spellCheck={false}
+          disabled={!workbookAvailable || busy}
+          onChange={(event) => {
+            setRestoreHash(event.currentTarget.value);
+            setProposal(null);
+            setMessage(null);
+          }}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={!workbookAvailable || busy || restoreHash.trim() === ""}
+        onClick={() => void handleRestore()}
+      >
+        Open saved proposal
+      </button>
+      <p>
+        Copy the proposal hash to find it later in this case. Opening checks the
+        saved input and the current workbook model again. It does not prove an
+        execution or approval.
+      </p>
       {message ? (
         <p role="alert" className="form-message form-message-error">
           {message}
@@ -163,12 +222,13 @@ export function ProvisionalOraclePanel({
       {proposal ? (
         <div role="status" className="notice">
           <p>
-            Local proposal saved:{" "}
+            Local proposal {origin}:{" "}
             {proposal.status === "complete-proposal"
               ? "all formulas have a proposed result"
               : "results are incomplete or contain errors"}
             .
           </p>
+          <p>Proposal hash: {proposal.evidenceContentSha256}.</p>
           <p>
             Source hash: {proposal.sourceBytesSha256}. Missing formulas:{" "}
             {proposal.missingFormulaIds.length}. Failed formulas:{" "}

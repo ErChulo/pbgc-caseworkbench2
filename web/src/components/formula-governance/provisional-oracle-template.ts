@@ -8,7 +8,12 @@ export function createProvisionalOracleTemplate(
   return (
     formulaCells
       .map(({ formulaId, cellAddress }) =>
-        JSON.stringify({ formulaId, cellAddress, value: null }),
+        JSON.stringify({
+          formulaId,
+          cellAddress,
+          value: null,
+          error: "No result supplied",
+        }),
       )
       .join("\n") + "\n"
   );

@@ -173,6 +173,34 @@ describe("local provisional oracle workspace", () => {
       ).ok,
     ).toBe(false);
   });
+  it("rejects a source changed while a saved proposal is being reconstructed", async () => {
+    const input = await fixture();
+    const saved = await preserveProvisionalOracle(input);
+    if (!saved.ok) throw new Error(saved.message);
+    const originalOpen = input.workspace.openChunkReader.bind(input.workspace);
+    let changed = false;
+    input.workspace.openChunkReader = (path) => {
+      const result = originalOpen(path);
+      if (path === saved.sourcePath && !changed) {
+        changed = true;
+        const bytes = input.workspace.files.get(path)?.slice();
+        if (!bytes) throw new Error("Source missing");
+        bytes[0] = (bytes[0] ?? 0) ^ 1;
+        input.workspace.files.set(path, bytes);
+      }
+      return result;
+    };
+    expect(
+      (
+        await readProvisionalOracle(
+          input.workspace,
+          caseId,
+          saved.evidence.evidenceContentSha256,
+          input.workbook,
+        )
+      ).ok,
+    ).toBe(false);
+  });
   it("blocks saving if the local case becomes inactive during directory creation", async () => {
     const input = await fixture();
     const original = input.workspace.createDirectory.bind(input.workspace);

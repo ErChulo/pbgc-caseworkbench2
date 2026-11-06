@@ -327,6 +327,7 @@ export function App({
           workbookAvailable={orchestrator.v1Workbook !== null}
           formulaCells={orchestrator.v1Workbook?.formulaCells ?? []}
           onImport={orchestrator.importProvisionalOracle}
+          onRestore={orchestrator.restoreProvisionalOracle}
         />
         <QuarantineQueue
           items={orchestrator.quarantineItems}
