@@ -1,3 +1,4 @@
+import { readPlanRuleHistory } from "../../adapters/filesystem/plan-rule-history";
 import { verifyRuleCandidatesInWorkspace } from "../../adapters/filesystem/verified-rule-candidates";
 import {
   architectureBuildIsCurrent,
@@ -142,6 +143,8 @@ import {
   authorRule,
   type GovernanceDependencies,
   validateRuleRecord,
+  validateRuleGovernance,
+  validateRuleUnresolvedBlockers,
 } from "../../domain/plan-rules/rule-authoring";
 import { resolveItem } from "../../domain/plan-rules/unresolved-items";
 import type {
@@ -1917,6 +1920,13 @@ export function useCaseOrchestrator(
         });
         return;
       }
+      if (
+        caseId !== null &&
+        !validateContract("planRuleRecord", result.value).valid
+      )
+        throw new Error(
+          "Plan-rule record does not match the approved contract. Select a supported applicability dimension; scenario-specific dimensions require a governed contract update.",
+        );
       const persisted =
         caseId === null
           ? false
@@ -2584,6 +2594,13 @@ export function useCaseOrchestrator(
   ): Promise<boolean> => {
     if (activeWorkspace === null) throw new Error("Workspace unavailable.");
     requireCurrent();
+    const existing = await readPlanRuleHistory(activeWorkspace, caseId);
+    requireCurrent();
+    if (!existing.ok) throw new Error(existing.message);
+    if (canonicalize(existing.rules) !== canonicalize(previewRules))
+      throw new Error(
+        "The saved rule history changed. Reload and review the case.",
+      );
     const created = await activeWorkspace.createDirectory(
       `cases/${caseId}/evidence`,
     );
@@ -2618,6 +2635,17 @@ export function useCaseOrchestrator(
     if (!event.ok)
       throw new Error(
         "The rule was saved, but its review event could not be preserved. Inspect the case history before retrying.",
+      );
+    const restored = await readPlanRuleHistory(activeWorkspace, caseId);
+    if (!restored.ok)
+      throw new Error(
+        `The rule was saved, but history verification failed: ${restored.message} Inspect the case history before retrying.`,
+      );
+    if (
+      canonicalize(restored.rules) !== canonicalize([...existing.rules, rule])
+    )
+      throw new Error(
+        "The rule was saved, but history verification failed. Inspect the case history before retrying.",
       );
     return true;
   };
@@ -3174,6 +3202,7 @@ export function useCaseOrchestrator(
     setCandidateNearDuplicates([]);
     setCandidateSupersessions([]);
     setEvidenceReviewMessage(message);
+    setPreviewRules([]);
   };
 
   const applyProvisionCandidateState = async (
@@ -3252,6 +3281,58 @@ export function useCaseOrchestrator(
     );
   };
 
+  const restorePlanRules = async (
+    activeWorkspace: BrowserDirectoryWorkspace,
+    caseId: Uuid,
+    catalog: EvidenceCatalog,
+    candidates: readonly ProvisionCandidate[],
+    unresolved: readonly UnresolvedItem[],
+    snapshot: PackageSnapshot | null,
+  ): Promise<{
+    readonly rules: readonly PlanRuleRecord[];
+    readonly warning: string | null;
+  }> => {
+    const history = await readPlanRuleHistory(activeWorkspace, caseId);
+    if (!history.ok) return { rules: [], warning: history.message };
+    if (history.rules.length === 0) return { rules: [], warning: null };
+    if (snapshot === null)
+      return {
+        rules: [],
+        warning: "Rule restoration requires the current evidence snapshot.",
+      };
+    for (const rule of history.rules) {
+      const governance = await validateRuleGovernance(rule, catalog, []);
+      const blockers = await validateRuleUnresolvedBlockers(
+        rule.affectedScope,
+        unresolved,
+      );
+      if (!governance.ok || !blockers.ok)
+        return {
+          rules: [],
+          warning:
+            "Rule restoration is blocked by current evidence or unresolved review.",
+        };
+    }
+    const selected = candidatesForRules(history.rules, candidates);
+    if (selected === null)
+      return {
+        rules: [],
+        warning: "A saved rule source candidate is missing or ambiguous.",
+      };
+    const verified = await verifyRuleCandidatesInWorkspace({
+      workspace: activeWorkspace,
+      snapshot,
+      catalog,
+      candidates: selected,
+    });
+    if (!verified.ok)
+      return {
+        rules: [],
+        warning: `Rule restoration blocked: ${verified.message}`,
+      };
+    return { rules: history.rules, warning: null };
+  };
+
   const loadGovernedEvidenceRecords = async (
     caseRecord: CaseRecord,
   ): Promise<void> => {
@@ -3303,7 +3384,23 @@ export function useCaseOrchestrator(
       return;
     }
     const latestUnresolved = latestUnresolvedItems(unresolved.value);
-    if (activeCaseId.current !== caseRecord.caseId) return;
+    const snapshot = priorSnapshot.current;
+    const review = caseReviewState.current;
+    const restoredRules = await restorePlanRules(
+      activeWorkspace,
+      caseRecord.caseId,
+      catalogResult.value,
+      currentCandidates,
+      unresolved.value,
+      snapshot,
+    );
+    if (
+      activeCaseId.current !== caseRecord.caseId ||
+      workspace.current !== activeWorkspace ||
+      priorSnapshot.current !== snapshot ||
+      caseReviewState.current !== review
+    )
+      return;
     invalidateArchitectureBuild();
     evidenceCatalogRef.current = catalogResult.value;
     setEvidenceCatalog(catalogResult.value);
@@ -3314,8 +3411,15 @@ export function useCaseOrchestrator(
     await applyProvisionCandidateState(currentCandidates);
     setEvidenceUnresolvedRecords(unresolved.value);
     setEvidenceUnresolvedItems(latestUnresolved);
+    setPreviewRules(restoredRules.rules);
+    if (restoredRules.warning !== null)
+      setRuleAuthoringOutcome({
+        kind: "error",
+        message: restoredRules.warning,
+      });
     setEvidenceReviewMessage(
-      `Restored governed catalog ${catalogResult.value.catalogContentSha256.slice(0, 12)} and ${String(currentCandidates.length)} proposal-only candidate(s).`,
+      restoredRules.warning ??
+        `Restored governed catalog ${catalogResult.value.catalogContentSha256.slice(0, 12)}, ${String(currentCandidates.length)} proposal-only candidate(s), and ${String(restoredRules.rules.length)} locally recorded rule(s).`,
     );
   };
 
@@ -3331,6 +3435,7 @@ export function useCaseOrchestrator(
     ) {
       return;
     }
+    const restoreSnapshot = priorSnapshot.current;
     const builtAt = dependencies.clock.now();
     const ruleArtifacts = await preservedRuleSourceArtifacts(caseId, builtAt);
     for (const ruleArtifact of ruleArtifacts) {
@@ -3375,6 +3480,7 @@ export function useCaseOrchestrator(
         );
       }),
     ]);
+    const restoreReview = caseReviewState.current;
     const allArtifactHashes = [
       ...new Set(checkpoint.artifacts.map((artifact) => artifact.sha256)),
     ];
@@ -3568,17 +3674,38 @@ export function useCaseOrchestrator(
       clearGovernedEvidenceRecords(unresolvedStored.error.safeMessage);
       return;
     }
-    if (activeCaseId.current !== caseId) return;
+    const restoredRules = await restorePlanRules(
+      activeWorkspace,
+      caseId,
+      built.value.catalog,
+      orderedCandidates,
+      unresolvedStored.value,
+      restoreSnapshot,
+    );
+    if (
+      activeCaseId.current !== caseId ||
+      workspace.current !== activeWorkspace ||
+      priorSnapshot.current !== restoreSnapshot ||
+      caseReviewState.current !== restoreReview
+    )
+      return;
     invalidateArchitectureBuild();
     evidenceCatalogRef.current = built.value.catalog;
     setEvidenceCatalog(built.value.catalog);
     await applyProvisionCandidateState(orderedCandidates);
     setEvidenceUnresolvedRecords(unresolvedStored.value);
     setEvidenceUnresolvedItems(latestUnresolvedItems(unresolvedStored.value));
+    setPreviewRules(restoredRules.rules);
+    if (restoredRules.warning !== null)
+      setRuleAuthoringOutcome({
+        kind: "error",
+        message: restoredRules.warning,
+      });
     setEvidenceReviewMessage(
-      correctedArtifactsSkipped === 0
-        ? `Governed catalog ${built.value.catalog.catalogContentSha256.slice(0, 12)} produced ${String(orderedCandidates.length)} proposal-only candidate(s).`
-        : `${String(correctedArtifactsSkipped)} corrected artifact(s) await a correction-bound candidate contract; no stale candidates were emitted for them.`,
+      restoredRules.warning ??
+        (correctedArtifactsSkipped === 0
+          ? `Governed catalog ${built.value.catalog.catalogContentSha256.slice(0, 12)} produced ${String(orderedCandidates.length)} proposal-only candidate(s).`
+          : `${String(correctedArtifactsSkipped)} corrected artifact(s) await a correction-bound candidate contract; no stale candidates were emitted for them.`),
     );
   };
 
@@ -4056,28 +4183,21 @@ export function useCaseOrchestrator(
       };
       const rules = previewRules;
       for (const rule of rules) {
+        if (!validateContract("planRuleRecord", rule).valid)
+          throw new Error(
+            "A plan-rule record does not match the approved contract. Review the rule before building.",
+          );
         const validation = await validateRuleRecord(rule);
         if (!validation.ok) throw new Error(validation.error);
       }
       if (rules.length > 0) {
         if (snapshot === null)
           throw new Error("Current rule source evidence is unavailable.");
-        const sourceCandidates: ProvisionCandidate[] = [];
-        for (const rule of rules) {
-          const citation = rule.primaryCitation;
-          const matches = provisionCandidates.filter(
-            (candidate) =>
-              candidate.artifactSha256 === citation.artifactSha256 &&
-              candidate.provisionIdentifier === citation.provisionIdentifier &&
-              (candidate.artifactLocator === citation.citationLocator ||
-                candidate.artifactLocator === citation.artifactLocator),
+        const sourceCandidates = candidatesForRules(rules, provisionCandidates);
+        if (sourceCandidates === null)
+          throw new Error(
+            "The rule source candidate is missing or ambiguous. Re-inspect and review the evidence.",
           );
-          if (matches.length !== 1 || matches[0] === undefined)
-            throw new Error(
-              "The rule source candidate is missing or ambiguous. Re-inspect and review the evidence.",
-            );
-          sourceCandidates.push(matches[0]);
-        }
         const verification = await verifyRuleCandidatesInWorkspace({
           workspace: activeWorkspace,
           snapshot,
@@ -5875,6 +5995,26 @@ export function useCaseOrchestrator(
     setManifestSummary,
     view,
   };
+}
+
+function candidatesForRules(
+  rules: readonly PlanRuleRecord[],
+  candidates: readonly ProvisionCandidate[],
+): readonly ProvisionCandidate[] | null {
+  const selected: ProvisionCandidate[] = [];
+  for (const rule of rules) {
+    const citation = rule.primaryCitation;
+    const matches = candidates.filter(
+      (candidate) =>
+        candidate.artifactSha256 === citation.artifactSha256 &&
+        candidate.provisionIdentifier === citation.provisionIdentifier &&
+        (candidate.artifactLocator === citation.citationLocator ||
+          candidate.artifactLocator === citation.artifactLocator),
+    );
+    if (matches.length !== 1 || matches[0] === undefined) return null;
+    selected.push(matches[0]);
+  }
+  return selected;
 }
 
 async function preservedRuleSourceArtifacts(

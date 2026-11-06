@@ -152,10 +152,8 @@ test("governed production path exposes unresolved workbook blockers", async ({
   const submitRule = page.getByRole("button", {
     name: "Validate rule preview",
   });
-  // Author the early-retirement-provision rule: it fully satisfies exactly
-  // the ERD trigger declared in rules/scenario-selection.yaml while leaving
-  // every other scenario with zero matched conditions, so the governed
-  // scenario selector has no partial (incomplete) trigger combinations.
+  // The scenario-specific dimension is not in the approved plan-rule schema.
+  // Verify it is blocked before persistence, then use a supported dimension.
   await page.getByLabel("Dimension").selectOption({
     label: "Early retirement provision",
   });
@@ -193,12 +191,92 @@ test("governed production path exposes unresolved workbook blockers", async ({
     { sha: planHash, text: PLAN_TEXT },
   );
   await submitRule.click();
+  await expect(
+    page.getByRole("alert").filter({
+      hasText: "Plan-rule record does not match the approved contract",
+    }),
+  ).toBeVisible();
+  const savedBeforeValidRule = await page.evaluate(() => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    return [...files.keys()].some((path) =>
+      path.endsWith("rule-records.jsonl"),
+    );
+  });
+  expect(savedBeforeValidRule).toBe(false);
+  await page
+    .getByLabel("Dimension")
+    .selectOption({ label: "Participant group" });
+  await page.getByLabel("Condition value").fill("all synthetic participants");
+  await submitRule.click();
   await expect(submitRule).toBeEnabled();
   await expect(
     page.getByText(
       /Governed validation passed and the plan-rule record was persisted locally/,
     ),
   ).toBeVisible();
+
+  // Reopen the same case and verify the saved rule is restored only after
+  // history, current review and source reinspection.
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
+  await page
+    .getByRole("button", { name: "Open PBGC-V1-PRODUCTION-001" })
+    .click();
+  await page
+    .getByRole("button", { name: "Rule authoring", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Supersession predecessor").locator("option"),
+  ).toHaveCount(2);
+
+  // A missing review event makes the local rule history unusable.
+  const savedEvents = await page.evaluate(() => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const item = [...files.entries()].find(([path]) =>
+      path.endsWith("/reviews/events.jsonl"),
+    );
+    if (!item) throw new Error("Review history not found");
+    const [path, bytes] = item;
+    const original = Array.from(bytes);
+    const lines = new TextDecoder()
+      .decode(bytes)
+      .split("\n")
+      .filter((line) => !line.includes('"plan-rule-recorded"'));
+    files.set(path, new TextEncoder().encode(lines.join("\n")));
+    return { path, original };
+  });
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
+  await page
+    .getByRole("button", { name: "Open PBGC-V1-PRODUCTION-001" })
+    .click();
+  await page
+    .getByRole("button", { name: "Rule authoring", exact: true })
+    .click();
+  await expect(
+    page.getByText("A saved plan-rule record is missing its review event."),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Supersession predecessor").locator("option"),
+  ).toHaveCount(1);
+  await page.evaluate(({ path, original }) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    files.set(path, new Uint8Array(original));
+  }, savedEvents);
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
+  await page
+    .getByRole("button", { name: "Open PBGC-V1-PRODUCTION-001" })
+    .click();
+  await page
+    .getByRole("button", { name: "Rule authoring", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Supersession predecessor").locator("option"),
+  ).toHaveCount(2);
 
   // 4. Population: approve the workbook-derived population candidate.
   const population = await approveSharedPanel(
@@ -338,7 +416,7 @@ test("governed production path exposes unresolved workbook blockers", async ({
     name: "Approve",
     exact: true,
   });
-  await expect(formulaButtons).toHaveCount(4);
+  await expect(formulaButtons).toHaveCount(2);
   for (const button of await formulaButtons.all())
     await expect(button).toBeDisabled();
   await expect(
