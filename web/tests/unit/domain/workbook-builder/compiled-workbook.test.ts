@@ -17,10 +17,22 @@ import {
 } from "../../../fixtures/formula-compiler";
 
 async function fixture() {
-  const base = await buildSpecV2();
+  const base = await buildSpecV2([
+    { id: "FORMULA-F1", field: "SUBTOTAL", cell: "C1", text: "=1+2" },
+    {
+      id: "FORMULA-F2",
+      field: "BENEFIT",
+      cell: "D1",
+      text: "=C1*0.01",
+      dependencies: ["FORMULA-F1"],
+    },
+  ]);
   const profileHash = "e".repeat(64) as Sha256;
   const withoutHash = {
     ...base,
+    cellMappings: base.cellMappings.filter(
+      (mapping) => mapping.iobClassification !== "I",
+    ),
     architectureLineage: {
       ...base.architectureLineage,
       population: [
@@ -159,5 +171,47 @@ describe("compiled workbook generation", () => {
       artifact: forged,
     });
     expect(result.ok).toBe(false);
+  });
+  it("blocks unverified participant input even when a column array is supplied", async () => {
+    const { input } = await fixture();
+    const source = await buildSpecV2();
+    const changed = {
+      ...input.buildSpec,
+      formulas: source.formulas,
+      cellMappings: source.cellMappings,
+      executionOrder: source.executionOrder,
+    };
+    const buildSpec = {
+      ...changed,
+      buildSpecContentSha256: await computeContentHash(changed),
+    };
+    const compilation = await compileBuildSpec({
+      buildSpec,
+      compilerVersion: "1.0.0",
+      clock: fixedClock,
+      uuid: fixedUuid,
+    });
+    expect(compilation.status).toBe("complete");
+    const result = await buildCompiledWorkbook(
+      {
+        ...input,
+        buildSpec,
+        populationData: new Map([
+          [
+            "RETIREES",
+            new Map([
+              ["COMP", [50000]],
+              ["YOS", [10]],
+            ]),
+          ],
+        ]),
+      },
+      compilation,
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.errors.map((error) => error.code)).toContain(
+        "POPULATION_ROUTING_UNVERIFIED",
+      );
   });
 });

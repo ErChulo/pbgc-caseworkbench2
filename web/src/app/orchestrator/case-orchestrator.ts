@@ -4015,32 +4015,12 @@ export function useCaseOrchestrator(
         populationProfile.effectiveWorkbookProfileContentSha256 ??
         buildSpec.buildSpecContentSha256;
 
-      let populationData:
-        | ReadonlyMap<string, ReadonlyMap<string, readonly unknown[]>>
-        | undefined;
-      if (approvedPopulationItem?.workbook) {
-        const dataMap = new Map<string, Map<string, unknown[]>>();
-        for (const sheet of approvedPopulationItem.workbook.sheets) {
-          const columnMap = new Map<string, unknown[]>();
-          for (const cell of sheet.cells) {
-            const colMatch = /^([A-Z]+)/.exec(cell.address);
-            const column = colMatch?.[1] ?? "A";
-            const existing = columnMap.get(column) ?? [];
-            existing.push(cell.storedValue);
-            columnMap.set(column, existing);
-          }
-          dataMap.set(sheet.name, columnMap);
-        }
-        populationData = dataMap;
-      }
-
       const workbookResult = await buildCompiledWorkbook(
         {
           buildSpec,
           populationProfile,
           workbookProfileContentSha256: workbookContentSha256,
           generatorVersion: "1.0.0",
-          populationData,
         },
         compilation,
       );

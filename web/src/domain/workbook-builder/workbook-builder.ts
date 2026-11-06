@@ -1,3 +1,4 @@
+import { normalizeCellAddress } from "../formula-compiler/reference-codec";
 import { compileBuildSpec } from "../formula-compiler/compiler";
 import { validateCompiledArtifact } from "../formula-compiler/serialization";
 import type {
@@ -100,6 +101,55 @@ export async function buildCompiledWorkbook(
     fresh.diagnostics.some((diagnostic) => diagnostic.blocksDownstream)
   )
     return blocked();
+  const targets = new Set<string>();
+  for (const formula of fresh.artifact.deterministicPayload.compiledFormulas) {
+    const address = normalizeCellAddress(formula.target.cellAddress);
+    if (address === null) return blocked();
+    const key = `${formula.target.tabName.toUpperCase()}!${address.replaceAll("$", "")}`;
+    if (targets.has(key)) {
+      return {
+        ok: false,
+        errors: [
+          {
+            code: "FORMULA_TARGET_COLLISION",
+            severity: "error",
+            message: "More than one scenario writes to the same workbook cell.",
+            affectedCells: [formula.target.cellAddress],
+            affectedNames: [],
+            detail:
+              "Separate scenario outputs need distinct approved cell targets.",
+            remediation:
+              "Resolve the scenario target layout and regenerate the BuildSpec.",
+          },
+        ],
+      };
+    }
+    targets.add(key);
+  }
+  if (
+    input.buildSpec.cellMappings.some(
+      (mapping) =>
+        mapping.iobClassification === "I" || mapping.iobClassification === "B",
+    )
+  ) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: "POPULATION_ROUTING_UNVERIFIED",
+          severity: "error",
+          message:
+            "Approved participant-level population routing is not available.",
+          affectedCells: [],
+          affectedNames: [],
+          detail:
+            "The current column arrays do not bind input values to an approved participant and workbook row.",
+          remediation:
+            "Complete and review participant-level population routing before generating the workbook.",
+        },
+      ],
+    };
+  }
   return buildWorkbookInternal(input, fresh.artifact);
 }
 

@@ -36,11 +36,6 @@ import type { FormulaGovernanceInput } from "../../src/domain/build-spec/models"
 import { compileBuildSpec } from "../../src/domain/formula-compiler/compiler";
 import { buildCompiledWorkbook } from "../../src/domain/workbook-builder/workbook-builder";
 import {
-  buildXLSXSpec,
-  writeXLSXBuffer,
-} from "../../src/domain/workbook-builder/serialization";
-import * as XLSX from "xlsx";
-import {
   candidate,
   citation,
   evidenceCatalog,
@@ -463,7 +458,7 @@ async function approvedFormulaGovernance(
 }
 
 describe("Feature 005/006/007 governed production pipeline integration", () => {
-  it("completes the Def_Act Non-Vested production path to a compiled V1 workbook", async () => {
+  it("blocks colliding scenario targets in the Def_Act Non-Vested pipeline", async () => {
     const fixture = await governedDefActFixture();
     const { workbookProfileSha256 } = fixture;
 
@@ -537,17 +532,6 @@ describe("Feature 005/006/007 governed production pipeline integration", () => {
     });
     expect(compilation.status).toBe("complete");
 
-    const populationData = new Map<string, Map<string, unknown[]>>();
-    const columnMap = new Map<string, unknown[]>();
-    for (const cell of fixture.population.candidates[0]?.workbook.sheets[0]
-      ?.cells ?? []) {
-      const column = /^([A-Z]+)/u.exec(cell.address)?.[1] ?? "A";
-      const existing = columnMap.get(column) ?? [];
-      existing.push(cell.storedValue);
-      columnMap.set(column, existing);
-    }
-    populationData.set("Def_Act Non-Vested", columnMap);
-
     const workbookResult = await buildCompiledWorkbook(
       {
         buildSpec,
@@ -559,35 +543,13 @@ describe("Feature 005/006/007 governed production pipeline integration", () => {
         },
         workbookProfileContentSha256: workbookProfileSha256,
         generatorVersion: "1.0.0",
-        populationData,
       },
       compilation,
     );
-    expect(workbookResult.ok).toBe(true);
-    if (!workbookResult.ok) return;
-    const artifact = compilation.artifact;
-    if (!artifact) throw new Error("Expected compiled artifact.");
-    const sheetSpec = buildXLSXSpec(workbookResult.workbook);
-    const parsed = XLSX.read(writeXLSXBuffer(sheetSpec), {
-      type: "buffer",
-      sheetStubs: true,
-    });
-    for (const compiled of artifact.deterministicPayload.compiledFormulas) {
-      const cell = parsed.Sheets[compiled.target.tabName]?.[
-        compiled.target.cellAddress
-      ] as XLSX.CellObject | undefined;
-      expect(cell?.f).toBe(compiled.canonicalFormulaText);
-      expect(
-        workbookResult.workbook.formulaCells.find(
-          (entry) => entry.formulaId === compiled.formulaId,
-        )?.formulaText,
-      ).toBe(`=${compiled.canonicalFormulaText}`);
-    }
-    const sheetNames = buildXLSXSpec(workbookResult.workbook).sheets.map(
-      (sheet) => sheet.name,
-    );
-    expect(sheetNames).toEqual(
-      expect.arrayContaining(["Summary", "Tables", "UD Table"]),
-    );
+    expect(workbookResult.ok).toBe(false);
+    if (!workbookResult.ok)
+      expect(workbookResult.errors.map((error) => error.code)).toContain(
+        "FORMULA_TARGET_COLLISION",
+      );
   });
 });
