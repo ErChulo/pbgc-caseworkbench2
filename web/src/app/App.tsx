@@ -303,6 +303,8 @@ export function App({
           }
           record={orchestrator.planSummaryRecord}
           message={orchestrator.planSummaryMessage}
+          reviewer={orchestrator.sharedReviewer}
+          onReviewerChange={orchestrator.setSharedReviewer}
           onInitialize={orchestrator.initializePlanSummary}
           onApproveAttribute={orchestrator.approvePlanSummaryAttribute}
         />

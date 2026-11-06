@@ -1,0 +1,7 @@
+# Plan Summary integrity
+
+Plan Summary attribute creation previously generated two UUIDs: the stored attribute ID differed from the ID included in its hash. Subsequent record hashes could also incorporate the prior record hash through object spread. Both are corrected. Transitions now check attribute, section and record consistency and section/attribute inventory before use. Duplicate field replacement is blocked until there is an explicit supersession workflow. Approval requires an unblocked proposed attribute, its exact nonblank value, a source citation, and a recorded reviewer and rationale. Empty, unreviewed or blocked summaries cannot be promoted to preliminary, and non-draft summaries cannot be edited through these functions. Older inconsistently hashed records require reconstruction; they are not silently accepted.
+
+The Plan Summary UI now asks for a reviewer rather than fabricating an anonymous actuary and explains that locally asserted identity and authority are not authenticated. These checks do not authenticate the reviewer or source, prove citation authority, resolve conflicts, or establish that the summary is complete. The UI currently initializes an empty draft and does not yet implement a complete evidence-to-attribute authoring and review workflow.
+
+Synthetic unit tests exercise identity/hash consistency, allowed transitions, tampering, missing citations, duplicates and invalid approval attempts. A synthetic Chromium test exercises initialization and the reviewer disclaimer.

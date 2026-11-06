@@ -10,6 +10,8 @@ interface PlanSummaryPanelProps {
   readonly enabled: boolean;
   readonly record: PlanSummaryRecord | null;
   readonly message: string | null;
+  readonly reviewer: string;
+  readonly onReviewerChange: (value: string) => void;
   readonly onInitialize: () => Promise<void>;
   readonly onApproveAttribute: (
     attributeId: string,
@@ -22,6 +24,8 @@ export function PlanSummaryPanel({
   enabled,
   record,
   message,
+  reviewer,
+  onReviewerChange,
   onInitialize,
   onApproveAttribute,
 }: PlanSummaryPanelProps): React.ReactElement {
@@ -92,6 +96,23 @@ export function PlanSummaryPanel({
         )}
       </div>
 
+      {enabled && record && (
+        <div className="shared-reviewer">
+          <label>
+            Plan Summary reviewer
+            <input
+              value={reviewer}
+              onChange={(event) => {
+                onReviewerChange(event.currentTarget.value);
+              }}
+            />
+          </label>
+          <p>
+            Reviewer identity and authority are not authenticated by this
+            application.
+          </p>
+        </div>
+      )}
       {!enabled && (
         <div className="notice">
           <p>
@@ -263,7 +284,9 @@ export function PlanSummaryPanel({
                                 onClick={() => {
                                   void handleApprove(attribute);
                                 }}
-                                disabled={!approvalRationale.trim()}
+                                disabled={
+                                  !approvalRationale.trim() || !reviewer.trim()
+                                }
                               >
                                 Approve
                               </button>

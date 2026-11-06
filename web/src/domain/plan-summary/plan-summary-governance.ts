@@ -59,6 +59,9 @@ export async function addPlanSummaryAttribute(
   humanActor: HumanActor,
   deps: PlanSummaryGovernanceDependencies,
 ): Promise<PlanSummaryRecord> {
+  await requireValidRecord(record);
+  if (record.overallStatus !== "draft")
+    throw new Error("Only draft Plan Summaries can be changed.");
   const sectionIndex = record.sections.findIndex(
     (s) => s.sectionId === sectionId,
   );
@@ -75,8 +78,13 @@ export async function addPlanSummaryAttribute(
     (a) => a.fieldPath === fieldPath,
   );
 
+  if (existingAttribute)
+    throw new Error(
+      "Existing attributes require an explicit supersession workflow.",
+    );
+  const attributeId = deps.uuid.generate();
   const attribute: PlanSummaryAttribute = {
-    attributeId: existingAttribute?.attributeId ?? deps.uuid.generate(),
+    attributeId,
     sectionId,
     fieldPath,
     fieldValue,
@@ -95,7 +103,7 @@ export async function addPlanSummaryAttribute(
     reviewStatus: "provisional",
     approvalRationale: "",
     attributeContentSha256: await computeAttributeHash({
-      attributeId: existingAttribute?.attributeId ?? deps.uuid.generate(),
+      attributeId,
       sectionId,
       fieldPath,
       fieldValue,
@@ -115,11 +123,7 @@ export async function addPlanSummaryAttribute(
       continue;
     }
 
-    const updatedAttributes = existingAttribute
-      ? currentSection.attributes.map((a) =>
-          a.attributeId === existingAttribute.attributeId ? attribute : a,
-        )
-      : [...currentSection.attributes, attribute];
+    const updatedAttributes = [...currentSection.attributes, attribute];
 
     const sectionHash = await computeSectionHash(updatedAttributes);
     updatedSections.push({
@@ -148,6 +152,19 @@ export async function approvePlanSummaryAttribute(
   humanActor: HumanActor,
   deps: PlanSummaryGovernanceDependencies,
 ): Promise<{ record: PlanSummaryRecord; decision: PlanSummaryDecision }> {
+  await requireValidRecord(record);
+  if (record.overallStatus !== "draft")
+    throw new Error("Only draft Plan Summaries can be changed.");
+  if (
+    (humanActor as { actorType: string }).actorType !== "human" ||
+    !humanActor.actorKey.trim() ||
+    !humanActor.displayName.trim() ||
+    !humanActor.authorityContext.trim() ||
+    !rationale.trim()
+  )
+    throw new Error(
+      "A reviewer, authority context and rationale are required.",
+    );
   let found = false;
   const updatedSections: PlanSummarySection[] = [];
 
@@ -167,10 +184,36 @@ export async function approvePlanSummaryAttribute(
       continue;
     }
 
+    if (
+      attribute.status !== "proposed" ||
+      attribute.blockedReason !== null ||
+      attribute.conflictingValues.length > 0
+    )
+      throw new Error(
+        "Only unblocked, non-conflicting proposed attributes can be approved.",
+      );
+    if (
+      selectedValue === null ||
+      selectedValue.trim() === "" ||
+      selectedValue !== attribute.fieldValue
+    )
+      throw new Error("Approval must select the exact proposed value.");
+    if (
+      attribute.citations.length === 0 ||
+      (selectedCitation !== null &&
+        !attribute.citations.some(
+          (citation) =>
+            JSON.stringify(citation) === JSON.stringify(selectedCitation),
+        ))
+    )
+      throw new Error(
+        "Approval requires a citation from the proposed evidence.",
+      );
     const approvedAttribute: PlanSummaryAttribute = {
       ...attribute,
       status: "approved",
       fieldValue: selectedValue,
+      citations: selectedCitation ? [selectedCitation] : attribute.citations,
       reviewStatus: "human-approved",
       approvalRationale: rationale,
       attributeContentSha256: await computeAttributeHash({
@@ -230,6 +273,7 @@ export async function approvePlanSummaryAttribute(
 export async function detectConflicts(
   record: PlanSummaryRecord,
 ): Promise<PlanSummaryRecord> {
+  await requireValidRecord(record);
   const updatedSections: PlanSummarySection[] = [];
 
   for (const section of record.sections) {
@@ -270,15 +314,27 @@ export async function promotePlanSummaryToPreliminary(
   humanActor: HumanActor,
   deps: PlanSummaryGovernanceDependencies,
 ): Promise<PlanSummaryRecord> {
-  const allApproved = record.sections.every((section) =>
-    section.attributes.every(
-      (attr) => attr.status === "approved" || attr.status === "blocked",
-    ),
-  );
+  await requireValidRecord(record);
+  if (record.overallStatus !== "draft")
+    throw new Error("Only draft Plan Summaries can be changed.");
+  if (
+    (humanActor as { actorType: string }).actorType !== "human" ||
+    !humanActor.actorKey.trim() ||
+    !humanActor.displayName.trim() ||
+    !humanActor.authorityContext.trim()
+  )
+    throw new Error("A reviewer and authority context are required.");
+  const attributes = record.sections.flatMap((section) => section.attributes);
+  const allApproved =
+    attributes.length > 0 &&
+    attributes.every(
+      (attr) =>
+        attr.status === "approved" && attr.reviewStatus === "human-approved",
+    );
 
   if (!allApproved) {
     throw new Error(
-      "Cannot promote to preliminary: all attributes must be approved or blocked.",
+      "Cannot promote to preliminary: all attributes must be approved and at least one is required.",
     );
   }
 
@@ -291,6 +347,57 @@ export async function promotePlanSummaryToPreliminary(
 
   const contentSha256 = await computeRecordHash(updatedRecord);
   return { ...updatedRecord, recordContentSha256: contentSha256 };
+}
+
+async function requireValidRecord(record: PlanSummaryRecord): Promise<void> {
+  if (
+    record.sections.length !== PLAN_SUMMARY_SECTIONS.length ||
+    PLAN_SUMMARY_SECTIONS.some(
+      (definition) =>
+        record.sections.filter(
+          (section) =>
+            section.sectionId === definition.sectionId &&
+            section.sectionTitle === definition.sectionTitle,
+        ).length !== 1,
+    )
+  )
+    throw new Error("Plan Summary section inventory is invalid.");
+  const ids = new Set<string>();
+  for (const section of record.sections) {
+    const fields = new Set<string>();
+    for (const attribute of section.attributes) {
+      if (
+        ids.has(attribute.attributeId) ||
+        fields.has(attribute.fieldPath) ||
+        !attribute.fieldPath.trim()
+      )
+        throw new Error("Plan Summary attribute inventory is invalid.");
+      ids.add(attribute.attributeId);
+      fields.add(attribute.fieldPath);
+      if (
+        attribute.sectionId !== section.sectionId ||
+        (await computeAttributeHash({
+          attributeId: attribute.attributeId,
+          sectionId: attribute.sectionId,
+          fieldPath: attribute.fieldPath,
+          fieldValue: attribute.fieldValue,
+          source: attribute.source,
+          citations: attribute.citations,
+          effectiveDate: attribute.effectiveDate,
+          adoptionDate: attribute.adoptionDate,
+          phaseInPercentage: attribute.phaseInPercentage,
+        })) !== attribute.attributeContentSha256
+      )
+        throw new Error("Plan Summary attribute integrity check failed.");
+    }
+    if (
+      (await computeSectionHash(section.attributes)) !==
+      section.sectionContentSha256
+    )
+      throw new Error("Plan Summary section integrity check failed.");
+  }
+  if ((await computeRecordHash(record)) !== record.recordContentSha256)
+    throw new Error("Plan Summary record integrity check failed.");
 }
 
 async function computeAttributeHash(
@@ -322,7 +429,10 @@ async function computeSectionHash(
 async function computeRecordHash(
   record: Omit<PlanSummaryRecord, "recordContentSha256">,
 ): Promise<Sha256> {
-  const hash = await hashTyped(record, { typeName: "PlanSummaryRecord" });
+  const { recordContentSha256: ignored, ...content } =
+    record as PlanSummaryRecord;
+  void ignored;
+  const hash = await hashTyped(content, { typeName: "PlanSummaryRecord" });
   return hash as Sha256;
 }
 

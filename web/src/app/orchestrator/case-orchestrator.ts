@@ -3734,6 +3734,12 @@ export function useCaseOrchestrator(
       return;
     }
     setPlanSummaryMessage(null);
+    if (!sharedReviewer.trim() || !rationale.trim()) {
+      setPlanSummaryMessage(
+        "A reviewer and rationale are required for Plan Summary review.",
+      );
+      return;
+    }
     try {
       const parsedAttributeId = parseUuid(attributeId);
       if (!parsedAttributeId.ok) {
@@ -3748,11 +3754,10 @@ export function useCaseOrchestrator(
         rationale,
         {
           actorType: "human",
-          actorKey:
-            sharedReviewer.trim() === "" ? "anonymous" : sharedReviewer.trim(),
-          displayName:
-            sharedReviewer.trim() === "" ? "Anonymous" : sharedReviewer.trim(),
-          authorityContext: "actuary",
+          actorKey: sharedReviewer.trim(),
+          displayName: sharedReviewer.trim(),
+          authorityContext:
+            "Locally asserted plan-summary reviewer; authority not verified",
         },
         {
           uuid: { generate: () => dependencies.uuid.generate() },

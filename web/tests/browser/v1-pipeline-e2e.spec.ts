@@ -48,10 +48,17 @@ test.describe("V1 Pipeline End-to-End", () => {
         "Initialize the Plan Summary to begin documenting plan attributes from approved evidence.",
       ),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Initialize Plan Summary" }).click();
+    const summary = page.getByRole("region", { name: "Plan Summary" });
+    await expect(summary.getByLabel("Plan Summary reviewer")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Initialize Plan Summary" }),
+      summary.getByText(
+        /Reviewer identity and authority are not authenticated/u,
+      ),
     ).toBeVisible();
-
+    await expect(
+      summary.getByRole("navigation", { name: "Plan Summary sections" }),
+    ).toBeVisible();
     expect(outboundRequests).toEqual([]);
   });
 
