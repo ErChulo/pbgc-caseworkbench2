@@ -30,6 +30,7 @@ describe("provisional oracle panel", () => {
         workbookAvailable={false}
         onImport={vi.fn()}
         onRestore={vi.fn()}
+        onFind={vi.fn()}
       />,
     );
     expect(screen.getByText(/Generate the current V1 workbook/)).toBeVisible();
@@ -57,6 +58,7 @@ describe("provisional oracle panel", () => {
         workbookAvailable
         onImport={onImport}
         onRestore={vi.fn()}
+        onFind={vi.fn()}
       />,
     );
     const file = new File(["synthetic"], "results.jsonl", {
@@ -75,6 +77,37 @@ describe("provisional oracle panel", () => {
       await screen.findByText(/all formulas have a proposed result/),
     ).toBeVisible();
     expect(screen.getByText(/Formula approval stays blocked/)).toBeVisible();
+  });
+  it("lists unverified names without a workbook and requires a separate verified open", async () => {
+    const hash = "a".repeat(64);
+    const onFind = vi
+      .fn()
+      .mockResolvedValue({ hashes: [hash], ignoredEntries: 1 });
+    const onRestore = vi.fn();
+    render(
+      <ProvisionalOraclePanel
+        formulaCells={[]}
+        enabled
+        workbookAvailable={false}
+        onImport={vi.fn()}
+        onRestore={onRestore}
+        onFind={onFind}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Find saved proposal names" }),
+    );
+    expect(
+      await screen.findByText(/Unexpected entries not listed: 1/),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: `Select ${hash}` }));
+    expect(screen.getByLabelText("Saved proposal SHA-256 hash")).toHaveValue(
+      hash,
+    );
+    expect(
+      screen.getByRole("button", { name: "Open saved proposal" }),
+    ).toBeDisabled();
+    expect(onRestore).not.toHaveBeenCalled();
   });
   it("reopens only the selected proposal and clears the result on verification failure", async () => {
     const hash = "c".repeat(64);
@@ -96,6 +129,7 @@ describe("provisional oracle panel", () => {
         workbookAvailable
         onImport={vi.fn()}
         onRestore={onRestore}
+        onFind={vi.fn()}
       />,
     );
     fireEvent.change(screen.getByLabelText("Saved proposal SHA-256 hash"), {
@@ -128,6 +162,7 @@ describe("provisional oracle panel", () => {
         workbookAvailable
         onImport={onImport}
         onRestore={vi.fn()}
+        onFind={vi.fn()}
       />,
     );
     fireEvent.change(screen.getByLabelText("Local oracle input"), {

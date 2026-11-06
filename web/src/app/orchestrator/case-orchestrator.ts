@@ -1,6 +1,7 @@
 import {
   preserveProvisionalOracle,
   readProvisionalOracle,
+  listProvisionalOracleCandidates,
 } from "../../adapters/filesystem/provisional-oracle-workspace";
 import type {
   ProvisionalOracleEvidence,
@@ -994,6 +995,10 @@ export interface CaseOrchestrator {
     file: File,
     format: ProvisionalOracleFormat,
   ) => Promise<ProvisionalOracleEvidence>;
+  readonly findProvisionalOracles: () => Promise<{
+    readonly hashes: readonly string[];
+    readonly ignoredEntries: number;
+  }>;
   readonly restoreProvisionalOracle: (
     evidenceHash: string,
   ) => Promise<ProvisionalOracleEvidence>;
@@ -1356,6 +1361,27 @@ export function useCaseOrchestrator(
       );
     if (!saved.ok) throw new Error(saved.message);
     return saved.evidence;
+  };
+
+  const findProvisionalOracles = async (): Promise<{
+    readonly hashes: readonly string[];
+    readonly ignoredEntries: number;
+  }> => {
+    const currentWorkspace = workspace.current;
+    const currentCaseId = activeCaseId.current;
+    if (currentWorkspace === null || currentCaseId === null)
+      throw new Error("Select a local case first.");
+    const found = await listProvisionalOracleCandidates(
+      currentWorkspace,
+      currentCaseId,
+    );
+    if (
+      workspace.current !== currentWorkspace ||
+      activeCaseId.current !== currentCaseId
+    )
+      throw new Error("The case changed during listing. Try again.");
+    if (!found.ok) throw new Error(found.message);
+    return { hashes: found.hashes, ignoredEntries: found.ignoredEntries };
   };
 
   const restoreProvisionalOracle = async (
@@ -6050,6 +6076,7 @@ export function useCaseOrchestrator(
     v1Workbook,
     importProvisionalOracle,
     restoreProvisionalOracle,
+    findProvisionalOracles,
     v1XlsxBytes,
     v1OutputMessage,
     downloadV1Workbook,

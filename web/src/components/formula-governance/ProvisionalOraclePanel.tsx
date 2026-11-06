@@ -11,6 +11,7 @@ export function ProvisionalOraclePanel({
   formulaCells,
   onImport,
   onRestore,
+  onFind,
 }: {
   readonly enabled: boolean;
   readonly workbookAvailable: boolean;
@@ -18,6 +19,10 @@ export function ProvisionalOraclePanel({
     readonly formulaId: string;
     readonly cellAddress: string;
   }[];
+  readonly onFind: () => Promise<{
+    readonly hashes: readonly string[];
+    readonly ignoredEntries: number;
+  }>;
   readonly onRestore: (
     evidenceHash: string,
   ) => Promise<ProvisionalOracleEvidence>;
@@ -28,6 +33,10 @@ export function ProvisionalOraclePanel({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [restoreHash, setRestoreHash] = useState("");
+  const [candidates, setCandidates] = useState<{
+    readonly hashes: readonly string[];
+    readonly ignoredEntries: number;
+  } | null>(null);
   const [origin, setOrigin] = useState<"saved" | "restored">("saved");
   const [format, setFormat] =
     useState<ProvisionalOracleFormat>("workbench-jsonl-v1");
@@ -47,11 +56,29 @@ export function ProvisionalOraclePanel({
       setProposal(imported);
       setRestoreHash(imported.evidenceContentSha256);
       setOrigin("saved");
+      setCandidates(null);
     } catch (error) {
       setMessage(
         error instanceof Error
           ? error.message
           : "Oracle proposal could not be imported.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handleFind() {
+    if (busy) return;
+    setBusy(true);
+    setMessage(null);
+    setCandidates(null);
+    try {
+      setCandidates(await onFind());
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Saved proposals could not be listed.",
       );
     } finally {
       setBusy(false);
@@ -186,6 +213,44 @@ export function ProvisionalOraclePanel({
       >
         {busy ? "Checking local input…" : "Save provisional evidence"}
       </button>
+      <button type="button" disabled={busy} onClick={() => void handleFind()}>
+        Find saved proposal names
+      </button>
+      <p>
+        Names are unverified. Select a name, then open it against the current
+        workbook. Opening checks local consistency only.
+      </p>
+      {candidates ? (
+        <div role="status">
+          {candidates.hashes.length === 0 ? (
+            <p>No saved proposal names found.</p>
+          ) : (
+            <ul>
+              {candidates.hashes.map((hash) => (
+                <li key={hash}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      setRestoreHash(hash);
+                      setProposal(null);
+                      setMessage(null);
+                    }}
+                  >
+                    Select {hash}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {candidates.ignoredEntries > 0 ? (
+            <p>
+              Unexpected entries not listed: {candidates.ignoredEntries}.
+              Inspect the local workspace if needed.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       <label>
         Saved proposal SHA-256 hash
         <input
@@ -194,7 +259,7 @@ export function ProvisionalOraclePanel({
           maxLength={64}
           autoComplete="off"
           spellCheck={false}
-          disabled={!workbookAvailable || busy}
+          disabled={busy}
           onChange={(event) => {
             setRestoreHash(event.currentTarget.value);
             setProposal(null);

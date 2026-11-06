@@ -63,7 +63,47 @@ test("governed production path exposes unresolved workbook blockers", async ({
   await expect(oraclePanel.getByLabel("Local oracle input")).toBeDisabled();
   await expect(
     oraclePanel.getByLabel("Saved proposal SHA-256 hash"),
-  ).toBeDisabled();
+  ).toBeEnabled();
+  await oraclePanel
+    .getByRole("button", { name: "Find saved proposal names" })
+    .click();
+  await expect(
+    oraclePanel.getByText("No saved proposal names found."),
+  ).toBeVisible();
+  const candidateHash = "a".repeat(64);
+  await page.evaluate(async (hash) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = [...files.keys()].find((item) =>
+      /^cases\/[^/]+\/case\.json$/u.test(item),
+    );
+    if (!path) throw new Error("Synthetic case not found");
+    const caseId = path.split("/")[1];
+    if (!caseId) throw new Error("Synthetic case ID missing");
+    const root = await (
+      globalThis as unknown as {
+        showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
+      }
+    ).showDirectoryPicker();
+    let current = root;
+    for (const name of ["cases", caseId, "evidence", "provisional-oracles"])
+      current = await current.getDirectoryHandle(name, { create: true });
+    await current.getDirectoryHandle(hash, { create: true });
+    await current.getDirectoryHandle("unexpected", { create: true });
+  }, candidateHash);
+  await oraclePanel
+    .getByRole("button", { name: "Find saved proposal names" })
+    .click();
+  await expect(
+    oraclePanel.getByText(/Unexpected entries not listed: 1/),
+  ).toBeVisible();
+  await oraclePanel
+    .getByRole("button", { name: `Select ${candidateHash}` })
+    .click();
+  await expect(
+    oraclePanel.getByLabel("Saved proposal SHA-256 hash"),
+  ).toHaveValue(candidateHash);
   await expect(
     oraclePanel.getByRole("button", { name: "Open saved proposal" }),
   ).toBeDisabled();

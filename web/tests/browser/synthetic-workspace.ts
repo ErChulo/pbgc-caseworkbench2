@@ -66,6 +66,18 @@ export async function installSyntheticWorkspace(page: Page) {
             }),
           } as unknown as FileSystemFileHandle;
         },
+        values: async function* () {
+          const base = prefix ? `${prefix}/` : "";
+          for (const [path, child] of directories) {
+            const name = path.startsWith(base) ? path.slice(base.length) : "";
+            if (name && !name.includes("/")) yield child;
+          }
+          for (const path of files.keys()) {
+            const name = path.startsWith(base) ? path.slice(base.length) : "";
+            if (name && !name.includes("/"))
+              yield { kind: "file", name } as FileSystemFileHandle;
+          }
+        },
         removeEntry: async () => undefined,
         resolve: async () => null,
       } as unknown as FileSystemDirectoryHandle;

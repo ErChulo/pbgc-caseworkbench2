@@ -30,6 +30,99 @@ type StoreResult =
     }
   | { readonly ok: false; readonly message: string };
 
+export type ProvisionalOracleCandidates =
+  | {
+      readonly ok: true;
+      readonly hashes: readonly Sha256[];
+      readonly ignoredEntries: number;
+    }
+  | { readonly ok: false; readonly message: string };
+
+/** Enumerated names are unverified candidates, not evidence or approval. */
+export async function listProvisionalOracleCandidates<StorageError>(
+  workspace: Pick<WorkspacePort<StorageError>, "list" | "openChunkReader">,
+  caseId: Uuid,
+): Promise<ProvisionalOracleCandidates> {
+  try {
+    if (
+      !parseUuid(caseId).ok ||
+      !(await matchingCase(workspace, caseId, false))
+    )
+      return {
+        ok: false,
+        message: "The local case is unavailable or invalid.",
+      };
+    const directory = `cases/${caseId}/evidence/provisional-oracles`;
+    const listed = await workspace.list(directory);
+    if (!listed.ok) {
+      const error: unknown = listed.error;
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "NOT_FOUND"
+      ) {
+        if (!(await matchingCase(workspace, caseId, false)))
+          return {
+            ok: false,
+            message: "The local case changed during listing.",
+          };
+        return { ok: true, hashes: Object.freeze([]), ignoredEntries: 0 };
+      }
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "TOO_MANY_ENTRIES"
+      )
+        return {
+          ok: false,
+          message:
+            "There are too many entries to list safely. Use a known proposal hash.",
+        };
+      return {
+        ok: false,
+        message:
+          "Saved proposals could not be listed. Check local access or use a known proposal hash.",
+      };
+    }
+    if (listed.value.length > 256)
+      return {
+        ok: false,
+        message:
+          "There are too many entries to list safely. Use a known proposal hash.",
+      };
+    const hashes = new Set<Sha256>();
+    let ignoredEntries = 0;
+    for (const entry of listed.value) {
+      const prefix = `${directory}/`;
+      const name = entry.relativePath.startsWith(prefix)
+        ? entry.relativePath.slice(prefix.length)
+        : "";
+      const parsed = parseSha256(name);
+      if (entry.kind !== "directory" || !parsed.ok) {
+        ignoredEntries += 1;
+        continue;
+      }
+      if (hashes.has(parsed.value))
+        return { ok: false, message: "Saved proposal listing is ambiguous." };
+      hashes.add(parsed.value);
+    }
+    if (!(await matchingCase(workspace, caseId, false)))
+      return { ok: false, message: "The local case changed during listing." };
+    return {
+      ok: true,
+      hashes: Object.freeze([...hashes].sort()),
+      ignoredEntries,
+    };
+  } catch {
+    return {
+      ok: false,
+      message: "Saved proposals could not be listed safely.",
+    };
+  }
+}
+
 /** Stores a local proposal and its exact input. This does not authenticate the
  * case, the source, an execution, a reviewer, or the associated workbook. */
 export async function preserveProvisionalOracle<StorageError>(input: {
@@ -184,7 +277,7 @@ export async function readProvisionalOracle<StorageError>(
 }
 
 async function matchingCase<StorageError>(
-  workspace: Workspace<StorageError>,
+  workspace: Pick<WorkspacePort<StorageError>, "openChunkReader">,
   caseId: Uuid,
   requireActive: boolean,
 ): Promise<boolean> {
@@ -209,7 +302,7 @@ async function matchingCase<StorageError>(
 }
 
 async function readBytes<StorageError>(
-  workspace: Workspace<StorageError>,
+  workspace: Pick<WorkspacePort<StorageError>, "openChunkReader">,
   path: string,
   max: number,
 ): Promise<Uint8Array | null> {

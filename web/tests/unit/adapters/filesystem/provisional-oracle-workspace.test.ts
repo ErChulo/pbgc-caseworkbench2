@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  listProvisionalOracleCandidates,
   preserveProvisionalOracle,
   readProvisionalOracle,
 } from "../../../../src/adapters/filesystem/provisional-oracle-workspace";
@@ -81,6 +82,117 @@ async function fixture() {
 }
 
 describe("local provisional oracle workspace", () => {
+  it("lists only case-scoped syntactic hash candidates, never verified evidence", async () => {
+    const input = await fixture();
+    const base = `cases/${caseId}/evidence/provisional-oracles`;
+    const entries = [
+      {
+        relativePath: `${base}/${"b".repeat(64)}`,
+        kind: "directory" as const,
+        sizeBytes: null,
+      },
+      {
+        relativePath: `${base}/${"a".repeat(64)}`,
+        kind: "directory" as const,
+        sizeBytes: null,
+      },
+      {
+        relativePath: `${base}/other`,
+        kind: "directory" as const,
+        sizeBytes: null,
+      },
+      {
+        relativePath: `${base}/${"c".repeat(64)}`,
+        kind: "file" as const,
+        sizeBytes: 0,
+      },
+      {
+        relativePath: `cases/other/evidence/provisional-oracles/${"d".repeat(64)}`,
+        kind: "directory" as const,
+        sizeBytes: null,
+      },
+    ];
+    const workspace = {
+      openChunkReader: input.workspace.openChunkReader.bind(input.workspace),
+      list: () => Promise.resolve({ ok: true as const, value: entries }),
+    };
+    expect(await listProvisionalOracleCandidates(workspace, caseId)).toEqual({
+      ok: true,
+      hashes: ["a".repeat(64), "b".repeat(64)],
+      ignoredEntries: 3,
+    });
+    const absent = {
+      ...workspace,
+      list: () =>
+        Promise.resolve({ ok: false as const, error: { code: "NOT_FOUND" } }),
+    };
+    expect(await listProvisionalOracleCandidates(absent, caseId)).toEqual({
+      ok: true,
+      hashes: [],
+      ignoredEntries: 0,
+    });
+    const denied = {
+      ...workspace,
+      list: () =>
+        Promise.resolve({ ok: false as const, error: { code: "READ_FAILED" } }),
+    };
+    expect((await listProvisionalOracleCandidates(denied, caseId)).ok).toBe(
+      false,
+    );
+    const firstEntry = entries[0];
+    if (firstEntry === undefined) throw new Error("Missing listing fixture");
+    const capped = {
+      ...workspace,
+      list: () =>
+        Promise.resolve({
+          ok: false as const,
+          error: { code: "TOO_MANY_ENTRIES" },
+        }),
+    };
+    expect(await listProvisionalOracleCandidates(capped, caseId)).toEqual({
+      ok: false,
+      message:
+        "There are too many entries to list safely. Use a known proposal hash.",
+    });
+    const duplicate = {
+      ...workspace,
+      list: () =>
+        Promise.resolve({
+          ok: true as const,
+          value: [firstEntry, firstEntry],
+        }),
+    };
+    expect((await listProvisionalOracleCandidates(duplicate, caseId)).ok).toBe(
+      false,
+    );
+    const tooMany = {
+      ...workspace,
+      list: () =>
+        Promise.resolve({
+          ok: true as const,
+          value: Array.from({ length: 257 }, () => firstEntry),
+        }),
+    };
+    expect((await listProvisionalOracleCandidates(tooMany, caseId)).ok).toBe(
+      false,
+    );
+  });
+  it("does not report an empty list when the case changes during enumeration", async () => {
+    const input = await fixture();
+    const workspace = {
+      openChunkReader: input.workspace.openChunkReader.bind(input.workspace),
+      list: () => {
+        input.workspace.files.delete(`cases/${caseId}/case.json`);
+        return Promise.resolve({
+          ok: false as const,
+          error: { code: "NOT_FOUND" },
+        });
+      },
+    };
+    expect((await listProvisionalOracleCandidates(workspace, caseId)).ok).toBe(
+      false,
+    );
+  });
   it("preserves exact source and proposal under the case and verifies restoration", async () => {
     const input = await fixture();
     const saved = await preserveProvisionalOracle(input);

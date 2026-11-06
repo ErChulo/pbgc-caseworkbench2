@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ProvisionalOraclePanel } from "../../../src/components/formula-governance/ProvisionalOraclePanel";
 import { createProvisionalOracleTemplate } from "../../../src/components/formula-governance/provisional-oracle-template";
 import {
+  listProvisionalOracleCandidates,
   preserveProvisionalOracle,
   readProvisionalOracle,
 } from "../../../src/adapters/filesystem/provisional-oracle-workspace";
@@ -24,6 +25,25 @@ class MemoryWorkspace {
         ? { ok: false as const, error: { code: "NOT_FOUND" as const } }
         : { ok: true as const, value: bytesReader(bytes) },
     );
+  }
+  list(directory: string) {
+    const prefix = `${directory}/`;
+    const children = [
+      ...new Set(
+        [...this.files.keys()]
+          .filter((path) => path.startsWith(prefix))
+          .map((path) => path.slice(prefix.length).split("/")[0])
+          .filter((name): name is string => name !== undefined && name !== ""),
+      ),
+    ];
+    return Promise.resolve({
+      ok: true as const,
+      value: children.map((name) => ({
+        relativePath: `${prefix}${name}`,
+        kind: "directory" as const,
+        sizeBytes: null,
+      })),
+    });
   }
   createDirectory(path: string) {
     return Promise.resolve({
@@ -115,6 +135,11 @@ describe("synthetic local oracle proposal flow", () => {
       if (!restored.ok) throw new Error(restored.message);
       return restored.evidence;
     };
+    const onFind = async () => {
+      const found = await listProvisionalOracleCandidates(workspace, caseId);
+      if (!found.ok) throw new Error(found.message);
+      return found;
+    };
     const panel = () => (
       <ProvisionalOraclePanel
         enabled
@@ -122,6 +147,7 @@ describe("synthetic local oracle proposal flow", () => {
         formulaCells={workbook.formulaCells}
         onImport={onImport}
         onRestore={onRestore}
+        onFind={onFind}
       />
     );
     const view = render(panel());
@@ -145,9 +171,12 @@ describe("synthetic local oracle proposal flow", () => {
     expect(hash).toMatch(/^[a-f0-9]{64}$/u);
     view.unmount();
     render(panel());
-    fireEvent.change(screen.getByLabelText("Saved proposal SHA-256 hash"), {
-      target: { value: hash },
-    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Find saved proposal names" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: `Select ${hash}` }),
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Open saved proposal" }),
     );

@@ -28,17 +28,55 @@ export interface BrowserWorkspaceError {
     | "ALREADY_EXISTS"
     | "READ_FAILED"
     | "WRITE_FAILED"
-    | "UNSUPPORTED_OPERATION";
+    | "UNSUPPORTED_OPERATION"
+    | "TOO_MANY_ENTRIES";
 }
 
 export class BrowserDirectoryWorkspace implements WorkspacePort<BrowserWorkspaceError> {
   constructor(private readonly root: FileSystemDirectoryHandle) {}
 
-  list(): Promise<Result<readonly WorkspaceEntry[], BrowserWorkspaceError>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "UNSUPPORTED_OPERATION" },
-    });
+  /** Bounded, immediate-child listing only. No file contents are read. */
+  async list(
+    relativeDirectory: string,
+  ): Promise<Result<readonly WorkspaceEntry[], BrowserWorkspaceError>> {
+    try {
+      const segments = safeSegments(relativeDirectory);
+      const directory = await this.directoryHandle(relativeDirectory, false);
+      const iterable = directory as FileSystemDirectoryHandle & {
+        values?: () => AsyncIterable<FileSystemHandle>;
+      };
+      if (typeof iterable.values !== "function")
+        return { ok: false, error: { code: "UNSUPPORTED_OPERATION" } };
+      const items: WorkspaceEntry[] = [];
+      for await (const entry of iterable.values()) {
+        if (items.length >= 256)
+          return { ok: false, error: { code: "TOO_MANY_ENTRIES" } };
+        const name = entry.name;
+        const kind: unknown = entry.kind;
+        const childSegments = safeSegments(name);
+        if (
+          childSegments.length !== 1 ||
+          childSegments[0] !== name ||
+          (kind !== "directory" && kind !== "file")
+        )
+          return { ok: false, error: { code: "READ_FAILED" } };
+        items.push({
+          relativePath: [...segments, name].join("/"),
+          kind,
+          sizeBytes: null,
+        });
+      }
+      items.sort((a, b) =>
+        a.relativePath < b.relativePath
+          ? -1
+          : a.relativePath > b.relativePath
+            ? 1
+            : 0,
+      );
+      return { ok: true, value: Object.freeze(items) };
+    } catch (error) {
+      return { ok: false, error: browserReadError(error) };
+    }
   }
 
   async stat(
