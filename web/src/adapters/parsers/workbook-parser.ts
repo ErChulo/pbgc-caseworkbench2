@@ -44,6 +44,21 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
         });
       }
     }
+    const sheetProperties = workbook.Workbook?.Sheets;
+    const sheetInventory = workbook.SheetNames.map((name, index) => {
+      const properties = sheetProperties?.[index];
+      const hidden = properties?.Hidden;
+      return {
+        name,
+        hidden:
+          sheetProperties?.length !== workbook.SheetNames.length ||
+          properties === undefined ||
+          (properties.name !== undefined && properties.name !== name) ||
+          (hidden !== 0 && hidden !== 1 && hidden !== 2)
+            ? null
+            : hidden !== 0,
+      };
+    });
     let names: string[] = [];
     try {
       names = Object.keys(unzipSync(bytes));
@@ -56,7 +71,7 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
     ).length;
     return Object.freeze({
       parserId: "workbook-passive",
-      parserVersion: "1.0.0",
+      parserVersion: "1.1.0",
       status: risk.blocked ? "partial" : "success",
       mediaType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -64,6 +79,7 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
       metadata: Object.freeze({
         sheetCount: workbook.SheetNames.length,
         formulaCount,
+        sheetInventoryJson: JSON.stringify(sheetInventory),
         hiddenSheetCount: (workbook.Workbook?.Sheets ?? []).filter(
           (sheet) => (sheet.Hidden ?? 0) !== 0,
         ).length,

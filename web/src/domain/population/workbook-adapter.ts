@@ -1,5 +1,6 @@
 import type { PassiveExtraction } from "../../adapters/parsers/passive-result";
 import type { WorkbookCellObservation } from "../../adapters/parsers/workbook-parser";
+import { normalizeCellAddress } from "../formula-compiler/reference-codec";
 import { hashTyped } from "../manifests/canonical-json";
 import { parseSha256, type Sha256 } from "../shared/types";
 import { classifyRawValue, type RawValueKind } from "./tabular-adapter";
@@ -71,21 +72,33 @@ export function adaptWorkbookExtraction(
       ]),
     });
   }
-  const cells = extraction.rawValues.filter(
-    isWorkbookCell,
-  ) as readonly WorkbookCellObservation[];
-  const names = [...new Set(cells.map((cell) => cell.sheet))];
-  const hiddenCount =
-    typeof extraction.metadata.hiddenSheetCount === "number"
-      ? extraction.metadata.hiddenSheetCount
-      : 0;
+  const inventory = readSheetInventory(extraction.metadata.sheetInventoryJson);
+  const cells = extraction.rawValues.filter(isWorkbookCell);
+  if (
+    inventory === null ||
+    cells.length !== extraction.rawValues.length ||
+    !validCells(cells, inventory) ||
+    extraction.metadata.sheetCount !== inventory.length ||
+    extraction.metadata.hiddenSheetCount !==
+      inventory.filter((sheet) => sheet.hidden).length
+  ) {
+    return Object.freeze({
+      status: "blocked",
+      sheets: Object.freeze([]),
+      formulaExecutionCount: 0,
+      limitations: Object.freeze([
+        ...extraction.limitations,
+        "Sheet identity or visibility is missing or inconsistent; re-inspect the workbook.",
+      ]),
+    });
+  }
   return Object.freeze({
     status: "profiled",
     sheets: Object.freeze(
-      names.map((name, index) =>
+      inventory.map(({ name, hidden }) =>
         Object.freeze({
           name,
-          hidden: index >= Math.max(0, names.length - hiddenCount),
+          hidden,
           cells: Object.freeze(
             cells
               .filter((cell) => cell.sheet === name)
@@ -107,6 +120,52 @@ export function adaptWorkbookExtraction(
   });
 }
 
+function readSheetInventory(
+  value: unknown,
+): readonly { readonly name: string; readonly hidden: boolean }[] | null {
+  if (typeof value !== "string") return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed) || parsed.length === 0) return null;
+    const result: { name: string; hidden: boolean }[] = [];
+    const names = new Set<string>();
+    for (const item of parsed as unknown[]) {
+      if (typeof item !== "object" || item === null || Array.isArray(item))
+        return null;
+      const sheet = item as Record<string, unknown>;
+      if (
+        typeof sheet.name !== "string" ||
+        sheet.name.length === 0 ||
+        typeof sheet.hidden !== "boolean"
+      )
+        return null;
+      const identity = sheet.name.toUpperCase();
+      if (names.has(identity)) return null;
+      names.add(identity);
+      result.push({ name: sheet.name, hidden: sheet.hidden });
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+function validCells(
+  cells: readonly WorkbookCellObservation[],
+  inventory: readonly { readonly name: string; readonly hidden: boolean }[],
+): boolean {
+  const sheets = new Set(inventory.map((sheet) => sheet.name));
+  const seen = new Set<string>();
+  for (const cell of cells) {
+    const address = normalizeCellAddress(cell.address);
+    if (!sheets.has(cell.sheet) || address === null) return false;
+    const key = `${cell.sheet.toUpperCase()}\u0000${address.replaceAll("$", "")}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
+
 function isWorkbookCell(value: unknown): value is WorkbookCellObservation {
   if (typeof value !== "object" || value === null || Array.isArray(value))
     return false;
@@ -114,6 +173,7 @@ function isWorkbookCell(value: unknown): value is WorkbookCellObservation {
   return (
     typeof record.sheet === "string" &&
     typeof record.address === "string" &&
+    Object.prototype.hasOwnProperty.call(record, "storedValue") &&
     (typeof record.formulaText === "string" || record.formulaText === null) &&
     (typeof record.cellType === "string" || record.cellType === null)
   );
