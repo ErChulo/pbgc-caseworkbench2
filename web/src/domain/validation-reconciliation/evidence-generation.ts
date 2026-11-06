@@ -1,5 +1,5 @@
 import { hashTyped } from "../manifests/canonical-json";
-import { parseSha256, type Sha256 } from "../shared/types";
+import { parseSha256, parseUtcTimestamp, type Sha256 } from "../shared/types";
 import type {
   ValidationResult,
   ReconciliationResult,
@@ -23,8 +23,10 @@ export interface ReconciliationEvidenceMetadata {
 }
 
 export async function generateValidationEvidence(
-  result: ValidationResult,
+  suppliedResult: ValidationResult,
 ): Promise<{ readonly evidence: string; readonly hash: Sha256 }> {
+  const result = structuredClone(suppliedResult);
+  await requireWorkbookValidationIntegrity(result);
   const evidence = {
     validationId: result.validationId,
     validationType: result.validationType,
@@ -64,6 +66,64 @@ export async function generateValidationEvidence(
     evidence: JSON.stringify(evidence),
     hash,
   };
+}
+
+/** Checks result integrity only; independent validation of the workbook is separate. */
+async function requireWorkbookValidationIntegrity(
+  result: ValidationResult,
+): Promise<void> {
+  try {
+    if (
+      result.validationType !== "workbook" ||
+      (result.schemaVersion as string) !== "1.0.0" ||
+      !["valid", "warnings", "invalid"].includes(result.status) ||
+      typeof result.validatedAt !== "string" ||
+      !parseUtcTimestamp(result.validatedAt).ok
+    )
+      throw new Error("Unsupported validation type or metadata.");
+    const workbook = result as Partial<
+      import("./models").WorkbookValidationEvidence
+    >;
+    if (
+      ![
+        workbook.workbookContentSha256,
+        workbook.buildSpecContentSha256,
+        workbook.architectureContentSha256,
+        workbook.populationProfileContentSha256,
+      ].every((value) => typeof value === "string" && parseSha256(value).ok) ||
+      typeof workbook.validatorVersion !== "string" ||
+      workbook.validatorVersion.trim() === ""
+    )
+      throw new Error("Missing validation binding.");
+    if (
+      (result.status === "invalid") !== result.errors.length > 0 ||
+      (result.status === "valid" && result.warnings.length > 0) ||
+      (result.status === "warnings" && result.warnings.length === 0)
+    )
+      throw new Error("Inconsistent status.");
+    const payload = {
+      validationType: result.validationType,
+      workbookContentSha256: workbook.workbookContentSha256,
+      buildSpecContentSha256: workbook.buildSpecContentSha256,
+      architectureContentSha256: workbook.architectureContentSha256,
+      populationProfileContentSha256: workbook.populationProfileContentSha256,
+      validatorVersion: workbook.validatorVersion,
+      status: result.status,
+      errors: result.errors,
+      warnings: result.warnings,
+      affectedComponentIds: result.affectedComponentIds,
+      schemaVersion: result.schemaVersion,
+    };
+    const hash = await hashTyped(payload, {
+      typeName: "WorkbookValidationResult",
+    });
+    if (hash !== result.validationId || hash !== result.validationContentSha256)
+      throw new Error("Invalid hash.");
+  } catch {
+    throw new Error(
+      "Workbook validation evidence failed integrity verification.",
+    );
+  }
 }
 
 export async function generateReconciliationEvidence(

@@ -1,0 +1,5 @@
+# Validation snapshot and evidence integrity
+
+Workbook structural validation and the validation engine now snapshot their inputs before asynchronous hashing and validation. This avoids combining the hash of one workbook or BuildSpec with findings or lineage from caller-mutated state. Synthetic tests mutate workbook, BuildSpec and population inputs while validation is in progress.
+
+Workbook validation evidence generation now verifies the stored workbook-bound content hash, status consistency, required source hashes, validator label and timestamp before exporting evidence. Tampered or legacy unbound results fail closed. Evidence generation for non-workbook validation types is blocked until their hashing contracts are implemented. These checks establish internal consistency, not validator authenticity, source approval, or that a workbook was executed. Reconciliation still independently re-runs structural validation, and final release remains blocked on authenticated lineage and approvals.

@@ -305,6 +305,22 @@ describe("reconciliation coverage and integrity", () => {
       expect(result.reconciliationStatus).toBe("oracle-error");
     }
   });
+  it("validates a stable workbook snapshot while the caller changes its input", async () => {
+    const mutable = structuredClone(workbook);
+    const request = {
+      workbook: mutable,
+      validatorVersion: "test-validator-1",
+      validatedAt: time,
+    };
+    const expected = await validateWorkbook(request);
+    const pending = validateWorkbook(request);
+    const first = mutable.formulaCells[0] as
+      { formulaText: string } | undefined;
+    if (!first) throw new Error("Missing formula");
+    first.formulaText = "=999";
+    expect(await pending).toEqual(expected);
+  });
+
   it("binds validation hashes to the workbook and validator version, not the timestamp", async () => {
     const original = await validateWorkbook({
       workbook,

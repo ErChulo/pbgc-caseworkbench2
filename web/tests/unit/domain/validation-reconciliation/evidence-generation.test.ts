@@ -62,6 +62,21 @@ describe("evidence generation", () => {
       workbook.buildSpecContentSha256,
     );
     expect(evidence.validatorVersion).toBe("1.0.0");
+    await expect(
+      generateValidationEvidence({ ...validated, status: "valid", errors: [] }),
+    ).rejects.toThrow("integrity verification");
+    await expect(
+      generateValidationEvidence({
+        ...validated,
+        validationId: "a".repeat(64) as Sha256,
+      }),
+    ).rejects.toThrow("integrity verification");
+    await expect(
+      generateValidationEvidence({
+        ...validated,
+        validatedAt: "not-a-date" as typeof validated.validatedAt,
+      }),
+    ).rejects.toThrow("integrity verification");
   });
 
   it("generates reconciliation evidence with oracle results", async () => {

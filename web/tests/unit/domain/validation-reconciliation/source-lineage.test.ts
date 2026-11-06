@@ -73,6 +73,17 @@ describe("validation engine source lineage", () => {
     const result = await new WorkbookValidationEngine().validate(input);
     expect(result.status).toBe("valid");
   });
+  it("uses the captured source lineage if caller state changes during validation", async () => {
+    const input = structuredClone(await fixture());
+    const engine = new WorkbookValidationEngine();
+    const expected = await engine.validate(input);
+    const pending = engine.validate(input);
+    (input.population as { effectiveDecisionId: string }).effectiveDecisionId =
+      "other";
+    (input.buildSpec as { ruleSetVersion: string }).ruleSetVersion = "tampered";
+    expect(await pending).toEqual(expected);
+  });
+
   it("blocks stale or different BuildSpecs and population decisions", async () => {
     const input = await fixture();
     const engine = new WorkbookValidationEngine();

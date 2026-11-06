@@ -35,8 +35,9 @@ export interface WorkbookReconciliationEngineInput {
 
 export class WorkbookValidationEngine {
   async validate(
-    input: WorkbookValidationEngineInput,
+    suppliedInput: WorkbookValidationEngineInput,
   ): Promise<ValidationResult> {
+    const input = structuredClone(suppliedInput);
     const validationInput: WorkbookValidationInput = {
       workbook: input.workbook,
       validatorVersion: input.validatorVersion,

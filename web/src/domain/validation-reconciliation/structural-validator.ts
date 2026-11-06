@@ -12,8 +12,9 @@ import { validateCalculationSheetNames } from "../workbook-builder/sheet-policy"
 import { validatePopulationApplication } from "./population-validator";
 
 export async function validateWorkbook(
-  input: WorkbookValidationInput,
+  suppliedInput: WorkbookValidationInput,
 ): Promise<WorkbookValidationEvidence> {
+  const input = structuredClone(suppliedInput);
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
   const workbook = input.workbook;
