@@ -47,12 +47,13 @@ export function buildFinalCaseworkOutputPayload(
     caseId: input.caseId,
     packagePurpose: "production-v1-casework-output",
     packageStatus,
-    section436Required: input.section436Required,
+    // A bare false flag is not a reviewed non-applicability determination.
+    section436Required: true,
     stages,
     artifacts,
-    unresolvedItems: [...input.unresolvedItems].sort((left, right) =>
-      left.itemId.localeCompare(right.itemId),
-    ),
+    unresolvedItems: input.unresolvedItems
+      .map((item) => ({ ...item }))
+      .sort((left, right) => left.itemId.localeCompare(right.itemId)),
     maturityClaims: maturityClaims(stages),
     // References alone do not establish derivation. Do not invent lineage.
     lineage: [],
@@ -156,22 +157,24 @@ function buildStages(
   artifacts: readonly CaseworkOutputArtifactReference[],
 ): readonly CaseworkOutputStage[] {
   return stageOrder.map(({ stageKey, label }) => {
-    const required = stageKey !== "section-436" || input.section436Required;
-    if (!required) {
-      return stage(stageKey, label, false, "not-required", "specified", [], []);
-    }
+    // No verified case-bound non-applicability determination exists in this input.
 
     const matching = artifacts.filter((artifact) =>
       artifactBelongsToStage(stageKey, artifact.artifactType),
     );
-    const blockers = blockersForStage(input, stageKey);
-    const status = blockers.length === 0 ? "ready" : "blocked";
+    const blockers = [...blockersForStage(input, stageKey)];
+    // Inputs provide only hashes, references, and asserted labels. They do not
+    // establish the content, authority, review, or derivation of a stage.
+    if (blockers.length === 0) {
+      blockers.push("Stage readiness is not verified by references alone.");
+    }
+    const status = "blocked" as const;
     return stage(
       stageKey,
       label,
       true,
       status,
-      status === "ready" ? "implemented" : "specified",
+      "specified",
       matching.map((artifact) => artifact.contentSha256),
       blockers,
     );
@@ -261,10 +264,24 @@ function blockersForStage(
       );
       return blockers;
     }
-    case "section-436":
-      return input.section436 === null
-        ? ["Section 436 is required but no evaluation artifact is available."]
-        : [];
+    case "section-436": {
+      const blockers: string[] = [];
+      if (!input.section436Required) {
+        blockers.push(
+          "Section 436 non-applicability has not been verified; the stage remains required.",
+        );
+      }
+      if (input.section436 === null) {
+        blockers.push(
+          "Section 436 is required but no evaluation artifact is available.",
+        );
+      } else {
+        blockers.push(
+          "The Section 436 evaluation reference has not been verified as a completed, approved case evaluation.",
+        );
+      }
+      return blockers;
+    }
   }
 }
 

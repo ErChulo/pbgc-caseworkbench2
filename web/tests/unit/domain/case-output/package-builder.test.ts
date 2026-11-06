@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { validateContract } from "../../../../src/contracts/schema-validator";
 
 import {
   buildFinalCaseworkOutputPayload,
@@ -67,7 +68,8 @@ describe("final casework output package builder", () => {
     expect(
       payload.maturityClaims.some((claim) => claim.externalExecutionClaimed),
     ).toBe(false);
-    expect(stage(payload, "workbook")?.maturityLevel).toBe("implemented");
+    expect(stage(payload, "workbook")?.maturityLevel).toBe("specified");
+    expect(stage(payload, "workbook")?.status).toBe("blocked");
   });
 
   it("requires both validation and reconciliation", () => {
@@ -75,7 +77,69 @@ describe("final casework output package builder", () => {
     expect(stage(payload, "validation-reconciliation")?.blockers).toContain(
       "No reconciliation evidence artifact is available.",
     );
-    expect(stage(payload, "section-436")?.status).toBe("not-required");
+    expect(stage(payload, "section-436")?.status).toBe("blocked");
+    expect(payload.section436Required).toBe(true);
+    expect(stage(payload, "section-436")?.blockers.join(" ")).toContain(
+      "non-applicability has not been verified",
+    );
+  });
+
+  it("exports a schema-valid blocked report when non-applicability was asserted without evidence", async () => {
+    const report = await createFinalCaseworkOutputPackage(completeInput());
+    expect(report.deterministicPayload.section436Required).toBe(true);
+    expect(report.deterministicPayload.packageStatus).toBe("blocked");
+    const validation = validateContract("finalCaseworkOutputPackage", report);
+    expect(validation).toEqual({ valid: true, issues: [] });
+  });
+
+  it("does not mark any stage ready solely from asserted references and labels", () => {
+    const payload = buildFinalCaseworkOutputPayload({
+      ...completeInput(),
+      reconciliation: artifact("reconciliation-result", "reconciliation", "3"),
+      section436Required: true,
+      section436: artifact("section-436-evaluation", "evaluation", "4"),
+    });
+    expect(
+      payload.stages.every(
+        (item) => item.required && item.status === "blocked",
+      ),
+    ).toBe(true);
+    expect(payload.stages.every((item) => item.blockers.length > 0)).toBe(true);
+    expect(
+      payload.maturityClaims.every((claim) => claim.level === "specified"),
+    ).toBe(true);
+  });
+
+  it("does not treat a Section 436 reference as a verified completed evaluation", () => {
+    const payload = buildFinalCaseworkOutputPayload({
+      ...completeInput(),
+      section436Required: true,
+      section436: artifact("section-436-evaluation", "evaluation", "4"),
+    });
+    const section = stage(payload, "section-436");
+    expect(section?.status).toBe("blocked");
+    expect(section?.artifactSha256Values).toEqual([sha("4")]);
+    expect(section?.blockers.join(" ")).toContain("has not been verified");
+    expect(
+      payload.maturityClaims.find((claim) => claim.subject === "section-436")
+        ?.level,
+    ).toBe("specified");
+  });
+
+  it("does not freeze or retain caller-owned unresolved item records", () => {
+    const item = {
+      itemId: "item",
+      scope: "plan",
+      downstreamConsequence: "review",
+      status: "open",
+    };
+    const payload = buildFinalCaseworkOutputPayload({
+      ...completeInput(),
+      unresolvedItems: [item],
+    });
+    expect(Object.isFrozen(item)).toBe(false);
+    item.status = "resolved";
+    expect(payload.unresolvedItems[0]?.status).toBe("open");
   });
 
   it.each(["open", "assigned", "reopened", "unknown"])(
@@ -108,7 +172,9 @@ describe("final casework output package builder", () => {
         },
       ],
     });
-    expect(stage(payload, "plan-rules")?.status).toBe("ready");
+    expect(stage(payload, "plan-rules")?.blockers).toEqual([
+      "Stage readiness is not verified by references alone.",
+    ]);
   });
 });
 

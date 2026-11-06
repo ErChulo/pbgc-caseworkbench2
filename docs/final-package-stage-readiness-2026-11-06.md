@@ -1,0 +1,11 @@
+# Final package stage readiness — 2026-11-06
+
+A final package was already globally blocked because its artifact references and lineage were not verified. Individual stages, however, could still be labeled ready merely because a hash or user-linked reference was present. A Section 436 reference could likewise be labeled ready without verifying that it represented a completed case evaluation, and a bare `section436Required: false` could label that stage not required without a reviewed determination.
+
+The package builder now marks each stage blocked until a future governed verification path establishes its readiness. Existing missing-input blockers remain visible; stages with no other blocker explain that references alone do not verify readiness. Linked artifacts and hashes are still listed, and blocked status reports remain exportable. Section 436 remains required: an unsupported false flag records a non-applicability blocker, while a linked evaluation records that its completion and approval have not been verified. The payload reports the effective requirement rather than repeating an unsupported false assertion. The panel explains these limits. Caller-owned unresolved items are copied before the report is frozen.
+
+This is deliberately conservative: it does not implement artifact-content validation, authenticated approval, derivation, or a reviewed non-applicability workflow. It cannot make a package complete, and it does not establish that all inputs are missing or wrong. A later feature must verify actual content, case binding, source authority, review decisions, and lineage before replacing these blockers. Other locally asserted metadata remains unauthenticated.
+
+## Verification
+
+Typecheck, lint, formatting, design-schema and runtime-contract validation passed. The full suite reported 1,139 passed and four skipped, with one failed suite because the approved Data Dictionary workbook is an LFS pointer rather than the required bytes. After that run, one additional test verified that an actual generated blocked report conforms to the runtime package schema; 15 focused package/UI tests passed. An isolated build and single-file check passed, with the pre-existing `node:fs/promises` browser-externalization warning. No new browser or external actuarial execution was performed. The existing modified `dist` file was preserved.

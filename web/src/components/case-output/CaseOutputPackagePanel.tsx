@@ -126,7 +126,10 @@ export function CaseOutputPackagePanel({
       <p>
         This package is the final casework output boundary. It references
         generated artifacts by hash and records blockers instead of inventing
-        missing workbook, validation, or Section 436 results.
+        missing workbook, validation, or Section 436 results. A linked file does
+        not make a stage ready. Content, authority, review, and lineage still
+        need verification. Section 436 remains required until a verified
+        non-applicability decision is supported.
       </p>
       <div className="case-output-linker">
         <h3>Link generated artifact</h3>
