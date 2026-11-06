@@ -1,3 +1,7 @@
+import { buildCheckedXlsx } from "../../../../src/domain/workbook-builder/checked-xlsx";
+import { sha256Bytes } from "../../../../src/domain/shared/digest";
+import { validateWorkbook } from "../../../../src/domain/validation-reconciliation/structural-validator";
+import { verifyGeneratedXlsx } from "../../../../src/domain/workbook-builder/xlsx-readback";
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import { buildCompiledWorkbook } from "../../../../src/domain/workbook-builder/workbook-builder";
@@ -87,7 +91,15 @@ describe("compiled workbook generation", () => {
     expect(first.workbook.formulaCells.map((f) => f.formulaId)).toEqual(
       artifact.deterministicPayload.executionOrder,
     );
-    const bytes = writeXLSXBuffer(buildXLSXSpec(first.workbook));
+    const structural = await validateWorkbook({
+      workbook: first.workbook,
+      validatorVersion: "1.0.0",
+      validatedAt: fixedClock.now(),
+    });
+    expect(structural.errors).toEqual([]);
+    const workbookSpec = buildXLSXSpec(first.workbook);
+    const bytes = writeXLSXBuffer(workbookSpec);
+    expect(verifyGeneratedXlsx(workbookSpec, bytes)).toEqual({ ok: true });
     expect(bytes).toEqual(writeXLSXBuffer(buildXLSXSpec(first.workbook)));
     const parsed = XLSX.read(bytes, { type: "buffer", sheetStubs: true });
     for (const f of artifact.deterministicPayload.compiledFormulas) {
@@ -113,6 +125,118 @@ describe("compiled workbook generation", () => {
     ).toBe(true);
   });
 
+  it("gates generation on structural validation and hashes the checked XLSX bytes", async () => {
+    const { input, compilation } = await fixture();
+    const built = await buildCompiledWorkbook(input, compilation);
+    if (!built.ok) throw new Error("Synthetic build failed");
+    const checked = await buildCheckedXlsx(
+      built.workbook,
+      "1.0.0",
+      fixedClock.now(),
+    );
+    expect(
+      (await buildCheckedXlsx(built.workbook, "", fixedClock.now())).ok,
+    ).toBe(false);
+    expect(
+      (
+        await buildCheckedXlsx(
+          built.workbook,
+          "1.0.0",
+          "2026-02-30T00:00:00Z" as ReturnType<typeof fixedClock.now>,
+        )
+      ).ok,
+    ).toBe(false);
+    if (!checked.ok) throw new Error(checked.message);
+    expect(checked.modelValidation.status).toBe("valid");
+    expect(checked.modelValidation.workbookContentSha256).toBe(
+      built.workbook.workbookContentSha256,
+    );
+    expect(checked.sha256).toBe(await sha256Bytes(checked.bytes));
+    const blob = new Blob([checked.bytes]);
+    checked.bytes[0] = (checked.bytes[0] ?? 0) ^ 1;
+    const downloaded = await new Promise<Uint8Array<ArrayBuffer>>(
+      (resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => {
+          reject(new Error("Synthetic blob read failed"));
+        };
+        reader.onload = () => {
+          if (!(reader.result instanceof ArrayBuffer))
+            reject(new Error("Invalid blob"));
+          else resolve(new Uint8Array(reader.result));
+        };
+        reader.readAsArrayBuffer(blob);
+      },
+    );
+    expect(await sha256Bytes(downloaded)).toBe(checked.sha256);
+    const sheet = built.workbook.sheets.find((item) =>
+      item.cells.some((cell) => cell.kind === "formula"),
+    );
+    const cell = sheet?.cells.find((item) => item.kind === "formula");
+    if (!sheet || !cell) throw new Error("Synthetic formula missing");
+    const altered = {
+      ...built.workbook,
+      sheets: built.workbook.sheets.map((item) =>
+        item === sheet
+          ? {
+              ...item,
+              cells: item.cells.map((entry) =>
+                entry === cell ? { ...entry, formulaText: "=999" } : entry,
+              ),
+            }
+          : item,
+      ),
+    };
+    const rehashed = {
+      ...altered,
+      workbookContentSha256: await computeWorkbookContentHash(altered),
+    };
+    const rejected = await buildCheckedXlsx(
+      rehashed,
+      "1.0.0",
+      fixedClock.now(),
+    );
+    expect(rejected.ok).toBe(false);
+    if (rejected.ok) throw new Error("Altered model accepted");
+    expect(rejected.message).toContain("FORMULA_WORKSHEET_MISMATCH");
+    expect("bytes" in rejected).toBe(false);
+  });
+  it("blocks a no-formula workbook rather than publishing it as a calculation engine", async () => {
+    const { input, compilation } = await fixture();
+    const built = await buildCompiledWorkbook(input, compilation);
+    if (!built.ok) throw new Error("Synthetic build failed");
+    const empty = {
+      ...built.workbook,
+      formulaCells: [],
+      sheets: built.workbook.sheets.map((sheet) => ({
+        ...sheet,
+        cells: sheet.cells.filter((cell) => cell.kind !== "formula"),
+      })),
+    };
+    const rehashed = {
+      ...empty,
+      workbookContentSha256: await computeWorkbookContentHash(empty),
+    };
+    const result = await buildCheckedXlsx(rehashed, "1.0.0", fixedClock.now());
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("Empty calculation model accepted");
+    expect(result.message).toContain("NO_FORMULA_CELLS");
+  });
+  it("snapshots the workbook before asynchronous validation", async () => {
+    const { input, compilation } = await fixture();
+    const built = await buildCompiledWorkbook(input, compilation);
+    if (!built.ok) throw new Error("Synthetic build failed");
+    const workbook = structuredClone(built.workbook);
+    const expected = await buildCheckedXlsx(
+      workbook,
+      "1.0.0",
+      fixedClock.now(),
+    );
+    const pending = buildCheckedXlsx(workbook, "1.0.0", fixedClock.now());
+    (workbook as { caseId: string }).caseId = "changed-after-call";
+    const actual = await pending;
+    expect(actual).toEqual(expected);
+  });
   it("rejects incomplete and missing compilation", async () => {
     const { input, compilation } = await fixture();
     for (const candidate of [

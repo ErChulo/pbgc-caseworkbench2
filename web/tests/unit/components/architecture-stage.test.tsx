@@ -24,6 +24,9 @@ describe("governed architecture stage UI", () => {
       screen.getByText(/does not record an architecture approval/u),
     ).toBeVisible();
     expect(
+      screen.getByText(/does not execute formulas or establish correctness/),
+    ).toBeVisible();
+    expect(
       screen.queryByRole("button", { name: /approve architecture/i }),
     ).not.toBeInTheDocument();
     await user.click(

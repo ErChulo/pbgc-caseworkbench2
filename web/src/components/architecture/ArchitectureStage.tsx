@@ -47,7 +47,8 @@ export function ArchitectureStage({
         Build a proposed architecture from the current approved rules,
         population reviews, policies, and case controls. The rules determine
         scenarios and tabs. Building does not record an architecture approval or
-        approve a workbook.
+        approve a workbook. If generated, the workbook is checked against its
+        model. This does not execute formulas or establish correctness.
       </p>
       <button
         type="button"

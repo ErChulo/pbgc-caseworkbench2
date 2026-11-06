@@ -1,3 +1,4 @@
+import { buildCheckedXlsx } from "../../domain/workbook-builder/checked-xlsx";
 import {
   preserveProvisionalOracle,
   readProvisionalOracle,
@@ -178,10 +179,6 @@ import { compileBuildSpec } from "../../domain/formula-compiler/compiler";
 import type { CompilationResult } from "../../domain/formula-compiler/models";
 import { buildCompiledWorkbook } from "../../domain/workbook-builder/workbook-builder";
 import type { V1Workbook } from "../../domain/workbook-builder/models";
-import {
-  buildXLSXSpec,
-  writeXLSXBytes,
-} from "../../domain/workbook-builder/serialization";
 import { validateContract } from "../../contracts/schema-validator";
 import {
   createEvidenceExtraction,
@@ -1002,7 +999,7 @@ export interface CaseOrchestrator {
   readonly restoreProvisionalOracle: (
     evidenceHash: string,
   ) => Promise<ProvisionalOracleEvidence>;
-  readonly v1XlsxBytes: Uint8Array | null;
+  readonly v1Ready: boolean;
   readonly v1OutputMessage: string | null;
   readonly downloadV1Workbook: () => void;
   readonly finalOutputInput: FinalCaseworkOutputInput | null;
@@ -1265,7 +1262,12 @@ export function useCaseOrchestrator(
     v1WorkbookRef.current = workbook;
     setV1Workbook(workbook);
   };
-  const [v1XlsxBytes, setV1XlsxBytes] = useState<Uint8Array | null>(null);
+  const [v1XlsxBlob, setV1XlsxBlob] = useState<Blob | null>(null);
+  const v1XlsxBlobRef = useRef<Blob | null>(null);
+  const setCurrentV1XlsxBlob = (blob: Blob | null): void => {
+    v1XlsxBlobRef.current = blob;
+    setV1XlsxBlob(blob);
+  };
   const [v1OutputMessage, setV1OutputMessage] = useState<string | null>(null);
   const [planSummaryRecord, setPlanSummaryRecord] =
     useState<PlanSummaryRecord | null>(null);
@@ -1305,7 +1307,7 @@ export function useCaseOrchestrator(
         setCurrentV1Workbook(null);
       },
       clearWorkbookBytes: () => {
-        setV1XlsxBytes(null);
+        setCurrentV1XlsxBlob(null);
       },
       clearOutputMessage: () => {
         setV1OutputMessage(null);
@@ -1540,7 +1542,7 @@ export function useCaseOrchestrator(
     setV1BuildSpec(null);
     setV1CompilationResult(null);
     setCurrentV1Workbook(null);
-    setV1XlsxBytes(null);
+    setCurrentV1XlsxBlob(null);
     setV1OutputMessage(null);
     setPlanSummaryRecord(null);
     setPlanSummaryMessage(null);
@@ -4281,7 +4283,7 @@ export function useCaseOrchestrator(
     setV1BuildSpec(null);
     setV1CompilationResult(null);
     setCurrentV1Workbook(null);
-    setV1XlsxBytes(null);
+    setCurrentV1XlsxBlob(null);
     setV1OutputMessage(null);
     try {
       const activeWorkspace = workspace.current;
@@ -4561,13 +4563,22 @@ export function useCaseOrchestrator(
         return;
       }
       const workbook = workbookResult.workbook;
-      const xlsxSpec = buildXLSXSpec(workbook);
-      const xlsxBytes = writeXLSXBytes(xlsxSpec);
+      const checked = await buildCheckedXlsx(
+        workbook,
+        "1.0.0",
+        dependencies.clock.now(),
+      );
+      requireCurrent();
+      if (!checked.ok) throw new Error(checked.message);
+      // Blob snapshots bytes, preventing later mutation of the checked array.
+      const xlsxBlob = new Blob([checked.bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       setCurrentV1Workbook(workbook);
-      setV1XlsxBytes(xlsxBytes);
+      setCurrentV1XlsxBlob(xlsxBlob);
 
       setArchitectureBuildMessage(
-        `V1 output built: architecture → BuildSpec → ${compilation.status} compilation → workbook (${String(xlsxBytes.byteLength)} bytes). Hash: ${architecture.architectureContentSha256.slice(0, 12)}.`,
+        `V1 output built: architecture → BuildSpec → ${compilation.status} compilation → workbook (${String(xlsxBlob.size)} bytes). Generated XLSX SHA-256: ${checked.sha256}. Read-back checks model consistency only; no execution or approval is established.`,
       );
     } catch (error) {
       if (
@@ -4579,7 +4590,7 @@ export function useCaseOrchestrator(
       setV1BuildSpec(null);
       setV1CompilationResult(null);
       setCurrentV1Workbook(null);
-      setV1XlsxBytes(null);
+      setCurrentV1XlsxBlob(null);
       setArchitectureBuildMessage(
         error instanceof Error ? error.message : "Architecture build failed.",
       );
@@ -4843,14 +4854,14 @@ export function useCaseOrchestrator(
   };
 
   const downloadV1Workbook = (): void => {
-    if (v1XlsxBytes === null || activeCase === null) return;
-    const blob = new Blob([v1XlsxBytes.buffer as ArrayBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
+    const blob = v1XlsxBlobRef.current;
+    const caseId = activeCaseId.current;
+    if (blob === null || caseId === null || v1WorkbookRef.current === null)
+      return;
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `V1-Workbook-${String(activeCase.caseId)}.xlsx`;
+    anchor.download = `V1-Workbook-${String(caseId)}.xlsx`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -6077,7 +6088,7 @@ export function useCaseOrchestrator(
     importProvisionalOracle,
     restoreProvisionalOracle,
     findProvisionalOracles,
-    v1XlsxBytes,
+    v1Ready: v1XlsxBlob !== null,
     v1OutputMessage,
     downloadV1Workbook,
     recordArchitecturePolicyApproval,

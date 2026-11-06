@@ -512,7 +512,7 @@ export function App({
           }
           message={orchestrator.architectureBuildMessage}
           onBuild={orchestrator.recordArchitectureSelection}
-          v1Ready={orchestrator.v1XlsxBytes !== null}
+          v1Ready={orchestrator.v1Ready}
           onDownload={orchestrator.downloadV1Workbook}
         />
         <CaseOutputPackagePanel
