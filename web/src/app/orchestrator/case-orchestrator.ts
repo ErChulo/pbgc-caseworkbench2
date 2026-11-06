@@ -1758,7 +1758,10 @@ export function useCaseOrchestrator(
     const primaryCandidate = selectedCandidates.find(
       (candidate) =>
         candidate.artifactSha256 === draft.primaryCitation.artifactSha256 &&
-        candidate.artifactLocator === draft.primaryCitation.artifactLocator,
+        candidate.provisionIdentifier ===
+          draft.primaryCitation.provisionIdentifier &&
+        (candidate.artifactLocator === draft.primaryCitation.artifactLocator ||
+          candidate.artifactLocator === draft.primaryCitation.citationLocator),
     );
     const catalog = evidenceCatalogRef.current ?? evidenceReviewDemo.catalog;
     const predecessor =
@@ -5765,18 +5768,14 @@ function buildRuleAuthorCandidates(
     const artifact = artifactBySha256.get(candidate.artifactSha256);
     if (artifact === undefined) return [];
     // The rule-authoring contract resolves the primary citation against BOTH
-    // the proposed candidate (by artifactSha256 + artifactLocator) and the
-    // released catalog artifact (by sha256 + locator + sourceRole + released).
-    // Production candidates carry segment locators while released catalog
-    // artifacts carry the observed file-path locator, so present the pairing
-    // with the catalog artifact's locator and preserve the precise segment in
-    // citationLocator.
+    // the proposed candidate (by hash, provision and artifact or segment locator)
+    // and the released catalog artifact (by hash, file locator and source role).
+    // Keep the candidate unchanged so its content hash still binds its
+    // extraction locator. The citation separately identifies the catalog
+    // artifact and the precise candidate segment.
     return [
       {
-        candidate: {
-          ...candidate,
-          artifactLocator: artifact.locator,
-        },
+        candidate,
         citation: {
           artifactSha256: artifact.sha256,
           artifactLocator: artifact.locator,

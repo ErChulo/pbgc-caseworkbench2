@@ -228,7 +228,11 @@ export async function extractProvisionCandidate(
     return { ok: false, error: "Verbatim text must not be empty" };
   if (input.normalizedRestatement.trim().length === 0)
     return { ok: false, error: "Normalized restatement must not be empty" };
-  if (input.confidence < 0 || input.confidence > 1)
+  if (
+    !Number.isFinite(input.confidence) ||
+    input.confidence < 0 ||
+    input.confidence > 1
+  )
     return { ok: false, error: "Confidence must be between 0 and 1" };
   if (
     input.status === "unresolved" &&

@@ -209,6 +209,98 @@ describe("governed rule authoring", () => {
     });
   });
 
+  it("rejects changed candidate content, identity, and non-finite confidence", async () => {
+    const base = await input();
+    const original = await candidate();
+    for (const modified of [
+      { ...original, verbatimText: "Changed evidence." },
+      {
+        ...original,
+        candidateId:
+          "00000000-0000-4000-8000-000000000299" as typeof original.candidateId,
+      },
+      { ...original, confidence: Number.NaN },
+    ]) {
+      expect(
+        await authorRule(
+          { ...base, proposedCandidates: [modified] },
+          dependencies,
+        ),
+      ).toMatchObject({
+        ok: false,
+        error: { code: "INVALID_PRIMARY_CITATION" },
+      });
+    }
+    expect(
+      await authorRule({ ...base, confidence: Number.NaN }, dependencies),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_PRIMARY_CITATION" } });
+    expect(
+      await authorRule(
+        {
+          ...base,
+          primaryCitation: { ...citation, provisionIdentifier: "other" },
+        },
+        dependencies,
+      ),
+    ).toMatchObject({ ok: false, error: { code: "INVALID_PRIMARY_CITATION" } });
+  });
+
+  it("accepts an unchanged segment locator paired to the catalog artifact", async () => {
+    const base = await input();
+    const { extractProvisionCandidate } =
+      await import("../../../../src/domain/plan-rules/candidate-extraction");
+    const data = await candidate();
+    const segment = await extractProvisionCandidate({
+      ...data,
+      artifactLocator: "text:line=1:offset=0",
+    });
+    if (!segment.ok) throw new Error(segment.error);
+    const result = await authorRule(
+      {
+        ...base,
+        proposedCandidates: [segment.value],
+        primaryCitation: {
+          ...citation,
+          citationLocator: segment.value.artifactLocator,
+        },
+      },
+      dependencies,
+    );
+    expect(result.ok).toBe(true);
+    expect(segment.value.artifactLocator).toBe("text:line=1:offset=0");
+  });
+
+  it("rejects tampered, same-id, and different-scope predecessors", async () => {
+    const predecessor = await rule();
+    const base = { ...(await input()), effectiveDate: "2022-01-01" };
+    for (const previous of [
+      { ...predecessor, governingRestatement: "Tampered" },
+      await rule(dependencies.uuid()),
+      await rule("00000000-0000-4000-8000-000000000202"),
+    ]) {
+      const draft =
+        previous.ruleId === "00000000-0000-4000-8000-000000000202"
+          ? { ...base, affectedScope: "other" }
+          : base;
+      expect(
+        await authorRule({ ...draft, predecessor: previous }, dependencies),
+      ).toMatchObject({
+        ok: false,
+        error: { code: "SUPERSESSION_CHAIN_INVALID" },
+      });
+    }
+  });
+
+  it("snapshots authoring input before asynchronous checks", async () => {
+    const base = await input();
+    const pending = authorRule(base, dependencies);
+    base.governingRestatement = "Changed after authoring started.";
+    const result = await pending;
+    expect(result.ok && result.value.governingRestatement).toBe(
+      "The monthly benefit equals accrued benefit.",
+    );
+  });
+
   it("binds a successor to an unchanged predecessor hash with a gapless link", async () => {
     const predecessor = await rule();
     const successor = await rule(

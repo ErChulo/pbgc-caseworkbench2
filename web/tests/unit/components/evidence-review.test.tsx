@@ -8,10 +8,26 @@ import { ProvisionCandidateReview } from "../../../src/components/evidence/Provi
 import { UnresolvedItemQueue } from "../../../src/components/evidence/UnresolvedItemQueue";
 import { evidenceReviewDemo } from "../../../src/components/evidence/demo-evidence";
 import { App } from "../../../src/app/App";
+import { extractProvisionCandidate } from "../../../src/domain/plan-rules/candidate-extraction";
+import { validateUnresolvedItem } from "../../../src/domain/plan-rules/unresolved-items";
 
 afterEach(cleanup);
 
 describe("Feature 001 evidence reviewer UI", () => {
+  it("keeps synthetic candidate and unresolved-item hashes consistent", async () => {
+    for (const { candidate } of evidenceReviewDemo.candidates) {
+      expect(await extractProvisionCandidate(candidate)).toEqual({
+        ok: true,
+        value: candidate,
+      });
+    }
+    for (const item of evidenceReviewDemo.unresolvedItems) {
+      expect(await validateUnresolvedItem(item)).toEqual({
+        ok: true,
+        value: undefined,
+      });
+    }
+  });
   it("wires every evidence review stage into the application navigator", async () => {
     const user = userEvent.setup();
     render(<App />);

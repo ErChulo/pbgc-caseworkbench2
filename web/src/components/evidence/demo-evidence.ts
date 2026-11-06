@@ -26,7 +26,7 @@ const quarantinedHash = sha(
 
 const planCandidate: RuleAuthorCandidate = {
   candidate: {
-    candidateId: uuid("101"),
+    candidateId: fullUuid("39a6ebfc-bb1c-5827-a635-650e68c2c2b6"),
     artifactSha256: planHash,
     artifactLocator: "synthetic/plan-document.txt#line-18",
     provisionIdentifier: "4.1",
@@ -43,7 +43,7 @@ const planCandidate: RuleAuthorCandidate = {
     ruleSetVersion: "feature-001-plan-rule-v1",
     status: "proposed",
     candidateContentSha256: sha(
-      "a1e207803025809c48891db7700ceec4600c2b581a10f2f7bc31b20026d5c5fc",
+      "39a6ebfcbb1c4827a635650e68c2c2b6733ed368b6e52fc11a1befbeb2a7fd7d",
     ),
   },
   citation: {
@@ -57,7 +57,7 @@ const planCandidate: RuleAuthorCandidate = {
 
 const amendmentCandidate: RuleAuthorCandidate = {
   candidate: {
-    candidateId: uuid("102"),
+    candidateId: fullUuid("da4659f2-a257-593d-a605-8d2c9502bed4"),
     artifactSha256: amendmentHash,
     artifactLocator: "synthetic/amendment-01.txt#line-7",
     provisionIdentifier: "4.1",
@@ -74,7 +74,7 @@ const amendmentCandidate: RuleAuthorCandidate = {
     ruleSetVersion: "feature-001-plan-rule-v1",
     status: "proposed",
     candidateContentSha256: sha(
-      "ea19173809db917d1cb2b8bc4670fae4212c9cfa2c8d9ee636cfce825248ad61",
+      "da4659f2a257693d36058d2c9502bed4dd370e2b479ecf8d47b85d4e378b807e",
     ),
     linkedUnresolvedItemIds: [uuid("401")],
   },
@@ -221,13 +221,13 @@ export const evidenceReviewDemo: {
       openAt: timestamp("2026-07-29T12:05:00.000Z"),
       resolutionHistory: [],
       itemContentSha256: sha(
-        "f50c38512c7e493b968214b77222d1af8ffd264a32f74338605d8d0625138b7d",
+        "755864692bf56fcd67f683f6a24db48308da0f30db4be0df3dbe653ac471aaa7",
       ),
       status: "open",
       revisionOrdinal: 1,
       priorRevisionContentSha256: null,
       revisionContentSha256: sha(
-        "280bad3b9b347536ef7254ee7ec087225d422ed98723630fb7df32a372a41579",
+        "58c0275279ca90ea051486d3978a8f30c5b0de8fe420fe15592e5ea042b2b205",
       ),
     },
   ],
@@ -237,6 +237,12 @@ function uuid(suffix: string) {
   const parsed = parseUuid(
     `00000000-0000-4000-8000-${suffix.padStart(12, "0")}`,
   );
+  if (!parsed.ok) throw new Error("Synthetic UUID is invalid.");
+  return parsed.value;
+}
+
+function fullUuid(value: string) {
+  const parsed = parseUuid(value);
   if (!parsed.ok) throw new Error("Synthetic UUID is invalid.");
   return parsed.value;
 }

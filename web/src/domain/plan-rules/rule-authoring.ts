@@ -1,3 +1,4 @@
+import { extractProvisionCandidate } from "./candidate-extraction";
 import { catalogContentSha256 } from "../evidence/catalog";
 import type { EvidenceCatalog } from "../evidence/models";
 import { requiresAuthorityOverride } from "../evidence/source-roles";
@@ -59,9 +60,10 @@ export interface GovernedRuleAuthoringInput {
 }
 
 export async function authorRule(
-  input: GovernedRuleAuthoringInput,
+  suppliedInput: GovernedRuleAuthoringInput,
   dependencies: GovernanceDependencies = systemGovernanceDependencies,
 ): Promise<Result<PlanRuleRecord, AuthoringError>> {
+  const input = structuredClone(suppliedInput);
   const ruleId = parseUuid(dependencies.uuid());
   const authoredAt = parseUtcTimestamp(dependencies.now());
   if (!ruleId.ok || !authoredAt.ok) {
@@ -81,7 +83,10 @@ export async function authorRule(
     !input.proposedCandidates.some(
       (candidate) =>
         candidate.artifactSha256 === input.primaryCitation.artifactSha256 &&
-        candidate.artifactLocator === input.primaryCitation.artifactLocator,
+        candidate.provisionIdentifier ===
+          input.primaryCitation.provisionIdentifier &&
+        (candidate.artifactLocator === input.primaryCitation.artifactLocator ||
+          candidate.artifactLocator === input.primaryCitation.citationLocator),
     )
   ) {
     return authoringFailure(
@@ -101,11 +106,63 @@ export async function authorRule(
       "Rule dates must be real ISO dates and effectiveDate must not exceed endDate.",
     );
   }
-  if (input.confidence < 0 || input.confidence > 1) {
+  if (
+    !Number.isFinite(input.confidence) ||
+    input.confidence < 0 ||
+    input.confidence > 1
+  ) {
     return authoringFailure(
       "INVALID_PRIMARY_CITATION",
       "Confidence must be between zero and one.",
     );
+  }
+  if (
+    (input.reviewer as { actorType: string }).actorType !== "human" ||
+    !input.reviewer.actorKey.trim() ||
+    !input.reviewer.displayName.trim() ||
+    !input.reviewer.authorityContext.trim()
+  )
+    return authoringFailure(
+      "INVALID_PRIMARY_CITATION",
+      "A reviewer and authority context are required.",
+    );
+  for (const candidate of input.proposedCandidates) {
+    const { candidateId, candidateContentSha256, ...candidateInput } =
+      candidate;
+    try {
+      const rebuilt = await extractProvisionCandidate(candidateInput);
+      if (
+        !rebuilt.ok ||
+        rebuilt.value.candidateId !== candidateId ||
+        rebuilt.value.candidateContentSha256 !== candidateContentSha256
+      )
+        return authoringFailure(
+          "INVALID_PRIMARY_CITATION",
+          "Candidate content or identity is invalid. Re-inspect the evidence.",
+        );
+    } catch {
+      return authoringFailure(
+        "INVALID_PRIMARY_CITATION",
+        "Candidate content or identity is invalid. Re-inspect the evidence.",
+      );
+    }
+  }
+  if (input.predecessor) {
+    let validPredecessor = false;
+    try {
+      validPredecessor = (await validateRuleRecord(input.predecessor)).ok;
+    } catch {
+      validPredecessor = false;
+    }
+    if (
+      !validPredecessor ||
+      input.predecessor.ruleId === ruleId.value ||
+      input.predecessor.affectedScope !== input.affectedScope
+    )
+      return authoringFailure(
+        "SUPERSESSION_CHAIN_INVALID",
+        "The predecessor must be valid, distinct, and in the same scope.",
+      );
   }
   const applicabilityError = validateApplicability(
     input.applicabilityConditions,
@@ -261,6 +318,13 @@ export async function validateRuleRecord(
 ): Promise<Result<void, string>> {
   if (
     record.reviewStatus !== "human-approved" ||
+    (record.authorHuman as { actorType: string }).actorType !== "human" ||
+    !record.authorHuman.actorKey.trim() ||
+    !record.authorHuman.displayName.trim() ||
+    !record.authorHuman.authorityContext.trim() ||
+    !Number.isFinite(record.confidence) ||
+    record.confidence < 0 ||
+    record.confidence > 1 ||
     record.approvalRationale.trim() === ""
   ) {
     return { ok: false, error: "Final rule approval fields are invalid." };
