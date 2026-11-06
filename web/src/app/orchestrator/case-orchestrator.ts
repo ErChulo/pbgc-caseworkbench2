@@ -1,4 +1,3 @@
-import { compiledWorkbookBlocker } from "../utilities/compiled-workbook-gate";
 import {
   isCaseOutputPath,
   verifyOutputArtifactReferences,
@@ -157,7 +156,7 @@ import { buildSpecEngine } from "../../domain/build-spec/build-spec-engine";
 import type { BuildSpecV2 } from "../../domain/build-spec/models";
 import { compileBuildSpec } from "../../domain/formula-compiler/compiler";
 import type { CompilationResult } from "../../domain/formula-compiler/models";
-import { buildWorkbook } from "../../domain/workbook-builder/workbook-builder";
+import { buildCompiledWorkbook } from "../../domain/workbook-builder/workbook-builder";
 import type { V1Workbook } from "../../domain/workbook-builder/models";
 import {
   buildXLSXSpec,
@@ -3849,6 +3848,8 @@ export function useCaseOrchestrator(
       return;
     }
     setArchitectureBuildMessage(null);
+    setV1BuildSpec(null);
+    setV1CompilationResult(null);
     setV1Workbook(null);
     setV1XlsxBytes(null);
     setV1OutputMessage(null);
@@ -3997,16 +3998,6 @@ export function useCaseOrchestrator(
         uuid: { generate: () => dependencies.uuid.generate() },
       });
       setV1CompilationResult(compilation);
-      const compilationBlocker = compiledWorkbookBlocker(
-        buildSpec,
-        compilation,
-      );
-      if (compilationBlocker !== null) {
-        setV1OutputMessage(compilationBlocker);
-        setArchitectureBuildMessage(compilationBlocker);
-        return;
-      }
-
       const approvedPopulationItem = populationItems.find(
         (item) =>
           item.projection.status === "approved" &&
@@ -4043,13 +4034,16 @@ export function useCaseOrchestrator(
         populationData = dataMap;
       }
 
-      const workbookResult = await buildWorkbook({
-        buildSpec,
-        populationProfile,
-        workbookProfileContentSha256: workbookContentSha256,
-        generatorVersion: "1.0.0",
-        populationData,
-      });
+      const workbookResult = await buildCompiledWorkbook(
+        {
+          buildSpec,
+          populationProfile,
+          workbookProfileContentSha256: workbookContentSha256,
+          generatorVersion: "1.0.0",
+          populationData,
+        },
+        compilation,
+      );
 
       if (!workbookResult.ok) {
         const messages = workbookResult.errors.map((e) => e.message).join("; ");
@@ -4060,10 +4054,9 @@ export function useCaseOrchestrator(
         return;
       }
       const workbook = workbookResult.workbook;
-      setV1Workbook(workbook);
-
       const xlsxSpec = buildXLSXSpec(workbook);
       const xlsxBytes = writeXLSXBytes(xlsxSpec);
+      setV1Workbook(workbook);
       setV1XlsxBytes(xlsxBytes);
 
       setArchitectureBuildMessage(

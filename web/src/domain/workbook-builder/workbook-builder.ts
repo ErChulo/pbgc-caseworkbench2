@@ -1,3 +1,9 @@
+import { compileBuildSpec } from "../formula-compiler/compiler";
+import { validateCompiledArtifact } from "../formula-compiler/serialization";
+import type {
+  CompilationResult,
+  CompiledFormulaArtifact,
+} from "../formula-compiler/models";
 import { deterministicUuid } from "../build-spec/identity";
 import { computeWorkbookContentHash } from "./workbook-hash";
 import { validateCalculationSheetNames } from "./sheet-policy";
@@ -30,8 +36,76 @@ import {
   type PopulationDataResolver,
 } from "./population-data-resolver";
 
+/** Preliminary model builder. Production callers must use buildCompiledWorkbook. */
 export async function buildWorkbook(
   input: WorkbookGenerationInput,
+): Promise<
+  | { ok: true; workbook: V1Workbook }
+  | { ok: false; errors: readonly WorkbookGenerationError[] }
+> {
+  return buildWorkbookInternal(input);
+}
+
+/** Verify and independently reproduce compiler output before materializing it. */
+export async function buildCompiledWorkbook(
+  input: WorkbookGenerationInput,
+  compilation: CompilationResult,
+): Promise<
+  | { ok: true; workbook: V1Workbook }
+  | { ok: false; errors: readonly WorkbookGenerationError[] }
+> {
+  const blocked = (): {
+    ok: false;
+    errors: readonly WorkbookGenerationError[];
+  } => ({
+    ok: false,
+    errors: [
+      {
+        code: "COMPILED_FORMULAS_INVALID",
+        severity: "error",
+        message: "Complete, verified compiled formulas are required.",
+        affectedCells: [],
+        affectedNames: [],
+        detail:
+          "The compiler output must match a fresh compilation of this BuildSpec under the supported compiler policy.",
+        remediation:
+          "Resolve compilation blockers and regenerate the BuildSpec and compiled formulas.",
+      },
+    ],
+  });
+  const artifact = compilation.artifact;
+  if (
+    input.buildSpec.formulas.length === 0 ||
+    compilation.status !== "complete" ||
+    artifact === null ||
+    compilation.diagnostics.some((diagnostic) => diagnostic.blocksDownstream)
+  )
+    return blocked();
+  const validation = await validateCompiledArtifact(artifact);
+  if (
+    !validation.valid ||
+    artifact.deterministicPayload.status !== "complete" ||
+    artifact.deterministicPayload.blockedFormulas.length !== 0
+  )
+    return blocked();
+  const fresh = await compileBuildSpec({
+    buildSpec: input.buildSpec,
+    compilerVersion: "1.0.0",
+    clock: { now: () => artifact.operationalMetadata.generatedAt },
+    uuid: { generate: () => artifact.operationalMetadata.compilationRunId },
+  });
+  if (
+    fresh.status !== "complete" ||
+    fresh.artifact?.contentSha256 !== artifact.contentSha256 ||
+    fresh.diagnostics.some((diagnostic) => diagnostic.blocksDownstream)
+  )
+    return blocked();
+  return buildWorkbookInternal(input, fresh.artifact);
+}
+
+async function buildWorkbookInternal(
+  input: WorkbookGenerationInput,
+  compiled?: CompiledFormulaArtifact,
 ): Promise<
   | { ok: true; workbook: V1Workbook }
   | { ok: false; errors: readonly WorkbookGenerationError[] }
@@ -119,9 +193,37 @@ export async function buildWorkbook(
   const populationProfileContentSha256 =
     input.populationProfile.effectiveWorkbookProfileContentSha256 ?? zeroHash;
 
+  const compiledById =
+    compiled === undefined
+      ? null
+      : new Map(
+          compiled.deterministicPayload.compiledFormulas.map((formula) => [
+            formula.formulaId,
+            formula,
+          ]),
+        );
+  const formulas =
+    compiledById === null
+      ? input.buildSpec.formulas
+      : input.buildSpec.formulas.map((formula) => {
+          const canonical = compiledById.get(formula.formulaId);
+          if (!canonical)
+            throw new Error("Verified compiler output is missing a formula.");
+          return {
+            ...formula,
+            formulaText: `=${canonical.canonicalFormulaText}`,
+            dependencies: canonical.dependencies,
+          };
+        });
   const formulaResult = generateFormulaCells({
-    formulas: input.buildSpec.formulas,
-    executionOrder: input.buildSpec.executionOrder,
+    formulas,
+    executionOrder:
+      compiled === undefined
+        ? input.buildSpec.executionOrder
+        : {
+            ...input.buildSpec.executionOrder,
+            order: compiled.deterministicPayload.executionOrder,
+          },
   });
 
   let resolver: PopulationDataResolver | undefined;
@@ -149,6 +251,9 @@ export async function buildWorkbook(
     buildSpecContentSha256: input.buildSpec.buildSpecContentSha256,
     populationDecisionId: input.populationProfile.effectiveDecisionId,
     populationProfileContentSha256: populationProfileContentSha256,
+    ...(compiled === undefined
+      ? {}
+      : { compiledFormulaContentSha256: compiled.contentSha256 }),
   });
 
   const workbook: V1Workbook = {

@@ -34,8 +34,12 @@ import { buildSpecEngine } from "../../src/domain/build-spec/build-spec-engine";
 import { formulaApprovalContentHash } from "../../src/domain/build-spec/formula-approval";
 import type { FormulaGovernanceInput } from "../../src/domain/build-spec/models";
 import { compileBuildSpec } from "../../src/domain/formula-compiler/compiler";
-import { buildWorkbook } from "../../src/domain/workbook-builder/workbook-builder";
-import { buildXLSXSpec } from "../../src/domain/workbook-builder/serialization";
+import { buildCompiledWorkbook } from "../../src/domain/workbook-builder/workbook-builder";
+import {
+  buildXLSXSpec,
+  writeXLSXBuffer,
+} from "../../src/domain/workbook-builder/serialization";
+import * as XLSX from "xlsx";
 import {
   candidate,
   citation,
@@ -544,20 +548,41 @@ describe("Feature 005/006/007 governed production pipeline integration", () => {
     }
     populationData.set("Def_Act Non-Vested", columnMap);
 
-    const workbookResult = await buildWorkbook({
-      buildSpec,
-      populationProfile: {
-        status: "approved",
-        effectiveDecisionId: "00000000-0000-4000-8000-000000000509",
-        effectiveWorkbookProfileContentSha256: workbookProfileSha256,
-        provenance: [],
+    const workbookResult = await buildCompiledWorkbook(
+      {
+        buildSpec,
+        populationProfile: {
+          status: "approved",
+          effectiveDecisionId: "00000000-0000-4000-8000-000000000509",
+          effectiveWorkbookProfileContentSha256: workbookProfileSha256,
+          provenance: [],
+        },
+        workbookProfileContentSha256: workbookProfileSha256,
+        generatorVersion: "1.0.0",
+        populationData,
       },
-      workbookProfileContentSha256: workbookProfileSha256,
-      generatorVersion: "1.0.0",
-      populationData,
-    });
+      compilation,
+    );
     expect(workbookResult.ok).toBe(true);
     if (!workbookResult.ok) return;
+    const artifact = compilation.artifact;
+    if (!artifact) throw new Error("Expected compiled artifact.");
+    const sheetSpec = buildXLSXSpec(workbookResult.workbook);
+    const parsed = XLSX.read(writeXLSXBuffer(sheetSpec), {
+      type: "buffer",
+      sheetStubs: true,
+    });
+    for (const compiled of artifact.deterministicPayload.compiledFormulas) {
+      const cell = parsed.Sheets[compiled.target.tabName]?.[
+        compiled.target.cellAddress
+      ] as XLSX.CellObject | undefined;
+      expect(cell?.f).toBe(compiled.canonicalFormulaText);
+      expect(
+        workbookResult.workbook.formulaCells.find(
+          (entry) => entry.formulaId === compiled.formulaId,
+        )?.formulaText,
+      ).toBe(`=${compiled.canonicalFormulaText}`);
+    }
     const sheetNames = buildXLSXSpec(workbookResult.workbook).sheets.map(
       (sheet) => sheet.name,
     );
