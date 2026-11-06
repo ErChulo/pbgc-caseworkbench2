@@ -58,6 +58,17 @@ export function buildXLSXSpec(workbook: V1Workbook): XLSXWorkbookSpec {
   if (workbook.namedRanges.some((range) => !sheetNames.has(range.tabName))) {
     throw new Error("A named range refers to a missing sheet.");
   }
+  const rangeKeys = new Set<string>();
+  for (const range of workbook.namedRanges) {
+    const scope =
+      range.scope === "sheet"
+        ? `sheet:${range.tabName.toUpperCase()}`
+        : "workbook";
+    const key = `${scope}\u0000${range.rangeName.toUpperCase()}`;
+    if (rangeKeys.has(key))
+      throw new Error("Named range scope and name must be unique.");
+    rangeKeys.add(key);
+  }
 
   const calcSheets: XLSXSheet[] = workbook.sheets.map((sheet) => ({
     name: sheet.name,

@@ -225,13 +225,12 @@ function validateNamedRanges(
     }
 
     if (
-      range.scope === "sheet" &&
       !workbook.sheets.some((s) => s.name === range.tabName) &&
       !["Summary", "Tables", "UD Table"].includes(range.tabName)
     ) {
       errors.push(
         error(
-          "INVALID_NAMED_RANGE_SCOPE",
+          "INVALID_NAMED_RANGE_TARGET_SHEET",
           `Named range ${range.rangeName} references non-existent sheet ${range.tabName}.`,
           [range.cellAddress],
           [range.rangeName],
@@ -250,6 +249,41 @@ function validateFormulaCells(
   const errors: ValidationError[] = [];
   const formulaIds = new Set(workbook.formulaCells.map((f) => f.formulaId));
   const cellAddresses = new Set<string>();
+  const seenIds = new Set<string>();
+  const sheetCells = new Map<
+    string,
+    import("../workbook-builder/models").WorkbookCell
+  >();
+  for (const sheet of workbook.sheets) {
+    for (const cell of sheet.cells) {
+      const address = normalizeCellAddress(cell.address);
+      if (address === null) {
+        errors.push(
+          error(
+            "INVALID_WORKSHEET_CELL",
+            "A worksheet cell has an invalid address.",
+            [cell.address],
+            [],
+            "Correct the workbook cell and regenerate.",
+          ),
+        );
+        continue;
+      }
+      const key = `${sheet.name.toUpperCase()}\u0000${address.replaceAll("$", "")}`;
+      if (sheetCells.has(key)) {
+        errors.push(
+          error(
+            "DUPLICATE_WORKSHEET_CELL",
+            "A worksheet has multiple cells at the same address.",
+            [cell.address],
+            [],
+            "Correct the workbook cell mappings and regenerate.",
+          ),
+        );
+      } else sheetCells.set(key, cell);
+    }
+  }
+  const formulaTargets = new Set<string>();
 
   for (const formula of workbook.formulaCells) {
     const normalizedAddress = normalizeCellAddress(formula.cellAddress);
@@ -266,7 +300,20 @@ function validateFormulaCells(
       continue;
     }
 
-    if (cellAddresses.has(formula.cellAddress)) {
+    const key = `${formula.tabName.toUpperCase()}\u0000${normalizedAddress.replaceAll("$", "")}`;
+    if (seenIds.has(formula.formulaId)) {
+      errors.push(
+        error(
+          "DUPLICATE_FORMULA_ID",
+          "A formula ID is defined more than once.",
+          [formula.cellAddress],
+          [formula.formulaId],
+          "Correct the formula definitions and regenerate.",
+        ),
+      );
+    }
+    seenIds.add(formula.formulaId);
+    if (cellAddresses.has(key)) {
       errors.push(
         error(
           "DUPLICATE_FORMULA_CELL",
@@ -277,7 +324,47 @@ function validateFormulaCells(
         ),
       );
     }
-    cellAddresses.add(formula.cellAddress);
+    cellAddresses.add(key);
+    formulaTargets.add(key);
+    const mappings = workbook.cellMappings.filter(
+      (mapping) => mapping.formulaId === formula.formulaId,
+    );
+    if (
+      mappings.length !== 1 ||
+      mappings[0]?.tabName.toUpperCase() !== formula.tabName.toUpperCase() ||
+      normalizeCellAddress(mappings[0].cellAddress)?.replaceAll("$", "") !==
+        normalizedAddress.replaceAll("$", "") ||
+      (mappings[0].iobClassification !== "O" &&
+        mappings[0].iobClassification !== "B")
+    ) {
+      errors.push(
+        error(
+          "FORMULA_MAPPING_MISMATCH",
+          "Formula metadata does not match exactly one output mapping.",
+          [formula.cellAddress],
+          [formula.formulaId],
+          "Correct the formula mappings and regenerate.",
+        ),
+      );
+    }
+    const cell = sheetCells.get(key);
+    if (
+      cell?.kind !== "formula" ||
+      cell.formulaText !== formula.formulaText ||
+      !formula.formulaText.startsWith("=") ||
+      !formula.formulaText.slice(1).trim() ||
+      (cell.value !== null && cell.value !== undefined)
+    ) {
+      errors.push(
+        error(
+          "FORMULA_WORKSHEET_MISMATCH",
+          "Formula metadata does not match its worksheet cell.",
+          [formula.cellAddress],
+          [formula.formulaId],
+          "Regenerate the workbook from verified compiled formulas.",
+        ),
+      );
+    }
 
     for (const dependency of formula.dependencies) {
       if (!formulaIds.has(dependency.formulaId)) {
@@ -294,6 +381,19 @@ function validateFormulaCells(
     }
   }
 
+  for (const [key, cell] of sheetCells) {
+    if (cell.kind === "formula" && !formulaTargets.has(key)) {
+      errors.push(
+        error(
+          "UNTRACKED_WORKSHEET_FORMULA",
+          "A worksheet formula has no matching formula metadata.",
+          [cell.address],
+          [],
+          "Regenerate the workbook from verified compiled formulas.",
+        ),
+      );
+    }
+  }
   return errors;
 }
 
@@ -364,11 +464,6 @@ function detectUnreachableCells(
   const errors: ValidationError[] = [];
   const reachable = new Set<string>();
 
-  const cellMappings = workbook.cellMappings;
-  for (const mapping of cellMappings) {
-    reachable.add(mapping.cellAddress);
-  }
-
   const dependencyMap = new Map<string, string[]>();
   for (const formula of workbook.formulaCells) {
     dependencyMap.set(
@@ -377,19 +472,11 @@ function detectUnreachableCells(
     );
   }
 
-  const formulaIdToCell = new Map<string, string>();
-  for (const formula of workbook.formulaCells) {
-    formulaIdToCell.set(formula.formulaId, formula.cellAddress);
-  }
-
   const visited = new Set<string>();
   const visit = (formulaId: string): void => {
     if (visited.has(formulaId)) return;
     visited.add(formulaId);
-    const cellAddress = formulaIdToCell.get(formulaId);
-    if (cellAddress) {
-      reachable.add(cellAddress);
-    }
+    reachable.add(formulaId);
     for (const dep of dependencyMap.get(formulaId) ?? []) {
       visit(dep);
     }
@@ -402,7 +489,7 @@ function detectUnreachableCells(
   }
 
   const unreachable = workbook.formulaCells.filter(
-    (f) => !reachable.has(f.cellAddress),
+    (f) => !reachable.has(f.formulaId),
   );
   for (const formula of unreachable) {
     errors.push(

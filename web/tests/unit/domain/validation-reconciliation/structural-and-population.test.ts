@@ -129,6 +129,211 @@ describe("structural validation", () => {
     },
   );
 
+  it("rejects rehashed worksheet/model formula mismatches and orphan formulas", async () => {
+    const workbook = await fixtureWorkbook();
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("Missing sheet");
+    const original = sheet.cells.find((cell) => cell.kind === "formula");
+    if (!original) throw new Error("Missing formula cell");
+    const alterations = [
+      {
+        code: "FORMULA_WORKSHEET_MISMATCH",
+        cells: sheet.cells.filter((cell) => cell !== original),
+      },
+      {
+        code: "FORMULA_WORKSHEET_MISMATCH",
+        cells: sheet.cells.map((cell) =>
+          cell === original ? { ...cell, formulaText: "=999" } : cell,
+        ),
+      },
+      {
+        code: "FORMULA_WORKSHEET_MISMATCH",
+        cells: sheet.cells.map((cell) =>
+          cell === original ? { ...cell, value: 0 } : cell,
+        ),
+      },
+      {
+        code: "UNTRACKED_WORKSHEET_FORMULA",
+        cells: [...sheet.cells, { ...original, address: "Z99" }],
+      },
+      {
+        code: "DUPLICATE_WORKSHEET_CELL",
+        cells: [
+          ...sheet.cells,
+          {
+            ...original,
+            address: `$${original.address.replace(/([A-Z]+)([0-9]+)/u, "$1$$$2")}`,
+          },
+        ],
+      },
+    ];
+    for (const alteration of alterations) {
+      const changed = {
+        ...workbook,
+        sheets: [{ ...sheet, cells: alteration.cells }],
+      };
+      const actual = {
+        ...changed,
+        workbookContentSha256: await computeWorkbookContentHash(changed),
+      };
+      const result = await validateWorkbook({
+        workbook: actual,
+        validatorVersion: "1",
+        validatedAt: actual.generatedAt,
+      });
+      expect(result.status).toBe("invalid");
+      expect(result.errors.map((item) => item.code)).toContain(alteration.code);
+    }
+  });
+
+  it("distinguishes the same cell address on different sheets", async () => {
+    const workbook = await fixtureWorkbook();
+    const formula = workbook.formulaCells[0];
+    if (!formula) throw new Error("Missing formula");
+    const other = {
+      ...formula,
+      formulaId: "other",
+      tabName: "Other",
+      dependencies: [],
+    };
+    const mapping = workbook.cellMappings.find(
+      (m) => m.formulaId === formula.formulaId,
+    );
+    if (!mapping) throw new Error("Missing mapping");
+    const changed = {
+      ...workbook,
+      formulaCells: [...workbook.formulaCells, other],
+      sheets: [
+        ...workbook.sheets,
+        {
+          name: "Other",
+          hidden: false,
+          cells: [
+            {
+              address: other.cellAddress,
+              kind: "formula" as const,
+              formulaText: other.formulaText,
+              value: null,
+              dataSource: null,
+              mappingId: null,
+            },
+          ],
+        },
+      ],
+      cellMappings: [
+        ...workbook.cellMappings,
+        { ...mapping, formulaId: other.formulaId, tabName: other.tabName },
+      ],
+    };
+    const actual = {
+      ...changed,
+      workbookContentSha256: await computeWorkbookContentHash(changed),
+    };
+    const result = await validateWorkbook({
+      workbook: actual,
+      validatorVersion: "1",
+      validatedAt: actual.generatedAt,
+    });
+    expect(result.errors.map((item) => item.code)).not.toContain(
+      "DUPLICATE_FORMULA_CELL",
+    );
+    expect(result.errors.map((item) => item.code)).not.toContain(
+      "FORMULA_WORKSHEET_MISMATCH",
+    );
+  });
+
+  it("rejects a formula mapping that points to a different sheet or address", async () => {
+    const workbook = await fixtureWorkbook();
+    const formula = workbook.formulaCells[0];
+    if (!formula) throw new Error("Missing formula");
+    const changed = {
+      ...workbook,
+      cellMappings: workbook.cellMappings.map((mapping) =>
+        mapping.formulaId === formula.formulaId
+          ? { ...mapping, tabName: "Other" }
+          : mapping,
+      ),
+    };
+    const actual = {
+      ...changed,
+      workbookContentSha256: await computeWorkbookContentHash(changed),
+    };
+    const result = await validateWorkbook({
+      workbook: actual,
+      validatorVersion: "1",
+      validatedAt: actual.generatedAt,
+    });
+    expect(result.errors.map((item) => item.code)).toContain(
+      "FORMULA_MAPPING_MISMATCH",
+    );
+  });
+
+  it("rejects named ranges that target missing sheets even at workbook scope", async () => {
+    const workbook = await fixtureWorkbook();
+    const range = {
+      rangeName: "SYNTHETIC",
+      scope: "workbook" as const,
+      tabName: "Missing",
+      cellAddress: "A1",
+      genericField: null,
+      scenarioId: null,
+      provenance: {
+        source: "architecture" as const,
+        architectureNamedRange: "SYNTHETIC",
+      },
+    };
+    const changed = { ...workbook, namedRanges: [range] };
+    const actual = {
+      ...changed,
+      workbookContentSha256: await computeWorkbookContentHash(changed),
+    };
+    const result = await validateWorkbook({
+      workbook: actual,
+      validatorVersion: "1",
+      validatedAt: actual.generatedAt,
+    });
+    expect(result.errors.map((item) => item.code)).toContain(
+      "INVALID_NAMED_RANGE_TARGET_SHEET",
+    );
+    expect(() => buildXLSXSpec(actual)).toThrow();
+  });
+
+  it("rejects duplicate names in the same Excel scope across scenarios", async () => {
+    const workbook = await fixtureWorkbook();
+    const range = {
+      rangeName: "SYNTHETIC",
+      scope: "workbook" as const,
+      tabName: "RETIREES",
+      cellAddress: "A1",
+      genericField: null,
+      scenarioId: "ONE",
+      provenance: {
+        source: "architecture" as const,
+        architectureNamedRange: "SYNTHETIC",
+      },
+    };
+    const changed = {
+      ...workbook,
+      namedRanges: [
+        range,
+        { ...range, rangeName: "synthetic", scenarioId: "TWO" },
+      ],
+    };
+    const actual = {
+      ...changed,
+      workbookContentSha256: await computeWorkbookContentHash(changed),
+    };
+    const result = await validateWorkbook({
+      workbook: actual,
+      validatorVersion: "1",
+      validatedAt: actual.generatedAt,
+    });
+    expect(result.errors.map((item) => item.code)).toContain(
+      "DUPLICATE_NAMED_RANGE",
+    );
+    expect(() => buildXLSXSpec(actual)).toThrow("unique");
+  });
+
   it("generates deterministic validation IDs", async () => {
     const workbook = await fixtureWorkbook();
     const validated1 = await validateWorkbook({

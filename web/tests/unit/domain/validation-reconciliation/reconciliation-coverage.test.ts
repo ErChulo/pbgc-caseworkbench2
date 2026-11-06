@@ -35,7 +35,14 @@ beforeAll(async () => {
     sheets: ["Test"].map((name) => ({
       name,
       hidden: false,
-      cells: [],
+      cells: formulas.map((formula) => ({
+        address: formula.cellAddress,
+        kind: "formula",
+        formulaText: formula.formulaText,
+        value: null,
+        dataSource: null,
+        mappingId: null,
+      })),
     })),
     caseId: "case",
     buildSpecId: "spec",
@@ -61,6 +68,7 @@ beforeAll(async () => {
     namedRanges: [],
     cellMappings: formulas.map((formula) => ({
       cellAddress: formula.cellAddress,
+      tabName: formula.tabName,
       formulaId: formula.formulaId,
       iobClassification: "O",
       dataSource: null,
