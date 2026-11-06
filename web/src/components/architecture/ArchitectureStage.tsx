@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
+// Legacy persisted selections are not an authenticated approval of a generated architecture.
 export interface ArchitectureSelection {
   readonly scenarioIds: readonly string[];
   readonly tabNames: readonly string[];
@@ -9,58 +10,28 @@ export interface ArchitectureSelection {
 
 export interface ArchitectureStageProps {
   readonly enabled: boolean;
-  readonly scenarioOptions: readonly string[];
-  readonly tabOptions: readonly string[];
   readonly message: string | null;
-  readonly selection: ArchitectureSelection | null;
-  readonly onApprove: (selection: ArchitectureSelection) => Promise<void>;
+  readonly onBuild: () => Promise<void>;
   readonly v1Ready: boolean;
   readonly onDownload: () => void;
 }
 
 export function ArchitectureStage({
   enabled,
-  scenarioOptions,
-  tabOptions,
   message,
-  selection,
-  onApprove,
+  onBuild,
   v1Ready,
   onDownload,
 }: ArchitectureStageProps) {
-  const [scenarios, setScenarios] = useState<readonly string[]>([]);
-  const [tabs, setTabs] = useState<readonly string[]>([]);
-  const [reviewer, setReviewer] = useState("");
-  const [rationale, setRationale] = useState("");
   const [busy, setBusy] = useState(false);
-  const selectedScenarioSet = useMemo(() => new Set(scenarios), [scenarios]);
-  const selectedTabSet = useMemo(() => new Set(tabs), [tabs]);
-
-  const toggle = (
-    value: string,
-    current: readonly string[],
-    setCurrent: (next: readonly string[]) => void,
-  ) => {
-    const next = new Set(current);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    setCurrent([...next].sort());
-  };
-
-  const approve = async () => {
+  const build = async () => {
     setBusy(true);
     try {
-      await onApprove({
-        scenarioIds: [...scenarios].sort(),
-        tabNames: [...tabs].sort(),
-        reviewer: reviewer.trim(),
-        rationale: rationale.trim(),
-      });
+      await onBuild();
     } finally {
       setBusy(false);
     }
   };
-
   return (
     <section className="case-panel" aria-labelledby="architecture-stage-title">
       <div className="panel-heading">
@@ -69,88 +40,26 @@ export function ArchitectureStage({
           <h2 id="architecture-stage-title">Architecture selection</h2>
         </div>
         <span className="status-chip status-chip-warning">
-          Human approval required
+          Human review required
         </span>
       </div>
       <p>
-        Select the scenarios and population tabs that will be used to construct
-        the V1 calculation engine. Reference matches remain proposals only.
+        Build a proposed architecture from the current approved rules,
+        population reviews, policies, and case controls. The rules determine
+        scenarios and tabs. Building does not record an architecture approval or
+        approve a workbook.
       </p>
-      <fieldset disabled={!enabled || busy}>
-        <legend>Calculation scenarios</legend>
-        {scenarioOptions.length === 0 ? (
-          <p>No governed scenarios are available.</p>
-        ) : null}
-        {scenarioOptions.map((value) => (
-          <label key={value} className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={selectedScenarioSet.has(value)}
-              onChange={() => {
-                toggle(value, scenarios, setScenarios);
-              }}
-            />
-            {value}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset disabled={!enabled || busy}>
-        <legend>Source tabs</legend>
-        {tabOptions.length === 0 ? (
-          <p>No approved population tabs are available.</p>
-        ) : null}
-        {tabOptions.map((value) => (
-          <label key={value} className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={selectedTabSet.has(value)}
-              onChange={() => {
-                toggle(value, tabs, setTabs);
-              }}
-            />
-            {value}
-          </label>
-        ))}
-      </fieldset>
-      <label>
-        Reviewer
-        <input
-          value={reviewer}
-          onChange={(event) => {
-            setReviewer(event.currentTarget.value);
-          }}
-          disabled={!enabled || busy}
-        />
-      </label>
-      <label>
-        Architecture approval rationale
-        <textarea
-          value={rationale}
-          onChange={(event) => {
-            setRationale(event.currentTarget.value);
-          }}
-          disabled={!enabled || busy}
-          rows={3}
-        />
-      </label>
       <button
         type="button"
         className="button button-primary"
-        disabled={
-          !enabled ||
-          busy ||
-          scenarios.length === 0 ||
-          tabs.length === 0 ||
-          reviewer.trim() === "" ||
-          rationale.trim() === ""
-        }
-        onClick={() => void approve()}
+        disabled={!enabled || busy}
+        onClick={() => void build()}
       >
-        Approve architecture selection
+        Build proposed architecture
       </button>
       {!enabled ? (
         <p className="form-message form-message-warning">
-          Create or resume a case before selecting architecture.
+          Create or resume a case before building an architecture.
         </p>
       ) : null}
       {message !== null ? (
@@ -166,14 +75,6 @@ export function ArchitectureStage({
         >
           Download V1 Workbook (.xlsx)
         </button>
-      ) : null}
-      {selection !== null ? (
-        <div className="case-output-linked-artifacts">
-          <h3>Governed selection</h3>
-          <p>Scenarios: {selection.scenarioIds.join(", ")}</p>
-          <p>Tabs: {selection.tabNames.join(", ")}</p>
-          <p>Approved by {selection.reviewer}</p>
-        </div>
       ) : null}
     </section>
   );

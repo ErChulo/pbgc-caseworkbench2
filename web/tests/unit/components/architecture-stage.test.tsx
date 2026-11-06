@@ -8,48 +8,28 @@ import { App } from "../../../src/app/App";
 afterEach(cleanup);
 
 describe("governed architecture stage UI", () => {
-  it("requires explicit human selection and approval inputs", async () => {
+  it("requests a proposal without claiming to record an approval", async () => {
     const user = userEvent.setup();
-    const onApprove = vi.fn().mockResolvedValue(undefined);
-
+    const onBuild = vi.fn().mockResolvedValue(undefined);
     render(
       <ArchitectureStage
         enabled
-        scenarioOptions={["DOR", "NRD"]}
-        tabOptions={["RETIREES", "TERMS"]}
         message={null}
-        selection={null}
-        onApprove={onApprove}
+        onBuild={onBuild}
         v1Ready={false}
         onDownload={vi.fn()}
       />,
     );
-
     expect(
-      screen.getByRole("heading", { name: "Architecture selection" }),
+      screen.getByText(/does not record an architecture approval/u),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Approve architecture selection" }),
-    ).toBeDisabled();
-
-    await user.click(screen.getByLabelText("DOR"));
-    await user.click(screen.getByLabelText("RETIREES"));
-    await user.type(screen.getByLabelText("Reviewer"), "Synthetic Reviewer");
-    await user.type(
-      screen.getByLabelText("Architecture approval rationale"),
-      "Governed scenario and tab approval.",
-    );
-
+      screen.queryByRole("button", { name: /approve architecture/i }),
+    ).not.toBeInTheDocument();
     await user.click(
-      screen.getByRole("button", { name: "Approve architecture selection" }),
+      screen.getByRole("button", { name: "Build proposed architecture" }),
     );
-
-    expect(onApprove).toHaveBeenCalledWith({
-      scenarioIds: ["DOR"],
-      tabNames: ["RETIREES"],
-      reviewer: "Synthetic Reviewer",
-      rationale: "Governed scenario and tab approval.",
-    });
+    expect(onBuild).toHaveBeenCalledWith();
   });
 
   it("renders the architecture stage inside the application shell", () => {
@@ -59,7 +39,7 @@ describe("governed architecture stage UI", () => {
       screen.getByRole("heading", { name: "Architecture selection" }),
     ).toBeVisible();
     expect(
-      screen.getByText(/Reference matches remain proposals only./u),
+      screen.getByText(/does not record an architecture approval/u),
     ).toBeVisible();
   });
 });

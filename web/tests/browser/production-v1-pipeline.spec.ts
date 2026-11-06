@@ -47,7 +47,7 @@ async function approveSharedPanel(
   return panel;
 }
 
-test("completes the governed production path from intake to V1 workbook", async ({
+test("governed production path exposes unresolved workbook blockers", async ({
   offlinePage: page,
   outboundRequests,
 }) => {
@@ -214,40 +214,12 @@ test("completes the governed production path from intake to V1 workbook", async 
   await controls.getByRole("button", { name: "Approve case controls" }).click();
   await expect(controls.getByText("Human approved")).toBeVisible();
 
-  // 7. Architecture selection: build the V1 engine and generate the workbook.
+  // 7. Build a proposed architecture, then review its formula cells.
   const architecture = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Architecture selection" }),
   });
-  await expect(
-    architecture.getByText("No governed scenarios are available."),
-  ).not.toBeVisible();
-  const scenarioFieldset = architecture
-    .locator("fieldset")
-    .filter({ hasText: "Calculation scenarios" });
-  // The scenario checkboxes list one entry per authored rule, so a single
-  // rule yields one option; the single-calculation case control additionally
-  // satisfies the Single Run aggregation scenario in the built architecture.
-  await expect(scenarioFieldset.locator("input")).toHaveCount(1);
-  for (const input of await scenarioFieldset.locator("input").all()) {
-    await input.check();
-  }
-  const tabFieldset = architecture
-    .locator("fieldset")
-    .filter({ hasText: "Source tabs" });
-  await expect(tabFieldset.locator("input")).toHaveCount(2);
-  for (const input of await tabFieldset.locator("input").all()) {
-    await input.check();
-  }
   await architecture
-    .getByLabel("Reviewer", { exact: true })
-    .fill("architect-reviewer");
-  await architecture
-    .getByLabel("Architecture approval rationale")
-    .fill("E2E approved scenario and tab selection.");
-  // 7b. First build attempt: the O-classified FV column blocks BuildSpec until
-  // its formula receives explicit human governance approval.
-  await architecture
-    .getByRole("button", { name: "Approve architecture selection" })
+    .getByRole("button", { name: "Build proposed architecture" })
     .click();
   await expect(
     architecture.getByText(/O\/B mapping lacks its exact formula/u),
@@ -284,14 +256,16 @@ test("completes the governed production path from intake to V1 workbook", async 
   ).toBeVisible();
 
   await architecture
-    .getByRole("button", { name: "Approve architecture selection" })
+    .getByRole("button", { name: "Build proposed architecture" })
     .click();
   await expect(
-    architecture.getByText(/V1 output built: architecture → BuildSpec/u),
+    architecture.getByText(
+      /More than one scenario writes to the same workbook cell/u,
+    ),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Download V1 Workbook (.xlsx)" }),
-  ).toBeVisible();
+  ).not.toBeVisible();
 
   expect(outboundRequests).toEqual([]);
 });

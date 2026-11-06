@@ -1070,9 +1070,7 @@ export interface CaseOrchestrator {
   readonly exportFinalCaseworkOutputPackage: () => Promise<void>;
   readonly exportCurrentManifest: () => Promise<void>;
   readonly generateDraftV1Summary: (file: File) => Promise<void>;
-  readonly recordArchitectureSelection: (
-    selection: ArchitectureSelection,
-  ) => Promise<void>;
+  readonly recordArchitectureSelection: () => Promise<void>;
   readonly processPackage: (
     files: readonly File[],
     signal: AbortSignal,

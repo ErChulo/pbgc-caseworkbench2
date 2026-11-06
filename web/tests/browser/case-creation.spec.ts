@@ -42,7 +42,7 @@ test("creates one production case and requires an explicit duplicate decision", 
   await expect(page.getByTestId("active-case-authoritative-id")).toHaveText(
     "PBGC-SYNTHETIC-001",
   );
-  await expect(page.getByText("Active case")).toBeVisible();
+  await expect(page.getByText("Active case", { exact: true })).toBeVisible();
 
   // Return to workspace home and create a duplicate to trigger collision
   await page.getByRole("button", { name: "Return to workspace home" }).click();

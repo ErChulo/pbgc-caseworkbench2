@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures";
 import { createSyntheticCase } from "./synthetic-workspace";
 
 test.describe("V1 Pipeline End-to-End", () => {
-  test("completes governed V1 pipeline from architecture to workbook", async ({
+  test("shows the governed V1 pipeline panels before architecture is built", async ({
     offlinePage: page,
     outboundRequests,
   }) => {

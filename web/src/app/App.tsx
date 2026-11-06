@@ -496,15 +496,8 @@ export function App({
           enabled={
             orchestrator.workspaceReady && orchestrator.activeCase !== null
           }
-          scenarioOptions={orchestrator.previewRules.map(
-            (rule) => rule.affectedScope,
-          )}
-          tabOptions={orchestrator.populationItems.map(
-            (item) => item.displayName,
-          )}
           message={orchestrator.architectureBuildMessage}
-          selection={orchestrator.architectureSelection}
-          onApprove={orchestrator.recordArchitectureSelection}
+          onBuild={orchestrator.recordArchitectureSelection}
           v1Ready={orchestrator.v1XlsxBytes !== null}
           onDownload={orchestrator.downloadV1Workbook}
         />
