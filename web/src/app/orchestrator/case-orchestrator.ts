@@ -1,3 +1,5 @@
+import { architectureBuildIsCurrent } from "../utilities/architecture-build-freshness";
+import { verifyPopulationSourceInWorkspace } from "../../adapters/filesystem/verified-population-source";
 import { populationReviewBlocker } from "../utilities/population-review-guard";
 import {
   isCaseOutputPath,
@@ -1105,6 +1107,7 @@ export function useCaseOrchestrator(
     null,
   );
   const activeCaseId = useRef<Uuid | null>(null);
+  const architectureBuildSequence = useRef(0);
   const priorSnapshot = useRef<PackageSnapshot | null>(null);
   const inventoryCheckpoints = useRef(
     new Map<string, InventoryCheckpointReference>(),
@@ -1305,6 +1308,7 @@ export function useCaseOrchestrator(
   };
 
   const resetCaseScopedState = (previewMode: boolean): void => {
+    architectureBuildSequence.current += 1;
     priorSnapshot.current = null;
     inventoryCheckpoints.current.clear();
     lastCheckpoint.current = null;
@@ -1342,6 +1346,7 @@ export function useCaseOrchestrator(
     setEvidenceUnresolvedRecords(
       previewMode ? evidenceReviewDemo.unresolvedItems : [],
     );
+    architectureBuildSequence.current += 1;
     setPreviewRules([]);
     setRuleAuthoringOutcome(null);
     setRuleAuthoringBusy(false);
@@ -1772,6 +1777,7 @@ export function useCaseOrchestrator(
       return;
     }
     const persisted = await persistPlanRuleRecord(result.value);
+    architectureBuildSequence.current += 1;
     setPreviewRules((current) => [...current, result.value]);
     setRuleAuthoringOutcome({
       kind: "success",
@@ -1789,6 +1795,7 @@ export function useCaseOrchestrator(
     }
     setEvidenceUnresolvedItems(evidenceReviewDemo.unresolvedItems);
     setEvidenceUnresolvedRecords(evidenceReviewDemo.unresolvedItems);
+    architectureBuildSequence.current += 1;
     setPreviewRules([]);
     setRuleAuthoringOutcome(null);
     setRuleAuthoringBusy(false);
@@ -3851,7 +3858,9 @@ export function useCaseOrchestrator(
       );
       return;
     }
+    const buildSequence = ++architectureBuildSequence.current;
     setArchitectureBuildMessage(null);
+    setV1Architecture(null);
     setV1BuildSpec(null);
     setV1CompilationResult(null);
     setV1Workbook(null);
@@ -3861,6 +3870,30 @@ export function useCaseOrchestrator(
       const activeWorkspace = workspace.current;
       if (activeWorkspace === null) throw new Error("Workspace unavailable.");
 
+      const reviewState = caseReviewState.current;
+      const snapshot = priorSnapshot.current;
+      const catalog = evidenceCatalogRef.current;
+      const stillCurrent = () =>
+        architectureBuildIsCurrent({
+          buildSequence,
+          currentBuildSequence: architectureBuildSequence.current,
+          caseId: activeCase.caseId,
+          activeCaseId: activeCaseId.current,
+          workspace: activeWorkspace,
+          currentWorkspace: workspace.current,
+          snapshot,
+          currentSnapshot: priorSnapshot.current,
+          reviewState,
+          currentReviewState: caseReviewState.current,
+          catalog,
+          currentCatalog: evidenceCatalogRef.current,
+        });
+      const requireCurrent = () => {
+        if (!stillCurrent())
+          throw new Error(
+            "Case evidence or review changed during the build. Run it again.",
+          );
+      };
       const rules = previewRules;
       for (const rule of rules) {
         const validation = await validateRuleRecord(rule);
@@ -3868,34 +3901,61 @@ export function useCaseOrchestrator(
       }
       const overrides: readonly AuthorityOverride[] = [];
 
-      const populationItems = caseReviewState.current.populationItems;
-      if (
-        populationItems.some(
-          (item) =>
-            item.projection.status === "approved" &&
-            item.workbook &&
-            item.namedRanges === undefined,
+      const populationItems = reviewState.populationItems;
+      const populationCandidates: {
+        candidate: PopulationReviewItem["candidate"];
+        workbook: NonNullable<PopulationReviewItem["workbook"]>;
+        namedRanges: NonNullable<PopulationReviewItem["namedRanges"]>;
+        evidenceObservations: NonNullable<
+          PopulationReviewItem["evidenceObservations"]
+        >;
+        decisions: readonly PopulationCandidateDecision[];
+      }[] = [];
+      for (const item of populationItems) {
+        if (
+          item.projection.status !== "approved" ||
+          item.workbook === undefined
         )
-      ) {
-        throw new Error(
-          "An approved workbook population was inspected without defined-name inventory. Re-inspect and review the updated candidate, and supersede the outdated approval.",
+          continue;
+        if (snapshot === null || item.namedRanges === undefined)
+          throw new Error(
+            "Approved workbook population needs a current evidence snapshot and defined-name inventory. Re-inspect and review it.",
+          );
+        const decisions = reviewState.populationDecisions.filter(
+          (d) => d.candidateKey === item.candidate.candidateKey,
         );
+        const observations = item.evidenceObservations ?? [];
+        const verified = await verifyPopulationSourceInWorkspace({
+          workspace: activeWorkspace,
+          snapshot,
+          candidate: item.candidate,
+          observations,
+          decisions,
+          storedWorkbook: item.workbook,
+          storedNamedRanges: item.namedRanges,
+          storedProfileHash: item.workbookProfileContentSha256,
+        });
+        requireCurrent();
+        if (!verified.ok)
+          throw new Error(
+            `Population verification blocked: ${verified.message}`,
+          );
+        if (
+          canonicalize(verified.value.populationDecision) !==
+          canonicalize(item.projection)
+        )
+          throw new Error(
+            "The population review projection is stale. Review the source again.",
+          );
+        populationCandidates.push({
+          candidate: item.candidate,
+          workbook: verified.value.workbook,
+          namedRanges: verified.value.namedRanges,
+          evidenceObservations: observations,
+          decisions,
+        });
       }
-      const populationCandidates = populationItems.flatMap((item) =>
-        item.projection.status === "approved" && item.workbook
-          ? [
-              {
-                candidate: item.candidate,
-                workbook: item.workbook,
-                namedRanges: item.namedRanges,
-                evidenceObservations: item.evidenceObservations ?? [],
-                decisions: caseReviewState.current.populationDecisions.filter(
-                  (d) => d.candidateKey === item.candidate.candidateKey,
-                ),
-              },
-            ]
-          : [],
-      );
+      requireCurrent();
 
       const loadedPolicies = await loadBundledRuleSets({
         scenarioSelection: scenarioSelectionYaml,
@@ -3908,6 +3968,7 @@ export function useCaseOrchestrator(
           decisions: architecturePolicyApprovals,
         },
       });
+      requireCurrent();
       if (!loadedPolicies.ok)
         throw new Error("Architecture policies could not be loaded.");
 
@@ -3928,6 +3989,7 @@ export function useCaseOrchestrator(
         },
       });
 
+      requireCurrent();
       if (!architectureResult.ok) {
         const blocker = architectureResult.error;
         const message =
@@ -3944,6 +4006,7 @@ export function useCaseOrchestrator(
 
       const architecture = architectureResult.value.architecture;
       await persistArchitecture(activeCase.caseId, architecture);
+      requireCurrent();
       setV1Architecture(architecture);
       setArchitectureSelection(null);
 
@@ -3995,6 +4058,7 @@ export function useCaseOrchestrator(
         },
       });
 
+      requireCurrent();
       if (!buildSpecResult.ok) {
         const messages = buildSpecResult.errors
           .map((e) => e.message)
@@ -4013,11 +4077,16 @@ export function useCaseOrchestrator(
         clock: { now: () => dependencies.clock.now() },
         uuid: { generate: () => dependencies.uuid.generate() },
       });
+      requireCurrent();
       setV1CompilationResult(compilation);
       const approvedPopulationItem = populationItems.find(
         (item) =>
           item.projection.status === "approved" &&
-          item.projection.effectiveDecisionId !== null,
+          item.projection.effectiveDecisionId !== null &&
+          populationCandidates.some(
+            (candidate) =>
+              candidate.candidate.candidateKey === item.candidate.candidateKey,
+          ),
       );
 
       const populationProfile = approvedPopulationItem?.projection ?? {
@@ -4041,6 +4110,7 @@ export function useCaseOrchestrator(
         compilation,
       );
 
+      requireCurrent();
       if (!workbookResult.ok) {
         const messages = workbookResult.errors.map((e) => e.message).join("; ");
         setV1OutputMessage(`Workbook generation failed: ${messages}`);
@@ -4059,6 +4129,16 @@ export function useCaseOrchestrator(
         `V1 output built: architecture → BuildSpec → ${compilation.status} compilation → workbook (${String(xlsxBytes.byteLength)} bytes). Hash: ${architecture.architectureContentSha256.slice(0, 12)}.`,
       );
     } catch (error) {
+      if (
+        activeCaseId.current !== activeCase.caseId ||
+        architectureBuildSequence.current !== buildSequence
+      )
+        return;
+      setV1Architecture(null);
+      setV1BuildSpec(null);
+      setV1CompilationResult(null);
+      setV1Workbook(null);
+      setV1XlsxBytes(null);
       setArchitectureBuildMessage(
         error instanceof Error ? error.message : "Architecture build failed.",
       );

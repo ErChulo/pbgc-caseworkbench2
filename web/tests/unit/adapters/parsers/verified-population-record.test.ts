@@ -1,3 +1,10 @@
+import {
+  parseUuid,
+  parseUtcTimestamp,
+} from "../../../../src/domain/shared/types";
+import { verifyPopulationSourceInWorkspace } from "../../../../src/adapters/filesystem/verified-population-source";
+import { bytesReader } from "../../../../src/app/utilities/file-readers";
+import { createPackageSnapshot } from "../../../../src/domain/attempts/snapshot";
 import { describe, expect, it } from "vitest";
 import { projectVerifiedPopulationRecord } from "../../../../src/adapters/parsers/verified-population-record";
 import { parseWorkbookPassive } from "../../../../src/adapters/parsers/workbook-parser";
@@ -148,6 +155,106 @@ describe("byte-bound population record review", () => {
     expect(
       await projectVerifiedPopulationRecord({ ...input, candidate: forged }),
     ).toMatchObject({ ok: false, code: "POPULATION_CANDIDATE_MISMATCH" });
+  });
+
+  it("binds the stored profile to the case snapshot and preserved bytes", async () => {
+    const input = await fixture();
+    const extraction = parseWorkbookPassive(input.bytes);
+    const workbook = adaptWorkbookExtraction(extraction);
+    const names = adaptWorkbookNamedRanges(extraction);
+    if (!names.ok) throw new Error("Fixture names unavailable");
+    const approval = input.decisions[0];
+    if (!approval) throw new Error("Fixture approval unavailable");
+    const uuid = parseUuid(approval.decisionId);
+    const timestamp = parseUtcTimestamp(approval.decisionTimestamp);
+    if (!uuid.ok || !timestamp.ok) throw new Error("Fixture metadata invalid");
+    const snapshot = await createPackageSnapshot(
+      [
+        {
+          observedRelativePath: "synthetic.xlsx",
+          normalizedDisplayPath: "synthetic.xlsx",
+          sha256: input.candidate.artifactSha256,
+          sizeBytes: input.bytes.byteLength,
+          declaredMediaType: null,
+          lastModifiedObserved: null,
+        },
+      ],
+      {
+        uuid: { generate: () => uuid.value },
+        clock: { now: () => timestamp.value },
+      },
+    );
+    const workspace = {
+      openChunkReader: () =>
+        Promise.resolve({ ok: true as const, value: bytesReader(input.bytes) }),
+    };
+    const request = {
+      workspace,
+      snapshot,
+      candidate: input.candidate,
+      observations: input.observations,
+      decisions: input.decisions,
+      storedWorkbook: workbook,
+      storedNamedRanges: names.ranges,
+      storedProfileHash: approval.workbookProfileContentSha256,
+    };
+    expect(await verifyPopulationSourceInWorkspace(request)).toMatchObject({
+      ok: true,
+    });
+    expect(
+      await verifyPopulationSourceInWorkspace({
+        ...request,
+        storedWorkbook: { ...workbook, sheets: [] },
+      }),
+    ).toMatchObject({ ok: false, code: "STORED_PROFILE_MISMATCH" });
+    expect(
+      await verifyPopulationSourceInWorkspace({
+        ...request,
+        snapshot: { ...snapshot, entries: [] },
+      }),
+    ).toMatchObject({ ok: false, code: "SNAPSHOT_INVALID" });
+    const emptySnapshot = await createPackageSnapshot([], {
+      uuid: { generate: () => uuid.value },
+      clock: { now: () => timestamp.value },
+    });
+    expect(
+      await verifyPopulationSourceInWorkspace({
+        ...request,
+        snapshot: emptySnapshot,
+      }),
+    ).toMatchObject({ ok: false, code: "SOURCE_NOT_IN_SNAPSHOT" });
+    const changed = new Uint8Array(input.bytes);
+    changed[0] = (changed[0] ?? 0) ^ 1;
+    expect(
+      await verifyPopulationSourceInWorkspace({
+        ...request,
+        workspace: {
+          openChunkReader: () =>
+            Promise.resolve({ ok: true as const, value: bytesReader(changed) }),
+        },
+      }),
+    ).toMatchObject({ ok: false, code: "SOURCE_BYTES_MISMATCH" });
+    const badReader = {
+      ...bytesReader(input.bytes),
+      read: () =>
+        Promise.resolve({
+          ok: true as const,
+          value: {
+            offsetBytes: 0,
+            bytes: new Uint8Array(0),
+            endOfSource: true,
+          },
+        }),
+    };
+    expect(
+      await verifyPopulationSourceInWorkspace({
+        ...request,
+        workspace: {
+          openChunkReader: () =>
+            Promise.resolve({ ok: true as const, value: badReader }),
+        },
+      }),
+    ).toMatchObject({ ok: false, code: "SOURCE_READ_FAILED" });
   });
 
   it("does not treat a formula cached result as a participant value", async () => {
