@@ -1,3 +1,4 @@
+import { hashTyped } from "../../../../src/domain/manifests/canonical-json";
 import { buildCheckedXlsx } from "../../../../src/domain/workbook-builder/checked-xlsx";
 import { sha256Bytes } from "../../../../src/domain/shared/digest";
 import { validateWorkbook } from "../../../../src/domain/validation-reconciliation/structural-validator";
@@ -152,6 +153,23 @@ describe("compiled workbook generation", () => {
       built.workbook.workbookContentSha256,
     );
     expect(checked.sha256).toBe(await sha256Bytes(checked.bytes));
+    const { diagnostic, bytes: reportBytes, bytesSha256 } = checked.diagnostic;
+    expect(diagnostic.kind).toBe("provisional-workbook-diagnostic");
+    expect(diagnostic.outcome).toBe("model-and-readback-consistent");
+    expect(diagnostic.readbackStatus).toBe("passed");
+    expect(diagnostic.blockedReason).toBeNull();
+    expect(diagnostic.generatedXlsxSha256).toBe(checked.sha256);
+    expect(diagnostic.generatedXlsxSizeBytes).toBe(checked.bytes.length);
+    expect(bytesSha256).toBe(await sha256Bytes(reportBytes));
+    expect(
+      JSON.parse(new TextDecoder().decode(reportBytes)) as unknown,
+    ).toEqual(diagnostic);
+    const { diagnosticContentSha256, ...payload } = diagnostic;
+    expect(
+      await hashTyped(payload, { typeName: "ProvisionalWorkbookDiagnostic" }),
+    ).toBe(diagnosticContentSha256);
+    expect("reviewer" in diagnostic).toBe(false);
+    expect("approval" in diagnostic).toBe(false);
     const blob = new Blob([checked.bytes]);
     checked.bytes[0] = (checked.bytes[0] ?? 0) ^ 1;
     const downloaded = await new Promise<Uint8Array<ArrayBuffer>>(
@@ -200,6 +218,47 @@ describe("compiled workbook generation", () => {
     if (rejected.ok) throw new Error("Altered model accepted");
     expect(rejected.message).toContain("FORMULA_WORKSHEET_MISMATCH");
     expect("bytes" in rejected).toBe(false);
+    if (!rejected.diagnostic)
+      throw new Error("Blocked model diagnostic missing");
+    expect(rejected.diagnostic.diagnostic.outcome).toBe("model-findings");
+    expect(rejected.diagnostic.diagnostic.readbackStatus).toBe("not-run");
+    expect(rejected.diagnostic.diagnostic.blockedReason).toContain(
+      "FORMULA_WORKSHEET_MISMATCH",
+    );
+    expect(rejected.diagnostic.diagnostic.generatedXlsxSha256).toBeNull();
+    expect(
+      rejected.diagnostic.diagnostic.validation.errors.some(
+        (error) => error.code === "FORMULA_WORKSHEET_MISMATCH",
+      ),
+    ).toBe(true);
+  });
+  it("makes a blocked model diagnostic when XLSX serialization fails", async () => {
+    const { input, compilation } = await fixture();
+    const built = await buildCompiledWorkbook(input, compilation);
+    if (!built.ok) throw new Error("Synthetic build failed");
+    const large = {
+      ...built.workbook,
+      support: {
+        ...built.workbook.support,
+        summarySheet: {
+          ...built.workbook.support.summarySheet,
+          generatorVersion: "x".repeat(32_768),
+        },
+      },
+    };
+    const workbook = {
+      ...large,
+      workbookContentSha256: await computeWorkbookContentHash(large),
+    };
+    const result = await buildCheckedXlsx(workbook, "1.0.0", fixedClock.now());
+    expect(result.ok).toBe(false);
+    if (result.ok || !result.diagnostic)
+      throw new Error("Missing blocked diagnostic");
+    expect(result.diagnostic.diagnostic.validation.status).toBe("valid");
+    expect(result.diagnostic.diagnostic.outcome).toBe("serialization-failed");
+    expect(result.diagnostic.diagnostic.readbackStatus).toBe("not-run");
+    expect(result.diagnostic.diagnostic.generatedXlsxSha256).toBeNull();
+    expect("bytes" in result).toBe(false);
   });
   it("blocks a no-formula workbook rather than publishing it as a calculation engine", async () => {
     const { input, compilation } = await fixture();

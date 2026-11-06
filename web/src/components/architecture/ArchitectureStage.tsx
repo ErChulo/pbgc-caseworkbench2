@@ -14,6 +14,8 @@ export interface ArchitectureStageProps {
   readonly onBuild: () => Promise<void>;
   readonly v1Ready: boolean;
   readonly onDownload: () => void;
+  readonly diagnosticReady: boolean;
+  readonly onDownloadDiagnostic: () => void;
 }
 
 export function ArchitectureStage({
@@ -22,6 +24,8 @@ export function ArchitectureStage({
   onBuild,
   v1Ready,
   onDownload,
+  diagnosticReady,
+  onDownloadDiagnostic,
 }: ArchitectureStageProps) {
   const [busy, setBusy] = useState(false);
   const build = async () => {
@@ -67,6 +71,17 @@ export function ArchitectureStage({
         <p className="notice" role="status">
           {message}
         </p>
+      ) : null}
+      {diagnosticReady ? (
+        <div>
+          <p>
+            The local diagnostic can include case details. It is not execution,
+            reconciliation, or approval evidence.
+          </p>
+          <button type="button" onClick={onDownloadDiagnostic}>
+            Download provisional workbook diagnostic (.json)
+          </button>
+        </div>
       ) : null}
       {v1Ready ? (
         <button

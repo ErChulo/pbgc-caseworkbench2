@@ -18,6 +18,8 @@ describe("governed architecture stage UI", () => {
         onBuild={onBuild}
         v1Ready={false}
         onDownload={vi.fn()}
+        diagnosticReady={false}
+        onDownloadDiagnostic={vi.fn()}
       />,
     );
     expect(
@@ -33,6 +35,33 @@ describe("governed architecture stage UI", () => {
       screen.getByRole("button", { name: "Build proposed architecture" }),
     );
     expect(onBuild).toHaveBeenCalledWith();
+  });
+
+  it("allows a provisional diagnostic for a blocked workbook without enabling download", async () => {
+    const onDownloadDiagnostic = vi.fn();
+    render(
+      <ArchitectureStage
+        enabled
+        message="Workbook model checks blocked output"
+        onBuild={() => Promise.resolve()}
+        v1Ready={false}
+        onDownload={vi.fn()}
+        diagnosticReady
+        onDownloadDiagnostic={onDownloadDiagnostic}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Download V1 Workbook (.xlsx)" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/not execution, reconciliation, or approval evidence/),
+    ).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Download provisional workbook diagnostic (.json)",
+      }),
+    );
+    expect(onDownloadDiagnostic).toHaveBeenCalledOnce();
   });
 
   it("renders the architecture stage inside the application shell", () => {

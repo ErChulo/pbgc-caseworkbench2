@@ -514,6 +514,8 @@ export function App({
           onBuild={orchestrator.recordArchitectureSelection}
           v1Ready={orchestrator.v1Ready}
           onDownload={orchestrator.downloadV1Workbook}
+          diagnosticReady={orchestrator.v1DiagnosticReady}
+          onDownloadDiagnostic={orchestrator.downloadV1Diagnostic}
         />
         <CaseOutputPackagePanel
           payload={finalOutputPayload}

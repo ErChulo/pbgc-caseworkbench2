@@ -482,6 +482,11 @@ test("governed production path exposes unresolved workbook blockers", async ({
   await expect(
     page.getByRole("button", { name: "Download V1 Workbook (.xlsx)" }),
   ).not.toBeVisible();
+  await expect(
+    architecture.getByRole("button", {
+      name: "Download provisional workbook diagnostic (.json)",
+    }),
+  ).not.toBeVisible();
 
   // A subsequent build must re-read the source, not trust the saved profile.
   await page.evaluate((sha) => {
