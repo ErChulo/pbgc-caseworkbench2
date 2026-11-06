@@ -3,6 +3,10 @@ import { hashTyped } from "../manifests/canonical-json";
 import type { Sha256 } from "../shared/types";
 import type { V1Workbook, WorkbookSheet, WorkbookCell } from "./models";
 import { validateCalculationSheetNames } from "./sheet-policy";
+import {
+  canonicalCellReference,
+  normalizeCellAddress,
+} from "../formula-compiler/reference-codec";
 
 export async function computeWorkbookHash(
   workbook: Omit<V1Workbook, "workbookContentSha256">,
@@ -22,6 +26,10 @@ export interface XLSXSheet {
   readonly name: string;
   readonly hidden: boolean;
   readonly rows: readonly (readonly (string | number | boolean | null)[])[];
+  readonly formulas?: readonly {
+    readonly address: string;
+    readonly formulaText: string;
+  }[];
 }
 
 export interface XLSXNamedRange {
@@ -41,10 +49,40 @@ export function buildXLSXSpec(workbook: V1Workbook): XLSXWorkbookSpec {
   const tablesSheet = buildTablesSheet(workbook);
   const udTableSheet = buildUDTableSheet(workbook);
 
+  const sheetNames = new Set([
+    "Summary",
+    "Tables",
+    "UD Table",
+    ...workbook.sheets.map((sheet) => sheet.name),
+  ]);
+  if (workbook.namedRanges.some((range) => !sheetNames.has(range.tabName))) {
+    throw new Error("A named range refers to a missing sheet.");
+  }
+
   const calcSheets: XLSXSheet[] = workbook.sheets.map((sheet) => ({
     name: sheet.name,
     hidden: sheet.hidden,
     rows: buildCalcSheetRows(sheet),
+    formulas: sheet.cells
+      .filter((cell) => cell.kind === "formula")
+      .map((cell) => {
+        const address = normalizedAddress(cell.address);
+        if (
+          cell.formulaText === null ||
+          !cell.formulaText.startsWith("=") ||
+          cell.formulaText.slice(1).trim() === ""
+        ) {
+          throw new Error(
+            "Formula cells require a nonempty Excel formula starting with equals.",
+          );
+        }
+        if (cell.value !== null && cell.value !== undefined) {
+          throw new Error(
+            "A cell cannot contain both a formula and an input value without an approved mapping.",
+          );
+        }
+        return { address, formulaText: cell.formulaText };
+      }),
   }));
 
   return {
@@ -52,8 +90,11 @@ export function buildXLSXSpec(workbook: V1Workbook): XLSXWorkbookSpec {
     namedRanges: workbook.namedRanges.map((nr) => ({
       name: nr.rangeName,
       scope: nr.scope,
-      sheetName: nr.scope === "sheet" ? extractSheetName(nr.cellAddress) : null,
-      reference: `${nr.tabName}!${nr.cellAddress}`,
+      sheetName: nr.scope === "sheet" ? nr.tabName : null,
+      reference: canonicalCellReference(
+        nr.tabName,
+        requireValidAddress(nr.cellAddress),
+      ),
     })),
   };
 }
@@ -65,19 +106,29 @@ function buildCalcSheetRows(
 
   const cellMap = new Map<string, WorkbookCell>();
   for (const cell of sheet.cells) {
-    cellMap.set(cell.address, cell);
+    const address = normalizedAddress(cell.address);
+    if (cellMap.has(address))
+      throw new Error("Workbook contains duplicate cell addresses.");
+    cellMap.set(address, cell);
   }
 
   let maxRow = 0;
   let maxCol = 0;
-  for (const cell of sheet.cells) {
-    const match = /^([A-Z]+)(\d+)$/.exec(cell.address);
+  for (const address of cellMap.keys()) {
+    const match = /^([A-Z]+)(\d+)$/.exec(address);
     if (match) {
       const rowNum = parseInt(match[2] ?? "0", 10);
       const colNum = columnToIndex(match[1] ?? "A");
       if (rowNum > maxRow) maxRow = rowNum;
       if (colNum > maxCol) maxCol = colNum;
     }
+  }
+
+  // The current array-based serializer must not allocate an unbounded sparse grid.
+  if (maxRow * (maxCol + 1) > 2_000_000) {
+    throw new Error(
+      "Worksheet exceeds the bounded export grid. Use a smaller workbook until sparse serialization is supported.",
+    );
   }
 
   for (let r = 1; r <= maxRow; r++) {
@@ -87,7 +138,7 @@ function buildCalcSheetRows(
       const cell = cellMap.get(addr);
       if (cell) {
         if (cell.kind === "formula") {
-          row.push(cell.formulaText ?? "");
+          row.push(null);
         } else {
           row.push(cell.value as string | number | boolean | null);
         }
@@ -218,9 +269,15 @@ function buildUDTableSheet(workbook: V1Workbook): XLSXSheet {
   };
 }
 
-function extractSheetName(cellAddress: string): string | null {
-  const match = /^'?([^'!]+)'?!/.exec(cellAddress);
-  return match?.[1] ?? null;
+function requireValidAddress(address: string): string {
+  const normalized = normalizeCellAddress(address);
+  if (normalized === null)
+    throw new Error("Workbook contains an invalid cell address.");
+  return normalized;
+}
+
+function normalizedAddress(address: string): string {
+  return requireValidAddress(address).replaceAll("$", "");
 }
 
 export function writeXLSXBuffer(spec: XLSXWorkbookSpec): Buffer {
@@ -232,22 +289,52 @@ export function writeXLSXBuffer(spec: XLSXWorkbookSpec): Buffer {
 
   for (const sheet of spec.sheets) {
     const ws = XLSX.utils.aoa_to_sheet(sheet.rows as never[][]);
-    XLSX.utils.book_append_sheet(workbook, ws, sheet.name);
-    if (sheet.hidden) {
-      (ws as Record<string, unknown>)["!hidden"] = true;
+    for (const formula of sheet.formulas ?? []) {
+      const address = normalizedAddress(formula.address);
+      if (
+        !formula.formulaText.startsWith("=") ||
+        formula.formulaText.slice(1).trim() === ""
+      ) {
+        throw new Error(
+          "Formula cells require a nonempty Excel formula starting with equals.",
+        );
+      }
+      if (ws[address] !== undefined)
+        throw new Error("A formula cannot overwrite an existing value.");
+      // A stub formula has no cached value: never invent a numeric zero.
+      ws[address] = { t: "z", f: formula.formulaText.slice(1) };
+      const point = XLSX.utils.decode_cell(address);
+      const range = ws["!ref"]
+        ? XLSX.utils.decode_range(ws["!ref"])
+        : { s: point, e: point };
+      range.s.r = Math.min(range.s.r, point.r);
+      range.s.c = Math.min(range.s.c, point.c);
+      range.e.r = Math.max(range.e.r, point.r);
+      range.e.c = Math.max(range.e.c, point.c);
+      ws["!ref"] = XLSX.utils.encode_range(range);
     }
+    XLSX.utils.book_append_sheet(workbook, ws, sheet.name);
+    workbook.Workbook ??= {};
+    workbook.Workbook.Sheets ??= [];
+    workbook.Workbook.Sheets.push({
+      name: sheet.name,
+      Hidden: sheet.hidden ? 1 : 0,
+    });
   }
 
   for (const nr of spec.namedRanges) {
     workbook.Workbook ??= {};
     workbook.Workbook.Names ??= [];
+    const sheetIndex =
+      nr.scope === "sheet" && nr.sheetName !== null
+        ? workbook.SheetNames.indexOf(nr.sheetName)
+        : -1;
+    if (nr.scope === "sheet" && sheetIndex < 0)
+      throw new Error("Sheet-scoped name refers to a missing sheet.");
     workbook.Workbook.Names.push({
       Name: nr.name,
-      Ref: `${nr.sheetName ? `'${nr.sheetName}'` : ""}!${nr.reference}`,
-      Sheet:
-        nr.scope === "sheet" && nr.sheetName
-          ? workbook.SheetNames.indexOf(nr.sheetName)
-          : undefined,
+      Ref: nr.reference,
+      Sheet: nr.scope === "sheet" ? sheetIndex : undefined,
     });
   }
 

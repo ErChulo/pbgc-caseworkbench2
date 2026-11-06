@@ -1,3 +1,4 @@
+import { compiledWorkbookBlocker } from "../utilities/compiled-workbook-gate";
 import {
   isCaseOutputPath,
   verifyOutputArtifactReferences,
@@ -3848,6 +3849,9 @@ export function useCaseOrchestrator(
       return;
     }
     setArchitectureBuildMessage(null);
+    setV1Workbook(null);
+    setV1XlsxBytes(null);
+    setV1OutputMessage(null);
     try {
       const activeWorkspace = workspace.current;
       if (activeWorkspace === null) throw new Error("Workspace unavailable.");
@@ -3993,6 +3997,15 @@ export function useCaseOrchestrator(
         uuid: { generate: () => dependencies.uuid.generate() },
       });
       setV1CompilationResult(compilation);
+      const compilationBlocker = compiledWorkbookBlocker(
+        buildSpec,
+        compilation,
+      );
+      if (compilationBlocker !== null) {
+        setV1OutputMessage(compilationBlocker);
+        setArchitectureBuildMessage(compilationBlocker);
+        return;
+      }
 
       const approvedPopulationItem = populationItems.find(
         (item) =>
