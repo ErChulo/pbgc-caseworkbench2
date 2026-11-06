@@ -176,6 +176,36 @@ test("governed production path exposes unresolved workbook blockers", async ({
     "Synthetic population workbook reviewed locally.",
   );
   const populationCandidate = population.locator("li").first();
+  // Approval must verify the preserved source, not only the displayed profile.
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const value = files.get(path);
+    if (!value) throw new Error("Synthetic workbook object not found");
+    const altered = Uint8Array.from(value);
+    altered[0] = (altered[0] ?? 0) ^ 1;
+    files.set(path, altered);
+  }, workbookHash);
+  await populationCandidate.getByRole("button", { name: "Approve" }).click();
+  await expect(population.getByRole("alert")).toContainText(
+    "Population approval blocked: The workbook bytes do not match",
+  );
+  await expect(
+    populationCandidate.getByText("Approved", { exact: true }),
+  ).not.toBeVisible();
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const value = files.get(path);
+    if (!value) throw new Error("Synthetic workbook object not found");
+    const original = Uint8Array.from(value);
+    original[0] = (original[0] ?? 0) ^ 1;
+    files.set(path, original);
+  }, workbookHash);
   await populationCandidate.getByRole("button", { name: "Approve" }).click();
   await expect(
     populationCandidate.getByText("Approved", { exact: true }),

@@ -1108,6 +1108,7 @@ export function useCaseOrchestrator(
   );
   const activeCaseId = useRef<Uuid | null>(null);
   const architectureBuildSequence = useRef(0);
+  const populationDecisionInFlight = useRef(false);
   const priorSnapshot = useRef<PackageSnapshot | null>(null);
   const inventoryCheckpoints = useRef(
     new Map<string, InventoryCheckpointReference>(),
@@ -2314,77 +2315,142 @@ export function useCaseOrchestrator(
     reviewer: string,
     rationale: string,
   ): Promise<void> => {
-    if (activeCase === null || priorSnapshot.current === null) {
+    if (
+      activeCase === null ||
+      priorSnapshot.current === null ||
+      workspace.current === null
+    ) {
       throw new Error("Active evidence checkpoint is unavailable.");
     }
-    const blocker = populationReviewBlocker(item, action);
-    if (blocker !== null) throw new Error(blocker);
-    const key = item.candidate.candidateKey;
-    const history = populationHistory.current.get(key) ?? [];
-    const prior = history.at(-1) ?? null;
-    const resultingStatus =
-      action === "approve"
-        ? ("approved" as const)
-        : action === "reject"
-          ? ("rejected" as const)
-          : action === "revoke"
-            ? ("revoked" as const)
-            : ("superseded" as const);
-    const base = {
-      appendOrdinal: history.length + 1,
-      priorDecisionId: prior?.decisionId ?? null,
-      priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
-      candidateKey: item.candidate.candidateKey,
-      artifactSha256: item.candidate.artifactSha256,
-      workbookProfileContentSha256: item.workbookProfileContentSha256,
-      decisionType: action,
-      resultingStatus,
-      ruleSetVersion: "feature-009-population-v1",
-      schemaVersion: "1.0.0",
-    } as const;
-    const decision: PopulationCandidateDecision = {
-      ...base,
-      decisionId: dependencies.uuid.generate(),
-      decisionContentSha256: await populationDecisionContentHash(base),
-      humanActor: {
-        actorType: "human",
-        actorId: reviewer,
-        displayName: reviewer,
-      },
-      rationale,
-      decisionTimestamp: dependencies.clock.now(),
+    if (populationDecisionInFlight.current)
+      throw new Error("Another population decision is still being saved.");
+    populationDecisionInFlight.current = true;
+    invalidateArchitectureBuild();
+    const caseId = activeCase.caseId;
+    const snapshot = priorSnapshot.current;
+    const activeWorkspace = workspace.current;
+    const reviewState = caseReviewState.current;
+    const requireCurrent = () => {
+      if (
+        activeCaseId.current !== caseId ||
+        priorSnapshot.current !== snapshot ||
+        workspace.current !== activeWorkspace ||
+        caseReviewState.current !== reviewState
+      )
+        throw new Error(
+          "Case evidence or review changed. Review the population again.",
+        );
     };
-    const replay = await replayPopulationCandidateDecisions(
-      item.candidate,
-      item.workbookProfileContentSha256,
-      [...history, decision],
-    );
-    if (!replay.ok) throw new Error(replay.error.safeMessage);
-    const nextHistory = [...history, decision];
-    const nextItems = caseReviewState.current.populationItems.map(
-      (candidate) =>
+    try {
+      const currentItem = reviewState.populationItems.find(
+        (candidate) =>
+          candidate.candidate.candidateKey === item.candidate.candidateKey,
+      );
+      if (!currentItem || canonicalize(currentItem) !== canonicalize(item))
+        throw new Error("Population review is stale. Review it again.");
+      const blocker = populationReviewBlocker(item, action);
+      if (blocker !== null) throw new Error(blocker);
+      const key = item.candidate.candidateKey;
+      const history = populationHistory.current.get(key) ?? [];
+      if (
+        canonicalize(history) !==
+        canonicalize(
+          reviewState.populationDecisions.filter(
+            (decision) => decision.candidateKey === key,
+          ),
+        )
+      )
+        throw new Error(
+          "Population decision history is stale. Reload the case.",
+        );
+      const prior = history.at(-1) ?? null;
+      const resultingStatus =
+        action === "approve"
+          ? ("approved" as const)
+          : action === "reject"
+            ? ("rejected" as const)
+            : action === "revoke"
+              ? ("revoked" as const)
+              : ("superseded" as const);
+      const base = {
+        appendOrdinal: history.length + 1,
+        priorDecisionId: prior?.decisionId ?? null,
+        priorDecisionContentSha256: prior?.decisionContentSha256 ?? null,
+        candidateKey: item.candidate.candidateKey,
+        artifactSha256: item.candidate.artifactSha256,
+        workbookProfileContentSha256: item.workbookProfileContentSha256,
+        decisionType: action,
+        resultingStatus,
+        ruleSetVersion: "feature-009-population-v1",
+        schemaVersion: "1.0.0",
+      } as const;
+      const decision: PopulationCandidateDecision = {
+        ...base,
+        decisionId: dependencies.uuid.generate(),
+        decisionContentSha256: await populationDecisionContentHash(base),
+        humanActor: {
+          actorType: "human",
+          actorId: reviewer,
+          displayName: reviewer,
+        },
+        rationale,
+        decisionTimestamp: dependencies.clock.now(),
+      };
+      requireCurrent();
+      if (action === "approve" && item.workbook !== undefined) {
+        if (item.namedRanges === undefined)
+          throw new Error(
+            "The workbook defined-name inventory is unavailable.",
+          );
+        const verified = await verifyPopulationSourceInWorkspace({
+          workspace: activeWorkspace,
+          snapshot,
+          candidate: item.candidate,
+          observations: item.evidenceObservations ?? [],
+          decisions: [...history, decision],
+          storedWorkbook: item.workbook,
+          storedNamedRanges: item.namedRanges,
+          storedProfileHash: item.workbookProfileContentSha256,
+        });
+        requireCurrent();
+        if (!verified.ok)
+          throw new Error(`Population approval blocked: ${verified.message}`);
+      }
+      const replay = await replayPopulationCandidateDecisions(
+        item.candidate,
+        item.workbookProfileContentSha256,
+        [...history, decision],
+      );
+      requireCurrent();
+      if (!replay.ok) throw new Error(replay.error.safeMessage);
+      const nextHistory = [...history, decision];
+      const nextItems = reviewState.populationItems.map((candidate) =>
         candidate.candidate.candidateKey === key
           ? { ...candidate, projection: replay.value }
           : candidate,
-    );
-    const nextState: CaseReviewState = {
-      ...caseReviewState.current,
-      populationItems: nextItems,
-      populationDecisions: [
-        ...caseReviewState.current.populationDecisions,
-        decision,
-      ],
-    };
-    await appendReviewEvent({ eventType: "population-decision", decision });
-    await persistCaseReviewState(
-      activeCase.caseId,
-      priorSnapshot.current.snapshotId,
-      nextState,
-    );
-    populationHistory.current.set(key, nextHistory);
-    invalidateArchitectureBuild();
-    caseReviewState.current = nextState;
-    setPopulationItems(nextItems);
+      );
+      const nextState: CaseReviewState = {
+        ...reviewState,
+        populationItems: nextItems,
+        populationDecisions: [...reviewState.populationDecisions, decision],
+      };
+      requireCurrent();
+      await appendReviewEvent({ eventType: "population-decision", decision });
+      requireCurrent();
+      await persistCaseReviewState(
+        caseId,
+        snapshot.snapshotId,
+        nextState,
+        requireCurrent,
+      );
+      requireCurrent();
+      populationHistory.current.set(key, nextHistory);
+      invalidateArchitectureBuild();
+      caseReviewState.current = nextState;
+      setPopulationItems(nextItems);
+    } finally {
+      populationDecisionInFlight.current = false;
+    }
   };
 
   const persistPlanRuleRecord = async (
@@ -2425,6 +2491,7 @@ export function useCaseOrchestrator(
     caseId: Uuid,
     evidenceSnapshotId: Sha256,
     state: CaseReviewState,
+    requireCurrent?: () => void,
   ): Promise<void> => {
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) throw new Error("Workspace unavailable.");
@@ -2467,6 +2534,7 @@ export function useCaseOrchestrator(
       );
       if (!saved.ok) throw new Error("Review snapshot could not be preserved.");
     }
+    requireCurrent?.();
     const pointerSaved = await activeWorkspace.writeAtomic(
       `cases/${caseId}/reviews/current.json`,
       new TextEncoder().encode(

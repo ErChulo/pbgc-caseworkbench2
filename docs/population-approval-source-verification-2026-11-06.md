@@ -1,0 +1,7 @@
+# Population approval source verification
+
+Before recording a workbook-population approval, the wizard now reopens the content-addressed source from the active case snapshot, checks its bytes and size, re-inspects the workbook, re-detects the candidate, compares the stored profile, and replays the proposed decision. Failed verification is shown in the population review panel and does not record an approval. Revocation, rejection and supersession remain available even when the source is unavailable, so a stale decision can still be withdrawn.
+
+Population decision saves are serialized within the session, and case, workspace, snapshot, review and history changes are checked around asynchronous steps and before the current-review pointer is written. The wizard clears derived architecture outputs as soon as a decision starts. These checks are not a transactional cross-operation or cross-window lock: another review operation can still race a storage write, and a partially written append-only event or immutable snapshot may remain if a later step fails. Reviewer identity, authorization, quarantine/eligibility, and final-release authority are not authenticated by this check.
+
+A synthetic Chromium test changes the preserved workbook before approval, confirms a visible blocker and no approval, restores it, and confirms approval proceeds; it also checks source re-verification before architecture building and invalidation after withdrawal. Tabular population review is not covered by the workbook-byte verifier. I/B routing remains blocked.

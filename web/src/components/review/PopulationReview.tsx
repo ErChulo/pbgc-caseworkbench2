@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type {
   PopulationCandidateProfile,
   PopulationDecisionProjection,
@@ -48,6 +49,31 @@ export function PopulationReview({
     rationale: string,
   ) => Promise<void>;
 }) {
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const recordDecision = async (
+    item: PopulationReviewItem,
+    action: "approve" | "reject" | "revoke" | "supersede",
+  ) => {
+    setBusy(true);
+    setDecisionError(null);
+    try {
+      await onDecision(
+        item,
+        action,
+        sharedReviewer.trim(),
+        sharedRationale.trim(),
+      );
+    } catch (error) {
+      setDecisionError(
+        error instanceof Error
+          ? error.message
+          : "Population decision could not be recorded.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   if (items.length === 0) return null;
   return (
     <section
@@ -68,6 +94,11 @@ export function PopulationReview({
         missing, blank, malformed, formula text, leading-zero text, and literal
         zero are not corrected or imputed.
       </p>
+      {decisionError !== null ? (
+        <p role="alert" className="form-message form-message-error">
+          {decisionError}
+        </p>
+      ) : null}
       <div className="shared-reviewer">
         <label htmlFor="population-reviewer">
           Reviewer name
@@ -140,6 +171,7 @@ export function PopulationReview({
                     type="button"
                     className="button button-secondary"
                     disabled={
+                      busy ||
                       sharedReviewer.trim().length === 0 ||
                       sharedRationale.trim().length === 0 ||
                       (action === "revoke" &&
@@ -147,14 +179,7 @@ export function PopulationReview({
                       (action === "supersede" &&
                         item.projection.status === "provisional")
                     }
-                    onClick={() =>
-                      void onDecision(
-                        item,
-                        action,
-                        sharedReviewer.trim(),
-                        sharedRationale.trim(),
-                      )
-                    }
+                    onClick={() => void recordDecision(item, action)}
                   >
                     {ACTION_LABELS[action]}
                   </button>
