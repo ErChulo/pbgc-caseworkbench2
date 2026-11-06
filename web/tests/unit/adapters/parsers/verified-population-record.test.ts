@@ -7,6 +7,7 @@ import {
   adaptWorkbookNamedRanges,
   workbookProfileContentHash,
 } from "../../../../src/domain/population/workbook-adapter";
+import { createPopulationCandidate } from "../../../../src/domain/population/population-factories";
 import { detectWorkbookPopulation } from "../../../../src/domain/population/population-detector";
 import { populationDecisionContentHash } from "../../../../src/domain/population/population-governance";
 import type { PopulationCandidateDecision } from "../../../../src/domain/population/population-types";
@@ -134,6 +135,19 @@ describe("byte-bound population record review", () => {
         bindings: [{ field: "KEY", column: "A", expectedHeader: "wrong" }],
       }),
     ).toMatchObject({ ok: false, code: "HEADER_MISMATCH" });
+  });
+
+  it("rejects a self-consistent candidate that was not detected from the source", async () => {
+    const input = await fixture();
+    const { candidateKey: ignored, ...candidateContent } = input.candidate;
+    void ignored;
+    const forged = await createPopulationCandidate({
+      ...candidateContent,
+      observedFields: ["forged", "headers"],
+    });
+    expect(
+      await projectVerifiedPopulationRecord({ ...input, candidate: forged }),
+    ).toMatchObject({ ok: false, code: "POPULATION_CANDIDATE_MISMATCH" });
   });
 
   it("does not treat a formula cached result as a participant value", async () => {

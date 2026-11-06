@@ -239,7 +239,7 @@ describe("T093 population candidate identity and governance", () => {
         cells: [workbookCell("A1", "DOB"), workbookCell("B1", "BSEX")],
       },
     ]);
-    expect(detected.candidate.detectorVersion).toBe("1.1.0");
+    expect(detected.candidate.detectorVersion).toBe("1.2.0");
   });
 
   it("emits participant-group characteristics from recognizable workbook sheet names", async () => {

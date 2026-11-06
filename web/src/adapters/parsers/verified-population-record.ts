@@ -1,25 +1,15 @@
-import { sha256Bytes } from "../../domain/shared/digest";
 import type { Sha256 } from "../../domain/shared/types";
-import {
-  validatePopulationEvidence,
-  replayPopulationCandidateDecisions,
-} from "../../domain/population/population-governance";
 import type {
   PopulationCandidateDecision,
   PopulationCandidateProfile,
   PopulationEvidenceObservation,
 } from "../../domain/population/population-types";
 import {
-  adaptWorkbookExtraction,
-  adaptWorkbookNamedRanges,
-  workbookProfileContentHash,
-} from "../../domain/population/workbook-adapter";
-import {
   projectPopulationRecord,
   type PopulationRecordFieldBinding,
   type PopulationRecordProjection,
 } from "../../domain/population/record-projection";
-import { parseWorkbookPassive } from "./workbook-parser";
+import { verifyPopulationWorkbook } from "./verified-population-workbook";
 
 export type VerifiedPopulationRecordResult =
   | {
@@ -59,60 +49,18 @@ export async function projectVerifiedPopulationRecord(input: {
     const bindings = structuredClone(input.bindings);
     const sheetName = input.sheetName;
     const sourceRow = input.sourceRow;
-    const sourceHash = await sha256Bytes(bytes);
-    if (sourceHash !== candidate.artifactSha256)
-      return fail(
-        "SOURCE_BYTES_MISMATCH",
-        "The workbook bytes do not match the population candidate.",
-      );
-    if (candidate.evidence.length === 0)
-      return fail(
-        "POPULATION_EVIDENCE_MISSING",
-        "Population evidence is required.",
-      );
-    const evidence = await validatePopulationEvidence(candidate, observations, [
-      sourceHash,
-    ]);
-    if (!evidence.ok)
-      return fail(
-        "POPULATION_EVIDENCE_INVALID",
-        "Population evidence does not match this source workbook.",
-      );
-    const extraction = parseWorkbookPassive(bytes);
-    const workbook = adaptWorkbookExtraction(extraction);
-    const names = adaptWorkbookNamedRanges(extraction);
-    if (
-      workbook.status !== "profiled" ||
-      !names.ok ||
-      extraction.riskIndicators.length > 0
-    )
-      return fail(
-        "WORKBOOK_INSPECTION_BLOCKED",
-        "The source workbook could not be safely profiled.",
-      );
-    const profileHash = await workbookProfileContentHash(
-      workbook,
-      names.ranges,
-    );
-    const replay = await replayPopulationCandidateDecisions(
+    const verified = await verifyPopulationWorkbook({
+      bytes,
       candidate,
-      profileHash,
+      observations,
       decisions,
-    );
-    const effective = decisions.at(-1);
-    if (
-      !replay.ok ||
-      replay.value.status !== "approved" ||
-      effective?.decisionId !== replay.value.effectiveDecisionId
-    )
-      return fail(
-        "POPULATION_DECISION_INVALID",
-        "The exact workbook profile needs an effective population approval.",
-      );
+    });
+    if (!verified.ok) return verified;
+    const { workbook, namedRanges, populationDecision } = verified.value;
     const projection = await projectPopulationRecord({
       workbook,
-      namedRanges: names.ranges,
-      populationDecision: replay.value,
+      namedRanges,
+      populationDecision,
       sheetName,
       sourceRow,
       bindings,
@@ -122,10 +70,11 @@ export async function projectVerifiedPopulationRecord(input: {
     return {
       ok: true,
       record: projection.record,
-      sourceArtifactSha256: sourceHash,
-      candidateKey: candidate.candidateKey,
-      populationDecisionContentSha256: effective.decisionContentSha256,
-      parserVersion: extraction.parserVersion,
+      sourceArtifactSha256: verified.value.sourceArtifactSha256,
+      candidateKey: verified.value.candidateKey,
+      populationDecisionContentSha256:
+        verified.value.populationDecisionContentSha256,
+      parserVersion: verified.value.parserVersion,
     };
   } catch {
     return fail(

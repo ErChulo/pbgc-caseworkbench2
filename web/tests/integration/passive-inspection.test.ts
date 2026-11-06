@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { strToU8, unzipSync, zipSync } from "fflate";
+import * as XLSX from "xlsx";
 
 import {
   parseDelimited,
@@ -99,6 +101,70 @@ describe("T064 passive inspection", () => {
     expect(
       result.riskIndicators.some((value) => value.startsWith("external-link:")),
     ).toBe(true);
+  });
+
+  it("blocks workbook external and ambiguous relationships before population profiling", () => {
+    for (const attribute of [
+      'TargetMode="External"',
+      'TargetMode="Ex&#116;ernal"',
+      'TargetMode="Unknown"',
+    ]) {
+      const parts = unzipSync(workbookFixture());
+      parts["xl/worksheets/_rels/sheet1.xml.rels"] = strToU8(
+        `<Relationships><Relationship Id="r1" ${attribute} Target="https://example.invalid"/></Relationships>`,
+      );
+      const result = parseWorkbookPassive(zipSync(parts));
+      expect(result.status).toBe("partial");
+      expect(
+        result.riskIndicators.some((indicator) =>
+          indicator.includes("relationship:"),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("flags workbook data-connection parts", () => {
+    const parts = unzipSync(workbookFixture());
+    parts["xl/connections.xml"] = strToU8("<connections/>");
+    const result = parseWorkbookPassive(zipSync(parts));
+    expect(result.status).toBe("partial");
+    expect(
+      result.riskIndicators.some((indicator) =>
+        indicator.startsWith("external-data-connection:"),
+      ),
+    ).toBe(true);
+  });
+
+  it("fails closed for ambiguous parts and oversized relationship metadata", () => {
+    const original = unzipSync(workbookFixture());
+    const duplicate = {
+      ...original,
+      "XL/WORKBOOK.XML": original["xl/workbook.xml"] ?? new Uint8Array(),
+    };
+    expect(parseWorkbookPassive(zipSync(duplicate)).status).toBe("unreadable");
+    const large = {
+      ...original,
+      "xl/worksheets/_rels/sheet1.xml.rels": strToU8(
+        "x".repeat(4 * 1024 * 1024 + 1),
+      ),
+    };
+    expect(parseWorkbookPassive(zipSync(large)).status).toBe("unreadable");
+  });
+
+  it("does not treat legacy binary workbooks as fully inspected", () => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([["Synthetic"]]),
+      "Test",
+    );
+    const bytes = XLSX.write(workbook, {
+      type: "array",
+      bookType: "xls",
+    }) as ArrayBuffer;
+    const result = parseWorkbookPassive(new Uint8Array(bytes));
+    expect(result.status).toBe("partial");
+    expect(result.riskIndicators).toContain("legacy-container-unverified");
   });
 
   it("extracts DOCX/PPTX text and records external relationships without following them", () => {

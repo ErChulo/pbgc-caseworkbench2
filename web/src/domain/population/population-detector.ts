@@ -156,7 +156,7 @@ export async function detectWorkbookPopulation(
         ? "proposed"
         : "unresolved",
     detectorIdentity: "feature-009-structural-population-detector",
-    detectorVersion: "1.1.0",
+    detectorVersion: "1.2.0",
     confidence: profile.status === "profiled" && fields.length >= 2 ? 0.8 : 0,
     evidence: observations,
     observedFields: fields,
