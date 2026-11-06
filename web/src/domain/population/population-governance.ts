@@ -7,7 +7,13 @@
  */
 
 import { canonicalizeTyped, hashTyped } from "../manifests/canonical-json";
-import { parseSha256, type Result, type Sha256 } from "../shared/types";
+import {
+  parseSha256,
+  parseUtcTimestamp,
+  parseUuid,
+  type Result,
+  type Sha256,
+} from "../shared/types";
 import type {
   PopulationCandidateProfile,
   PopulationCandidateDecision,
@@ -144,16 +150,47 @@ export async function replayPopulationCandidateDecisions(
       "INVALID_TRANSITION",
       "Population candidate source state must remain proposal-only.",
     );
+  if (
+    !isSha(candidate.candidateKey) ||
+    !isSha(candidate.artifactSha256) ||
+    !isSha(workbookProfileContentSha256)
+  )
+    return fail(
+      "INVALID_HASH",
+      "Population subject and profile identities must be valid SHA-256 values.",
+    );
   let prior: PopulationCandidateDecision | null = null;
   const seen = new Set<string>();
-  for (const decision of decisions) {
+  for (const value of decisions as readonly unknown[]) {
+    if (value === null || typeof value !== "object" || Array.isArray(value))
+      return fail("INVALID_CHAIN", "Population decision record is invalid.");
+    const decision = value as PopulationCandidateDecision;
+    const actor: unknown = decision.humanActor;
     if (
-      (decision.humanActor as { readonly actorType?: unknown }).actorType !==
-      "human"
+      actor === null ||
+      typeof actor !== "object" ||
+      Array.isArray(actor) ||
+      (actor as { actorType?: unknown }).actorType !== "human" ||
+      !nonBlank((actor as { actorId?: unknown }).actorId) ||
+      !nonBlank((actor as { displayName?: unknown }).displayName)
     )
       return fail(
         "INVALID_ACTOR",
         "Population candidate decisions require a human actor.",
+      );
+    if (
+      typeof decision.decisionId !== "string" ||
+      !parseUuid(decision.decisionId).ok ||
+      !isSha(decision.decisionContentSha256) ||
+      !nonBlank(decision.rationale) ||
+      !nonBlank(decision.ruleSetVersion) ||
+      !nonBlank(decision.schemaVersion) ||
+      typeof decision.decisionTimestamp !== "string" ||
+      !parseUtcTimestamp(decision.decisionTimestamp).ok
+    )
+      return fail(
+        "INVALID_CHAIN",
+        "Population decision identity, rationale, version, timestamp, or content hash is invalid.",
       );
     if (
       decision.candidateKey !== candidate.candidateKey ||
@@ -212,6 +249,14 @@ export async function replayPopulationCandidateDecisions(
       ),
     }),
   };
+}
+
+function nonBlank(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isSha(value: unknown): value is Sha256 {
+  return typeof value === "string" && parseSha256(value).ok;
 }
 
 function evidenceContent(input: {

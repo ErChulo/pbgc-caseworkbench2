@@ -193,6 +193,44 @@ describe("T093 population candidate identity and governance", () => {
     ).toBe(false);
   });
 
+  it("blocks malformed review metadata even when the deterministic decision hash is unchanged", async () => {
+    const detected = await detection();
+    const initial = await decision(
+      detected.candidate,
+      null,
+      "approve",
+      "approved",
+    );
+    const badDecisions: PopulationCandidateDecision[] = [
+      { ...initial, humanActor: { ...initial.humanActor, actorId: "  " } },
+      { ...initial, humanActor: { ...initial.humanActor, displayName: "" } },
+      {
+        ...initial,
+        humanActor:
+          null as unknown as PopulationCandidateDecision["humanActor"],
+      },
+      { ...initial, rationale: "  " },
+      { ...initial, decisionId: "not-a-uuid" },
+      { ...initial, decisionTimestamp: "2026-02-30T12:00:00Z" },
+      { ...initial, ruleSetVersion: "" },
+      { ...initial, schemaVersion: "" },
+    ];
+    for (const bad of badDecisions) {
+      const replay = await replayPopulationCandidateDecisions(
+        detected.candidate,
+        detected.candidate.candidateKey,
+        [bad],
+      );
+      expect(replay.ok).toBe(false);
+    }
+    const approval = await replayPopulationCandidateDecisions(
+      detected.candidate,
+      detected.candidate.candidateKey,
+      [initial],
+    );
+    expect(approval).toMatchObject({ ok: true, value: { status: "approved" } });
+  });
+
   it("emits participant-group characteristics from recognizable workbook sheet names", async () => {
     const detected = await workbookDetection([
       {
@@ -331,7 +369,7 @@ async function decision(
     schemaVersion: "1.0.0",
   } as const;
   return {
-    decisionId: `decision-${String(content.appendOrdinal)}`,
+    decisionId: `00000000-0000-4000-8000-${String(content.appendOrdinal).padStart(12, "0")}`,
     decisionContentSha256: await populationDecisionContentHash(content),
     ...content,
     humanActor: {
