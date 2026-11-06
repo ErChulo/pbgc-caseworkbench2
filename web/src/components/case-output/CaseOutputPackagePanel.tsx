@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Section436ReplayPanel } from "./Section436ReplayPanel";
 
 import type {
   CaseworkMaturityLevel,
@@ -241,6 +242,7 @@ export function CaseOutputPackagePanel({
           </ul>
         </div>
       ) : null}
+      <Section436ReplayPanel key={payload.caseId} caseId={payload.caseId} />
       <ol className="case-output-stage-list">
         {payload.stages.map((stage) => (
           <CaseOutputStageItem key={stage.stageKey} stage={stage} />
