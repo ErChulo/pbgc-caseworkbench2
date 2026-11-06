@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 
 import { expect, test } from "./fixtures";
@@ -54,6 +55,8 @@ test("governed production path exposes unresolved workbook blockers", async ({
   test.setTimeout(120_000);
   await createSyntheticCase(page, "PBGC-V1-PRODUCTION-001");
 
+  const workbookBytes = populationWorkbook();
+  const workbookHash = createHash("sha256").update(workbookBytes).digest("hex");
   await page.getByLabel("Add evidence files").setInputFiles([
     {
       name: "plan-document.txt",
@@ -67,7 +70,7 @@ test("governed production path exposes unresolved workbook blockers", async ({
       // a media-signature mismatch for formats without a registered mapping.
       name: "Certified Case Report.xlsx",
       mimeType: "application/octet-stream",
-      buffer: Buffer.from(populationWorkbook()),
+      buffer: Buffer.from(workbookBytes),
     },
   ]);
   await expect(page.getByText("File inventory complete")).toBeVisible();
@@ -267,5 +270,61 @@ test("governed production path exposes unresolved workbook blockers", async ({
     page.getByRole("button", { name: "Download V1 Workbook (.xlsx)" }),
   ).not.toBeVisible();
 
+  // A subsequent build must re-read the source, not trust the saved profile.
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const bytes = files.get(path);
+    if (!bytes) throw new Error("Synthetic workbook object not found");
+    const altered = Uint8Array.from(bytes);
+    altered[0] = (altered[0] ?? 0) ^ 1;
+    files.set(path, altered);
+  }, workbookHash);
+  await architecture
+    .getByRole("button", { name: "Build proposed architecture" })
+    .click();
+  await expect(
+    architecture.getByText(
+      /Population verification blocked: The workbook bytes do not match/u,
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Download V1 Workbook (.xlsx)" }),
+  ).not.toBeVisible();
+  await expect(
+    page.getByText("Select an architecture to review formula governance."),
+  ).toBeVisible();
+  // Restore the test bytes and show that withdrawing the population decision
+  // clears the previously displayed architecture without another build.
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const altered = files.get(path);
+    if (!altered) throw new Error("Synthetic workbook object not found");
+    const original = Uint8Array.from(altered);
+    original[0] = (original[0] ?? 0) ^ 1;
+    files.set(path, original);
+  }, workbookHash);
+  await architecture
+    .getByRole("button", { name: "Build proposed architecture" })
+    .click();
+  await expect(
+    architecture.getByText(
+      /More than one scenario writes to the same workbook cell/u,
+    ),
+  ).toBeVisible();
+  await populationCandidate
+    .getByRole("button", { name: "Withdraw approval" })
+    .click();
+  await expect(
+    populationCandidate.getByText("Revoked", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Select an architecture to review formula governance."),
+  ).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });
