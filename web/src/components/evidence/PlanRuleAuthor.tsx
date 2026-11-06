@@ -139,9 +139,15 @@ export function PlanRuleAuthor({
         </div>
       ) : (
         <p id="rule-author-status" className="notice" role="status">
-          No open unresolved item blocks this synthetic preview rule scope.
+          {production
+            ? "No open unresolved item blocks rule validation."
+            : "No open unresolved item blocks this synthetic preview rule scope."}
         </p>
       )}
+      <p className="notice">
+        Reviewer names and authority are locally asserted, not authenticated.
+        Source checks do not establish approval authority.
+      </p>
       <form
         className="rule-author-form"
         aria-describedby="rule-author-status rule-author-guidance"
@@ -276,7 +282,7 @@ export function PlanRuleAuthor({
         </label>
         <div className="form-grid">
           <label htmlFor="rule-reviewer">
-            Authorized reviewer
+            Reviewer name
             <input
               id="rule-reviewer"
               value={reviewer}

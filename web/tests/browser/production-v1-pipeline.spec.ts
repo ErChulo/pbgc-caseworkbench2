@@ -142,7 +142,8 @@ test("governed production path exposes unresolved workbook blockers", async ({
     .locator("#governing-restatement")
     .fill("Executed Defined Benefit Plan Document.");
   await page
-    .getByLabel("Authorized reviewer", { exact: true })
+    .getByRole("region", { name: "Plan rule author" })
+    .getByLabel("Reviewer name", { exact: true })
     .fill("architect-reviewer");
   await page
     .getByLabel("Approval rationale", { exact: true })
@@ -160,6 +161,37 @@ test("governed production path exposes unresolved workbook blockers", async ({
   });
   await page.getByLabel("Condition value").fill("true");
   await expect(submitRule).toBeEnabled();
+  const planHash = createHash("sha256").update(PLAN_TEXT).digest("hex");
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const value = files.get(path);
+    if (!value) throw new Error("Synthetic plan object not found");
+    const changed = Uint8Array.from(value);
+    changed[0] = (changed[0] ?? 0) ^ 1;
+    files.set(path, changed);
+  }, planHash);
+  await submitRule.click();
+  await expect(
+    page.getByRole("alert").filter({
+      hasText:
+        "Rule source verification blocked: The preserved source bytes do not match",
+    }),
+  ).toBeVisible();
+  await page.evaluate(
+    ({ sha, text }) => {
+      const files = (
+        globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+      ).__syntheticFiles;
+      files.set(
+        `objects/sha256/${sha.slice(0, 2)}/${sha}`,
+        new TextEncoder().encode(text),
+      );
+    },
+    { sha: planHash, text: PLAN_TEXT },
+  );
   await submitRule.click();
   await expect(submitRule).toBeEnabled();
   await expect(
@@ -257,6 +289,37 @@ test("governed production path exposes unresolved workbook blockers", async ({
   const architecture = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Architecture selection" }),
   });
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const bytes = files.get(path);
+    if (!bytes) throw new Error("Synthetic plan object not found");
+    const changed = Uint8Array.from(bytes);
+    changed[0] = (changed[0] ?? 0) ^ 1;
+    files.set(path, changed);
+  }, planHash);
+  await architecture
+    .getByRole("button", { name: "Build proposed architecture" })
+    .click();
+  await expect(
+    architecture.getByText(
+      /Rule source verification blocked: The preserved source bytes do not match/u,
+    ),
+  ).toBeVisible();
+  await page.evaluate(
+    ({ sha, text }) => {
+      const files = (
+        globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+      ).__syntheticFiles;
+      files.set(
+        `objects/sha256/${sha.slice(0, 2)}/${sha}`,
+        new TextEncoder().encode(text),
+      );
+    },
+    { sha: planHash, text: PLAN_TEXT },
+  );
   await architecture
     .getByRole("button", { name: "Build proposed architecture" })
     .click();

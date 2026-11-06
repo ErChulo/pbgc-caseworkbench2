@@ -144,7 +144,7 @@ describe("Feature 001 evidence reviewer UI", () => {
       "all synthetic participants",
     );
     await user.type(
-      screen.getByLabelText("Authorized reviewer"),
+      screen.getByLabelText("Reviewer name"),
       "Synthetic Reviewer",
     );
     await user.type(
@@ -240,7 +240,7 @@ describe("Feature 001 evidence reviewer UI", () => {
       "all synthetic participants",
     );
     await user.type(
-      screen.getByLabelText("Authorized reviewer"),
+      screen.getByLabelText("Reviewer name"),
       "Synthetic Reviewer",
     );
     await user.type(
@@ -326,7 +326,7 @@ describe("Feature 001 evidence reviewer UI", () => {
       "all synthetic participants",
     );
     await user.type(
-      screen.getByLabelText("Authorized reviewer"),
+      screen.getByLabelText("Reviewer name"),
       "Synthetic Reviewer",
     );
     await user.type(

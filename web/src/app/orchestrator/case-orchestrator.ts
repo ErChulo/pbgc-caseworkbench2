@@ -1,3 +1,4 @@
+import { verifyRuleCandidatesInWorkspace } from "../../adapters/filesystem/verified-rule-candidates";
 import {
   architectureBuildIsCurrent,
   invalidateDerivedBuildOutputs,
@@ -1191,6 +1192,8 @@ export function useCaseOrchestrator(
   const [ruleAuthoringOutcome, setRuleAuthoringOutcome] =
     useState<SessionPreviewOutcome | null>(null);
   const [ruleAuthoringBusy, setRuleAuthoringBusy] = useState(false);
+  const ruleAuthoringInFlight = useRef(false);
+  const unresolvedDecisionInFlight = useRef(false);
   const ruleAuthorCandidates = useMemo(
     () => buildRuleAuthorCandidates(evidenceCatalog, provisionCandidates),
     [evidenceCatalog, provisionCandidates],
@@ -1684,151 +1687,268 @@ export function useCaseOrchestrator(
     reviewer: string,
     rationale: string,
   ) => {
-    const result = await resolveItem(
-      item,
-      action as "accept" | "reject" | "supersede" | "branch",
-      interpretationId,
-      rationale,
-      {
-        actorType: "human",
-        actorKey: reviewer,
-        displayName: reviewer,
-        authorityContext:
-          activeCase === null
-            ? "synthetic-session-preview"
-            : "Locally asserted unresolved-item reviewer",
-      },
-      activeGovernanceDependencies,
-    );
-    if (!result.ok) {
+    if (unresolvedDecisionInFlight.current || ruleAuthoringInFlight.current)
       return {
         ok: false,
-        message: `Resolution validation failed: ${result.error}`,
+        message: "Another rule or unresolved-item decision is in progress.",
       };
-    }
-    const revisions = [
-      result.value.item,
-      ...(result.value.branchedItem === null
-        ? []
-        : [result.value.branchedItem]),
-    ];
-    if (activeCase !== null && workspace.current !== null) {
-      const persisted = await appendUnresolvedItems(
-        workspace.current,
-        activeCase.caseId,
-        revisions,
+    unresolvedDecisionInFlight.current = true;
+    const caseId = activeCase?.caseId ?? null;
+    const activeWorkspace = workspace.current;
+    const snapshot = priorSnapshot.current;
+    const isCurrent = () =>
+      activeCaseId.current === caseId &&
+      workspace.current === activeWorkspace &&
+      priorSnapshot.current === snapshot;
+    invalidateArchitectureBuild();
+    try {
+      const result = await resolveItem(
+        item,
+        action as "accept" | "reject" | "supersede" | "branch",
+        interpretationId,
+        rationale,
+        {
+          actorType: "human",
+          actorKey: reviewer,
+          displayName: reviewer,
+          authorityContext:
+            activeCase === null
+              ? "synthetic-session-preview"
+              : "Locally asserted unresolved-item reviewer",
+        },
+        activeGovernanceDependencies,
       );
-      if (!persisted.ok) {
-        return { ok: false, message: persisted.error.safeMessage };
+      if (!isCurrent())
+        return {
+          ok: false,
+          message: "Case evidence changed. Review the unresolved item again.",
+        };
+      if (!result.ok) {
+        return {
+          ok: false,
+          message: `Resolution validation failed: ${result.error}`,
+        };
       }
-      setEvidenceUnresolvedRecords(persisted.value);
-      setEvidenceUnresolvedItems(latestUnresolvedItems(persisted.value));
-    } else {
-      setEvidenceUnresolvedItems((current) => [
-        ...current.map((candidate) =>
-          candidate.itemId === item.itemId ? result.value.item : candidate,
-        ),
+      const revisions = [
+        result.value.item,
         ...(result.value.branchedItem === null
           ? []
           : [result.value.branchedItem]),
-      ]);
-      setEvidenceUnresolvedRecords((current) => [...current, ...revisions]);
+      ];
+      if (caseId !== null) {
+        if (activeWorkspace === null)
+          return { ok: false, message: "Workspace unavailable." };
+        const persisted = await appendUnresolvedItems(
+          activeWorkspace,
+          caseId,
+          revisions,
+        );
+        if (!persisted.ok) {
+          return { ok: false, message: persisted.error.safeMessage };
+        }
+        if (!isCurrent())
+          return {
+            ok: false,
+            message:
+              "The decision was saved, but the case changed. Inspect the case history.",
+          };
+        setEvidenceUnresolvedRecords(persisted.value);
+        setEvidenceUnresolvedItems(latestUnresolvedItems(persisted.value));
+      } else {
+        setEvidenceUnresolvedItems((current) => [
+          ...current.map((candidate) =>
+            candidate.itemId === item.itemId ? result.value.item : candidate,
+          ),
+          ...(result.value.branchedItem === null
+            ? []
+            : [result.value.branchedItem]),
+        ]);
+        setEvidenceUnresolvedRecords((current) => [...current, ...revisions]);
+      }
+      invalidateArchitectureBuild();
+      setRuleAuthoringOutcome(null);
+      return {
+        ok: true,
+        message:
+          activeCase === null
+            ? `${action} passed governed validation in this synthetic session preview. The decision was not persisted.`
+            : `${action} was appended to the active case unresolved-item history.`,
+      };
+    } catch {
+      return {
+        ok: false,
+        message:
+          "The unresolved-item decision could not be completed. Inspect the case history before retrying.",
+      };
+    } finally {
+      unresolvedDecisionInFlight.current = false;
     }
-    setRuleAuthoringOutcome(null);
-    return {
-      ok: true,
-      message:
-        activeCase === null
-          ? `${action} passed governed validation in this synthetic session preview. The decision was not persisted.`
-          : `${action} was appended to the active case unresolved-item history.`,
-    };
   };
 
   const recordRuleAuthoring = async (draft: RuleAuthoringDraft) => {
-    setRuleAuthoringBusy(true);
-    setRuleAuthoringOutcome(null);
-    const selectedIds = new Set(draft.candidateIds);
-    const sources =
-      activeCase === null && evidenceCatalog === null
-        ? evidenceReviewDemo.candidates
-        : ruleAuthorCandidates;
-    const selectedCandidates = sources
-      .filter((entry) => selectedIds.has(entry.candidate.candidateId))
-      .map((entry) => entry.candidate);
-    const primaryCandidate = selectedCandidates.find(
-      (candidate) =>
-        candidate.artifactSha256 === draft.primaryCitation.artifactSha256 &&
-        candidate.provisionIdentifier ===
-          draft.primaryCitation.provisionIdentifier &&
-        (candidate.artifactLocator === draft.primaryCitation.artifactLocator ||
-          candidate.artifactLocator === draft.primaryCitation.citationLocator),
-    );
-    const catalog = evidenceCatalogRef.current ?? evidenceReviewDemo.catalog;
-    const predecessor =
-      draft.predecessorRuleId === null
-        ? null
-        : (previewRules.find(
-            (rule) => rule.ruleId === draft.predecessorRuleId,
-          ) ?? null);
-    const result = await authorRule(
-      {
-        proposedCandidates: selectedCandidates,
-        primaryCitation: draft.primaryCitation,
-        catalog,
-        unresolvedRecords: evidenceUnresolvedRecords,
-        authorityOverrides: EMPTY_AUTHORITY_OVERRIDES,
-        governingRestatement: draft.governingRestatement,
-        effectiveDate: draft.effectiveDate,
-        endDate: null,
-        adoptionOrExecutionDate:
-          primaryCandidate?.extractedAdoptionDate ?? null,
-        applicabilityConditions: [
-          {
-            dimension: draft.applicabilityDimension,
-            value: draft.applicabilityValue,
-            evidence: [draft.primaryCitation],
-          },
-        ],
-        requiredApplicabilityDimensions: [draft.applicabilityDimension],
-        affectedScope: `provision/${primaryCandidate?.provisionIdentifier ?? SYNTHETIC_RULE_SCOPE}`,
-        reviewer: {
-          actorType: "human",
-          actorKey: draft.reviewer,
-          displayName: draft.reviewer,
-          authorityContext:
-            activeCase === null
-              ? `synthetic-session-preview: ${draft.rationale}`
-              : `case-orchestrator: ${draft.rationale}`,
-        },
-        approvalRationale: draft.rationale,
-        confidence: Math.min(
-          ...selectedCandidates.map((candidate) => candidate.confidence),
-        ),
-        predecessor,
-        linkType: predecessor === null ? undefined : "supersession",
-        ruleSetVersion: "feature-001-plan-rule-v1",
-      },
-      activeGovernanceDependencies,
-    );
-    if (!result.ok) {
+    if (ruleAuthoringInFlight.current) return;
+    if (unresolvedDecisionInFlight.current) {
       setRuleAuthoringOutcome({
         kind: "error",
-        message: `${result.error.code}: ${result.error.message}`,
+        message: "An unresolved-item decision is still in progress.",
       });
-      setRuleAuthoringBusy(false);
       return;
     }
-    const persisted = await persistPlanRuleRecord(result.value);
+    ruleAuthoringInFlight.current = true;
+    setRuleAuthoringBusy(true);
+    setRuleAuthoringOutcome(null);
     invalidateArchitectureBuild();
-    setPreviewRules((current) => [...current, result.value]);
-    setRuleAuthoringOutcome({
-      kind: "success",
-      message: persisted
-        ? `Governed validation passed and the plan-rule record was persisted locally for this case effective ${result.value.effectiveDate}.`
-        : `Governed validation passed for a synthetic session preview effective ${result.value.effectiveDate}. Select a workspace and active case to persist rule records.`,
-    });
-    setCaseOutputExportMessage(null);
-    setRuleAuthoringBusy(false);
+    const caseId = activeCase?.caseId ?? null;
+    const activeWorkspace = workspace.current;
+    const snapshot = priorSnapshot.current;
+    const reviewState = caseReviewState.current;
+    const catalogAtStart = evidenceCatalogRef.current;
+    const sequence = architectureBuildSequence.current;
+    const requireCurrent = () => {
+      if (
+        activeCaseId.current !== caseId ||
+        workspace.current !== activeWorkspace ||
+        priorSnapshot.current !== snapshot ||
+        caseReviewState.current !== reviewState ||
+        evidenceCatalogRef.current !== catalogAtStart ||
+        architectureBuildSequence.current !== sequence
+      )
+        throw new Error(
+          "Case evidence or review changed. Review the rule again.",
+        );
+    };
+    try {
+      const selectedIds = new Set(draft.candidateIds);
+      const sources =
+        activeCase === null && evidenceCatalog === null
+          ? evidenceReviewDemo.candidates
+          : ruleAuthorCandidates;
+      const selectedCandidates = sources
+        .filter((entry) => selectedIds.has(entry.candidate.candidateId))
+        .map((entry) => entry.candidate);
+      const primaryCandidate = selectedCandidates.find(
+        (candidate) =>
+          candidate.artifactSha256 === draft.primaryCitation.artifactSha256 &&
+          candidate.provisionIdentifier ===
+            draft.primaryCitation.provisionIdentifier &&
+          (candidate.artifactLocator ===
+            draft.primaryCitation.artifactLocator ||
+            candidate.artifactLocator ===
+              draft.primaryCitation.citationLocator),
+      );
+      const catalog = catalogAtStart ?? evidenceReviewDemo.catalog;
+      if (caseId !== null) {
+        if (
+          activeWorkspace === null ||
+          snapshot === null ||
+          catalogAtStart === null ||
+          !catalogMatchesCurrentReview(catalogAtStart)
+        )
+          throw new Error(
+            "A current case evidence snapshot and catalog are required.",
+          );
+        const verification = await verifyRuleCandidatesInWorkspace({
+          workspace: activeWorkspace,
+          snapshot,
+          catalog: catalogAtStart,
+          candidates: selectedCandidates,
+        });
+        requireCurrent();
+        if (!verification.ok)
+          throw new Error(
+            `Rule source verification blocked: ${verification.message}`,
+          );
+      }
+      const predecessor =
+        draft.predecessorRuleId === null
+          ? null
+          : (previewRules.find(
+              (rule) => rule.ruleId === draft.predecessorRuleId,
+            ) ?? null);
+      if (draft.predecessorRuleId !== null && predecessor === null)
+        throw new Error(
+          "The selected predecessor is no longer available. Review the rule again.",
+        );
+      const result = await authorRule(
+        {
+          proposedCandidates: selectedCandidates,
+          primaryCitation: draft.primaryCitation,
+          catalog,
+          unresolvedRecords: evidenceUnresolvedRecords,
+          authorityOverrides: EMPTY_AUTHORITY_OVERRIDES,
+          governingRestatement: draft.governingRestatement,
+          effectiveDate: draft.effectiveDate,
+          endDate: null,
+          adoptionOrExecutionDate:
+            primaryCandidate?.extractedAdoptionDate ?? null,
+          applicabilityConditions: [
+            {
+              dimension: draft.applicabilityDimension,
+              value: draft.applicabilityValue,
+              evidence: [draft.primaryCitation],
+            },
+          ],
+          requiredApplicabilityDimensions: [draft.applicabilityDimension],
+          affectedScope: `provision/${primaryCandidate?.provisionIdentifier ?? SYNTHETIC_RULE_SCOPE}`,
+          reviewer: {
+            actorType: "human",
+            actorKey: draft.reviewer,
+            displayName: draft.reviewer,
+            authorityContext:
+              activeCase === null
+                ? `synthetic-session-preview: ${draft.rationale}`
+                : `case-orchestrator: ${draft.rationale}`,
+          },
+          approvalRationale: draft.rationale,
+          confidence: Math.min(
+            ...selectedCandidates.map((candidate) => candidate.confidence),
+          ),
+          predecessor,
+          linkType: predecessor === null ? undefined : "supersession",
+          ruleSetVersion: "feature-001-plan-rule-v1",
+        },
+        activeGovernanceDependencies,
+      );
+      requireCurrent();
+      if (!result.ok) {
+        setRuleAuthoringOutcome({
+          kind: "error",
+          message: `${result.error.code}: ${result.error.message}`,
+        });
+        return;
+      }
+      const persisted =
+        caseId === null
+          ? false
+          : await persistPlanRuleRecord(
+              result.value,
+              caseId,
+              activeWorkspace,
+              requireCurrent,
+            );
+      requireCurrent();
+      invalidateArchitectureBuild();
+      setPreviewRules((current) => [...current, result.value]);
+      setRuleAuthoringOutcome({
+        kind: "success",
+        message: persisted
+          ? `Governed validation passed and the plan-rule record was persisted locally for this case effective ${result.value.effectiveDate}.`
+          : `Governed validation passed for a synthetic session preview effective ${result.value.effectiveDate}. Select a workspace and active case to persist rule records.`,
+      });
+      setCaseOutputExportMessage(null);
+    } catch (error) {
+      if (activeCaseId.current === caseId)
+        setRuleAuthoringOutcome({
+          kind: "error",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Rule authoring could not be completed.",
+        });
+    } finally {
+      ruleAuthoringInFlight.current = false;
+      setRuleAuthoringBusy(false);
+    }
   };
 
   const resetEvidenceSessionPreview = () => {
@@ -2458,25 +2578,47 @@ export function useCaseOrchestrator(
 
   const persistPlanRuleRecord = async (
     rule: PlanRuleRecord,
+    caseId: Uuid,
+    activeWorkspace: BrowserDirectoryWorkspace | null,
+    requireCurrent: () => void,
   ): Promise<boolean> => {
-    const activeWorkspace = workspace.current;
-    if (activeWorkspace === null || activeCase === null) return false;
-    await activeWorkspace.createDirectory(
-      `cases/${activeCase.caseId}/evidence`,
+    if (activeWorkspace === null) throw new Error("Workspace unavailable.");
+    requireCurrent();
+    const created = await activeWorkspace.createDirectory(
+      `cases/${caseId}/evidence`,
     );
+    if (!created.ok)
+      throw new Error("Plan-rule directory could not be created.");
+    requireCurrent();
     const saved = await activeWorkspace.append(
-      `cases/${activeCase.caseId}/evidence/rule-records.jsonl`,
+      `cases/${caseId}/evidence/rule-records.jsonl`,
       new TextEncoder().encode(`${canonicalize(rule)}\n`),
     );
     if (!saved.ok) throw new Error("Plan-rule record could not be preserved.");
-    await appendReviewEvent({
-      eventType: "plan-rule-recorded",
-      ruleId: rule.ruleId,
-      ruleContentSha256: rule.ruleContentSha256,
-      effectiveDate: rule.effectiveDate,
-      recordedAt: dependencies.clock.now(),
-      schemaVersion: "1.0.0",
-    });
+    try {
+      requireCurrent();
+    } catch {
+      throw new Error(
+        "The rule was saved, but the case changed before its review event. Inspect the case history before retrying.",
+      );
+    }
+    const event = await activeWorkspace.append(
+      `cases/${caseId}/reviews/events.jsonl`,
+      new TextEncoder().encode(
+        `${canonicalize({
+          eventType: "plan-rule-recorded",
+          ruleId: rule.ruleId,
+          ruleContentSha256: rule.ruleContentSha256,
+          effectiveDate: rule.effectiveDate,
+          recordedAt: dependencies.clock.now(),
+          schemaVersion: "1.0.0",
+        })}\n`,
+      ),
+    );
+    if (!event.ok)
+      throw new Error(
+        "The rule was saved, but its review event could not be preserved. Inspect the case history before retrying.",
+      );
     return true;
   };
 
@@ -3099,7 +3241,11 @@ export function useCaseOrchestrator(
     const currentHashes = new Set(
       checkpoint.artifacts.map((artifact) => artifact.sha256),
     );
-    const includedHashes = new Set(included.map((artifact) => artifact.sha256));
+    // The checkpoint covers case-package artifacts, not separately preserved
+    // reference policy files in the catalog.
+    const includedHashes = new Set(
+      value.caseEvidence.map((artifact) => artifact.sha256),
+    );
     return (
       currentHashes.size === includedHashes.size &&
       [...currentHashes].every((sha256) => includedHashes.has(sha256))
@@ -3912,6 +4058,37 @@ export function useCaseOrchestrator(
       for (const rule of rules) {
         const validation = await validateRuleRecord(rule);
         if (!validation.ok) throw new Error(validation.error);
+      }
+      if (rules.length > 0) {
+        if (snapshot === null)
+          throw new Error("Current rule source evidence is unavailable.");
+        const sourceCandidates: ProvisionCandidate[] = [];
+        for (const rule of rules) {
+          const citation = rule.primaryCitation;
+          const matches = provisionCandidates.filter(
+            (candidate) =>
+              candidate.artifactSha256 === citation.artifactSha256 &&
+              candidate.provisionIdentifier === citation.provisionIdentifier &&
+              (candidate.artifactLocator === citation.citationLocator ||
+                candidate.artifactLocator === citation.artifactLocator),
+          );
+          if (matches.length !== 1 || matches[0] === undefined)
+            throw new Error(
+              "The rule source candidate is missing or ambiguous. Re-inspect and review the evidence.",
+            );
+          sourceCandidates.push(matches[0]);
+        }
+        const verification = await verifyRuleCandidatesInWorkspace({
+          workspace: activeWorkspace,
+          snapshot,
+          catalog,
+          candidates: sourceCandidates,
+        });
+        requireCurrent();
+        if (!verification.ok)
+          throw new Error(
+            `Rule source verification blocked: ${verification.message}`,
+          );
       }
       const overrides: readonly AuthorityOverride[] = [];
 

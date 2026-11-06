@@ -70,9 +70,7 @@ test("reviews synthetic evidence through catalog, candidates, unresolved items, 
   await reviewStage
     .getByLabel("Condition value")
     .fill("all synthetic participants");
-  await reviewStage
-    .getByLabel("Authorized reviewer")
-    .fill("Synthetic Reviewer");
+  await reviewStage.getByLabel("Reviewer name").fill("Synthetic Reviewer");
   await reviewStage
     .getByLabel("Approval rationale")
     .fill("Synthetic evidence and scope reviewed.");
