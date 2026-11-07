@@ -16,11 +16,24 @@ interface Metadata {
   compression: number;
 }
 
-export function readBoundedOoxmlParts(bytes: Uint8Array): {
+export function readBoundedOoxmlParts(
+  bytes: Uint8Array,
+  options: {
+    readonly relationshipsOnly?: boolean;
+    readonly maxRelationshipBytes?: number;
+  } = {},
+): {
   names: readonly string[];
   xmlParts: ReadonlyMap<string, Uint8Array>;
 } {
   if (bytes.byteLength > MAX_INPUT) throw new Error("Package is too large.");
+  const relationshipLimit = options.maxRelationshipBytes ?? MAX_XML;
+  if (
+    !Number.isSafeInteger(relationshipLimit) ||
+    relationshipLimit < 0 ||
+    relationshipLimit > MAX_XML
+  )
+    throw new Error("Invalid relationship inspection limit.");
   const metadata = new Map<string, Metadata>();
   let declaredTotal = 0;
   // fflate visits the central directory without expanding data when the filter
@@ -36,6 +49,8 @@ export function readBoundedOoxmlParts(bytes: Uint8Array): {
         !Number.isSafeInteger(part.originalSize) ||
         part.originalSize < 0 ||
         part.originalSize > MAX_PART ||
+        (part.name.toLowerCase().endsWith(".rels") &&
+          part.originalSize > relationshipLimit) ||
         ((part.name.toLowerCase().endsWith(".xml") ||
           part.name.toLowerCase().endsWith(".rels")) &&
           part.originalSize > MAX_XML)
@@ -79,9 +94,9 @@ export function readBoundedOoxmlParts(bytes: Uint8Array): {
     )
       throw new Error("Local and central package entries do not match.");
     seen.add(file.name);
-    const capture =
-      file.name.toLowerCase().endsWith(".xml") ||
-      file.name.toLowerCase().endsWith(".rels");
+    const isRelationship = file.name.toLowerCase().endsWith(".rels");
+    const isXml = file.name.toLowerCase().endsWith(".xml") || isRelationship;
+    const capture = isRelationship || (!options.relationshipsOnly && isXml);
     const chunks: Uint8Array[] = [];
     let expanded = 0;
     file.ondata = (error, chunk, final) => {
@@ -91,7 +106,8 @@ export function readBoundedOoxmlParts(bytes: Uint8Array): {
       if (
         expanded > expected.originalSize ||
         expanded > MAX_PART ||
-        (capture && expanded > MAX_XML) ||
+        (isXml && expanded > MAX_XML) ||
+        (isRelationship && expanded > relationshipLimit) ||
         actualTotal > MAX_EXPANDED
       )
         throw new Error("Package expansion exceeds limits.");

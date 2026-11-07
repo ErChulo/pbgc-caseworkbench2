@@ -1,6 +1,9 @@
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { parseOoxmlPassive } from "../../src/adapters/parsers/ooxml-parser";
+import { parseWorkbookPassive } from "../../src/adapters/parsers/workbook-parser";
+import { workbookFixture } from "../fixtures/generators/passive-formats";
+import { unzipSync } from "fflate";
 import { readBoundedOoxmlParts } from "../../src/adapters/parsers/bounded-ooxml-parts";
 
 function document(text: string) {
@@ -93,5 +96,41 @@ describe("bounded passive OOXML expansion", () => {
     expect(
       parseOoxmlPassive(document("test").slice(0, 40), "docx").status,
     ).toBe("unreadable");
+  });
+});
+
+describe("bounded workbook package preflight", () => {
+  it("rejects oversized worksheet XML before workbook parsing", () => {
+    const parts = unzipSync(workbookFixture());
+    parts["xl/worksheets/sheet1.xml"] = strToU8(
+      "x".repeat(8 * 1024 * 1024 + 1),
+    );
+    const result = parseWorkbookPassive(zipSync(parts));
+    expect(result.status).toBe("unreadable");
+    expect(result.parserVersion).toBe("1.4.0");
+    expect(result.rawValues).toEqual([]);
+  });
+
+  it("rejects forged expanded sizes in local and central workbook headers", () => {
+    const bytes = workbookFixture();
+    const local = findSignature(bytes, [0x50, 0x4b, 0x03, 0x04]);
+    const central = findSignature(bytes, [0x50, 0x4b, 0x01, 0x02]);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    view.setUint32(local + 22, 1, true);
+    view.setUint32(central + 24, 1, true);
+    const result = parseWorkbookPassive(bytes);
+    expect(result.status).toBe("unreadable");
+    expect(result.rawValues).toEqual([]);
+  });
+
+  it("does not retain workbook XML when only relationships are requested", () => {
+    const parts = readBoundedOoxmlParts(workbookFixture(), {
+      relationshipsOnly: true,
+      maxRelationshipBytes: 4 * 1024 * 1024,
+    });
+    expect(parts.names).toContain("xl/workbook.xml");
+    expect(parts.xmlParts.has("xl/workbook.xml")).toBe(false);
+    expect(parts.xmlParts.has("xl/_rels/workbook.xml.rels")).toBe(true);
+    expect(parseWorkbookPassive(workbookFixture()).parserVersion).toBe("1.4.0");
   });
 });

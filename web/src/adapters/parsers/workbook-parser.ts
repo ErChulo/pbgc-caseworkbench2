@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { unzipSync } from "fflate";
+import { readBoundedOoxmlParts } from "./bounded-ooxml-parts";
 
 import {
   failedPassiveExtraction,
@@ -9,7 +9,6 @@ import {
   inspectOoxmlPartNames,
   inspectOoxmlRelationships,
 } from "../screening/ooxml-risk";
-import { assertUniqueArchivePaths } from "./archive-path";
 
 export interface WorkbookCellObservation {
   readonly sheet: string;
@@ -69,7 +68,7 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
     ).length;
     return Object.freeze({
       parserId: "workbook-passive",
-      parserVersion: "1.3.0",
+      parserVersion: "1.4.0",
       status: packageRisk.length > 0 ? "partial" : "success",
       mediaType:
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -100,37 +99,23 @@ export function parseWorkbookPassive(bytes: Uint8Array): PassiveExtraction {
       "workbook-passive",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "unreadable",
-      "Workbook is corrupt, encrypted, or unsupported; no repair was attempted.",
+      "Workbook is corrupt, encrypted, unsupported, or exceeds local inspection limits; no repair was attempted.",
+      "1.4.0",
     );
   }
 }
 
 /** Inspect ZIP metadata before handing it to the workbook parser. */
 function inspectWorkbookContainer(bytes: Uint8Array): string[] {
+  if (bytes.byteLength > 32 * 1024 * 1024)
+    throw new Error("Workbook input exceeds inspection limits.");
   const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b;
   if (!isZip) return ["legacy-container-unverified"];
-  const names: string[] = [];
-  let totalExpanded = 0;
-  const parts = unzipSync(bytes, {
-    filter(part) {
-      names.push(part.name);
-      totalExpanded += part.originalSize;
-      if (
-        names.length > 10_000 ||
-        !Number.isSafeInteger(totalExpanded) ||
-        totalExpanded > 512 * 1024 * 1024 ||
-        part.originalSize < 0 ||
-        part.size < 0 ||
-        (part.name.toLowerCase().endsWith(".rels") &&
-          part.originalSize > 4 * 1024 * 1024)
-      )
-        throw new Error("Workbook package exceeds inspection limits.");
-      return part.name.toLowerCase().endsWith(".rels");
-    },
+  const { names, xmlParts } = readBoundedOoxmlParts(bytes, {
+    relationshipsOnly: true,
+    maxRelationshipBytes: 4 * 1024 * 1024,
   });
-  // Ignore explicit directory entries, which do not contain document content.
   const fileNames = names.filter((name) => !name.endsWith("/"));
-  assertUniqueArchivePaths(fileNames);
   if (
     ![
       "[Content_Types].xml",
@@ -140,17 +125,10 @@ function inspectWorkbookContainer(bytes: Uint8Array): string[] {
     ].every((name) => fileNames.includes(name))
   )
     throw new Error("Workbook package is missing required OOXML parts.");
-  const seen = new Set<string>();
-  for (const name of fileNames) {
-    const key = name.normalize("NFC").toLowerCase();
-    if (seen.has(key))
-      throw new Error("Workbook package has ambiguous part names.");
-    seen.add(key);
-  }
   const decoder = new TextDecoder("utf-8", { fatal: true });
-  const relationshipXml = Object.keys(parts)
+  const relationshipXml = [...xmlParts.keys()]
     .sort()
-    .map((name) => decoder.decode(parts[name]));
+    .map((name) => decoder.decode(xmlParts.get(name)));
   return [
     ...inspectOoxmlPartNames(fileNames).indicators,
     ...inspectOoxmlRelationships(relationshipXml).indicators,
