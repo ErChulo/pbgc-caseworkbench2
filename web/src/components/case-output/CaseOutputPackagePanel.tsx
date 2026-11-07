@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Section436PreviewVerificationPanel } from "./Section436PreviewVerificationPanel";
 import { Section436PreviewPanel } from "./Section436PreviewPanel";
 import { Section436ReplayPanel } from "./Section436ReplayPanel";
 
@@ -245,6 +246,10 @@ export function CaseOutputPackagePanel({
       ) : null}
       <Section436PreviewPanel
         key={`preview-${payload.caseId}`}
+        caseId={payload.caseId}
+      />
+      <Section436PreviewVerificationPanel
+        key={`preview-check-${payload.caseId}`}
         caseId={payload.caseId}
       />
       <Section436ReplayPanel

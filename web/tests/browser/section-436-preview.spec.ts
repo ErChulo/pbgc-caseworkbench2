@@ -68,6 +68,45 @@ test("creates and downloads a blocked provisional preview without releasing the 
   await expect(panel.getByText(/Preview file SHA-256:/)).toContainText(
     createHash("sha256").update(previewBytes).digest("hex"),
   );
+  const verification = page.getByRole("region", {
+    name: "Check a provisional Section 436 preview",
+  });
+  await verification.getByLabel(/Provisional preview JSON file/).setInputFiles({
+    name: "preview.json",
+    mimeType: "application/json",
+    buffer: previewBytes,
+  });
+  await verification
+    .getByLabel(/Original preview input JSON file/)
+    .setInputFiles({
+      name: "source.json",
+      mimeType: "application/json",
+      buffer: inputBytes,
+    });
+  await verification
+    .getByRole("button", { name: "Check preview and input" })
+    .click();
+  await expect(
+    verification.getByText(
+      /Local regeneration matched. Evaluation status: blocked/,
+    ),
+  ).toBeVisible();
+  await verification
+    .getByLabel(/Original preview input JSON file/)
+    .setInputFiles({
+      name: "changed.json",
+      mimeType: "application/json",
+      buffer: Buffer.from("{}"),
+    });
+  await expect(
+    verification.getByText(/Local regeneration matched/),
+  ).not.toBeVisible();
+  await verification
+    .getByRole("button", { name: "Check preview and input" })
+    .click();
+  await expect(verification.getByRole("alert")).toContainText(
+    "input file hash does not match",
+  );
   await expect(
     page
       .locator("li.case-output-stage")
@@ -97,10 +136,13 @@ test("creates a provisional preview in the built file URL with network blocked",
   const panel = page.getByRole("region", {
     name: "Create a provisional Section 436 preview",
   });
+  const inputBytes = Buffer.from(
+    JSON.stringify({ caseId, facts: [], rules: [] }),
+  );
   await panel.getByLabel(/Preview input JSON file/).setInputFiles({
     name: "synthetic.json",
     mimeType: "application/json",
-    buffer: Buffer.from(JSON.stringify({ caseId, facts: [], rules: [] })),
+    buffer: inputBytes,
   });
   await panel
     .getByRole("button", { name: "Create provisional preview" })
@@ -111,5 +153,35 @@ test("creates a provisional preview in the built file URL with network blocked",
   await expect(
     panel.getByRole("button", { name: "Download provisional preview" }),
   ).toBeEnabled();
+  const downloadEvent = page.waitForEvent("download");
+  await panel
+    .getByRole("button", { name: "Download provisional preview" })
+    .click();
+  const download = await downloadEvent;
+  const path = await download.path();
+  if (!path) throw new Error("No preview download");
+  const verification = page.getByRole("region", {
+    name: "Check a provisional Section 436 preview",
+  });
+  await verification.getByLabel(/Provisional preview JSON file/).setInputFiles({
+    name: "preview.json",
+    mimeType: "application/json",
+    buffer: await readFile(path),
+  });
+  await verification
+    .getByLabel(/Original preview input JSON file/)
+    .setInputFiles({
+      name: "source.json",
+      mimeType: "application/json",
+      buffer: inputBytes,
+    });
+  await verification
+    .getByRole("button", { name: "Check preview and input" })
+    .click();
+  await expect(
+    verification.getByText(
+      /Local regeneration matched. Evaluation status: blocked/,
+    ),
+  ).toBeVisible();
   expect(outboundRequests).toEqual([]);
 });
