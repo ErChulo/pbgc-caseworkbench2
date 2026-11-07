@@ -520,15 +520,14 @@ export function App({
         <CaseOutputPackagePanel
           payload={finalOutputPayload}
           linkedArtifacts={orchestrator.caseOutputArtifacts}
+          busy={orchestrator.caseOutputBusy}
+          restoreBlocked={orchestrator.caseOutputRestoreBlocked}
           exportMessage={orchestrator.caseOutputExportMessage}
           linkMessage={orchestrator.caseOutputLinkMessage}
           onLinkArtifact={async (draft) => {
             await orchestrator.linkCaseOutputArtifact(draft);
           }}
-          onExport={async () => {
-            await Promise.resolve();
-            void orchestrator.exportFinalCaseworkOutputPackage();
-          }}
+          onExport={orchestrator.exportFinalCaseworkOutputPackage}
         />
       </main>
     </div>

@@ -20,7 +20,14 @@ import {
   isCaseOutputPath,
   verifyOutputArtifactReferences,
 } from "../../adapters/filesystem/output-artifact-verification";
-import { useMemo, useRef, useState } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
+import { CaseOutputOperationGuard } from "../utilities/case-output-operation";
 import scenarioSelectionYaml from "../../../../rules/scenario-selection.yaml?raw";
 import tabSelectionYaml from "../../../../rules/tab-selection.yaml?raw";
 import iobClassificationYaml from "../../../../rules/iob-classification.yaml?raw";
@@ -1086,6 +1093,8 @@ export interface CaseOrchestrator {
     readonly reviewer: string;
     readonly rationale: string;
   }) => Promise<void>;
+  readonly caseOutputBusy: boolean;
+  readonly caseOutputRestoreBlocked: boolean;
   readonly linkCaseOutputArtifact: (
     draft: CaseOutputArtifactLinkDraft,
   ) => Promise<void>;
@@ -1130,6 +1139,21 @@ export function useCaseOrchestrator(
     null,
   );
   const activeCaseId = useRef<Uuid | null>(null);
+  const caseOutputGuard = useRef(new CaseOutputOperationGuard()).current;
+  const [caseOutputBusy, setCaseOutputBusy] = useState(false);
+  const outputReferencesRevision = useRef(0);
+  const outputRestoreSequence = useRef(0);
+  const outputRestoringRef = useRef(false);
+  const [outputRestoring, setOutputRestoring] = useState(false);
+  const outputRestoreBlockedRef = useRef(false);
+  const [outputRestoreBlocked, setOutputRestoreBlocked] = useState(false);
+  const markCaseOutputChange =
+    <T>(setter: Dispatch<SetStateAction<T>>) =>
+    (value: SetStateAction<T>): void => {
+      caseOutputGuard.changed();
+      setCaseOutputExportMessage(null);
+      setter(value);
+    };
   const architectureBuildSequence = useRef(0);
   const populationDecisionInFlight = useRef(false);
   const priorSnapshot = useRef<PackageSnapshot | null>(null);
@@ -1164,10 +1188,10 @@ export function useCaseOrchestrator(
   const [relationshipItems, setRelationshipItems] = useState<
     readonly RelationshipReviewItem[]
   >([]);
-  const [populationItems, setPopulationItems] = useState<
+  const [populationItems, setPopulationItemsState] = useState<
     readonly PopulationReviewItem[]
   >([]);
-  const [manifestSummary, setManifestSummary] =
+  const [manifestSummary, setManifestSummaryState] =
     useState<ManifestExportSummary | null>(null);
   const [evidenceItems, setEvidenceItems] = useState<
     readonly ArtifactInventoryItem[]
@@ -1183,7 +1207,7 @@ export function useCaseOrchestrator(
   const [evidenceViewerError, setEvidenceViewerError] = useState<string | null>(
     null,
   );
-  const [sharedReviewer, setSharedReviewer] = useState("");
+  const [sharedReviewer, setSharedReviewerState] = useState("");
   const [sharedRationale, setSharedRationale] = useState("");
   const [evidenceReviewView, setEvidenceReviewView] =
     useState<EvidenceReviewView>("catalog");
@@ -1202,15 +1226,15 @@ export function useCaseOrchestrator(
   const [evidenceReviewMessage, setEvidenceReviewMessage] = useState<
     string | null
   >(null);
-  const [evidenceUnresolvedItems, setEvidenceUnresolvedItems] = useState<
+  const [evidenceUnresolvedItems, setEvidenceUnresolvedItemsState] = useState<
     readonly UnresolvedItem[]
   >(() => evidenceReviewDemo.unresolvedItems);
   const [evidenceUnresolvedRecords, setEvidenceUnresolvedRecords] = useState<
     readonly UnresolvedItem[]
   >(() => evidenceReviewDemo.unresolvedItems);
-  const [previewRules, setPreviewRules] = useState<readonly PlanRuleRecord[]>(
-    [],
-  );
+  const [previewRules, setPreviewRulesState] = useState<
+    readonly PlanRuleRecord[]
+  >([]);
   const [ruleAuthoringOutcome, setRuleAuthoringOutcome] =
     useState<SessionPreviewOutcome | null>(null);
   const [ruleAuthoringBusy, setRuleAuthoringBusy] = useState(false);
@@ -1226,7 +1250,7 @@ export function useCaseOrchestrator(
   const [caseOutputLinkMessage, setCaseOutputLinkMessage] = useState<
     string | null
   >(null);
-  const [caseOutputArtifacts, setCaseOutputArtifacts] = useState<
+  const [caseOutputArtifacts, setCaseOutputArtifactsState] = useState<
     readonly CaseworkOutputArtifactInput[]
   >([]);
   const [draftV1Summary, setDraftV1Summary] =
@@ -1301,6 +1325,21 @@ export function useCaseOrchestrator(
     useState<GovernanceDependencies>(createSessionGovernanceDependencies);
   const activeGovernanceDependencies =
     evidenceGovernanceDependencies ?? sessionGovernanceDependencies;
+  const setPopulationItems = markCaseOutputChange(setPopulationItemsState);
+  const setManifestSummary = markCaseOutputChange(setManifestSummaryState);
+  const setEvidenceUnresolvedItems = markCaseOutputChange(
+    setEvidenceUnresolvedItemsState,
+  );
+  const setPreviewRules = markCaseOutputChange(setPreviewRulesState);
+  const setCaseOutputArtifacts = (
+    value: SetStateAction<readonly CaseworkOutputArtifactInput[]>,
+  ): void => {
+    outputReferencesRevision.current += 1;
+    caseOutputGuard.changed();
+    setCaseOutputExportMessage(null);
+    setCaseOutputArtifactsState(value);
+  };
+  const setSharedReviewer = markCaseOutputChange(setSharedReviewerState);
 
   // Any change to build inputs invalidates derived in-memory outputs and any
   // asynchronous build that captured the previous case state.
@@ -1502,6 +1541,11 @@ export function useCaseOrchestrator(
   };
 
   const resetCaseScopedState = (previewMode: boolean): void => {
+    outputRestoreSequence.current += 1;
+    outputRestoringRef.current = false;
+    setOutputRestoring(false);
+    outputRestoreBlockedRef.current = false;
+    setOutputRestoreBlocked(false);
     priorSnapshot.current = null;
     inventoryCheckpoints.current.clear();
     lastCheckpoint.current = null;
@@ -1569,6 +1613,8 @@ export function useCaseOrchestrator(
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
+    caseOutputGuard.changed();
+    outputReferencesRevision.current += 1;
     if (activeCase?.caseId !== caseRecord.caseId) {
       resetCaseScopedState(false);
     }
@@ -3881,40 +3927,71 @@ export function useCaseOrchestrator(
   ): Promise<void> => {
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) return;
-    const opened = await activeWorkspace.openChunkReader(
-      `cases/${caseRecord.caseId}/outputs/artifact-references.json`,
-    );
-    if (!opened.ok) {
-      if (opened.error.code !== "NOT_FOUND") {
-        setCaseOutputLinkMessage(
-          "Existing final-output artifact references could not be read.",
-        );
-      }
-      return;
-    }
+    const sequence = ++outputRestoreSequence.current;
+    const revision = outputReferencesRevision.current;
+    outputRestoringRef.current = true;
+    setOutputRestoring(true);
+    const current = (): boolean =>
+      activeCaseId.current === caseRecord.caseId &&
+      workspace.current === activeWorkspace &&
+      outputReferencesRevision.current === revision &&
+      outputRestoreSequence.current === sequence;
     try {
+      const opened = await activeWorkspace.openChunkReader(
+        `cases/${caseRecord.caseId}/outputs/artifact-references.json`,
+      );
+      if (!current()) return;
+      if (!opened.ok) {
+        if (opened.error.code !== "NOT_FOUND")
+          throw new Error("Reference file could not be read.");
+        outputRestoreBlockedRef.current = false;
+        setOutputRestoreBlocked(false);
+        setCaseOutputLinkMessage(null);
+        return;
+      }
+      if (
+        !Number.isSafeInteger(opened.value.sizeBytes) ||
+        opened.value.sizeBytes <= 0 ||
+        opened.value.sizeBytes > 1024 * 1024
+      )
+        throw new Error("Reference file is empty or too large.");
       const value = JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
           await readAllBytes(opened.value),
         ),
       ) as unknown;
+      if (!Array.isArray(value) || value.length > 256)
+        throw new Error("Reference list is invalid or too large.");
       const references = parseCaseOutputArtifactReferences(value);
+      if (references.length !== value.length)
+        throw new Error("A reference is invalid.");
       const checked = await verifyOutputArtifactReferences(
         activeWorkspace,
         caseRecord.caseId,
         references,
       );
-      if (activeCaseId.current !== caseRecord.caseId) return;
+      if (!current()) return;
+      outputRestoreBlockedRef.current = false;
+      setOutputRestoreBlocked(false);
       setCaseOutputArtifacts(checked.verified);
-      if (checked.rejected.length > 0) {
+      setCaseOutputLinkMessage(null);
+      if (checked.rejected.length > 0)
         setCaseOutputLinkMessage(
           `${String(checked.rejected.length)} linked artifact(s) could not be verified and were not restored. Check the file and link it again.`,
         );
-      }
     } catch {
-      setCaseOutputLinkMessage(
-        "Existing final-output artifact references are not valid JSON and were ignored.",
-      );
+      if (current()) {
+        outputRestoreBlockedRef.current = true;
+        setOutputRestoreBlocked(true);
+        setCaseOutputLinkMessage(
+          "Final-output references could not be restored safely. No reference file was changed. Inspect it locally and reopen the case.",
+        );
+      }
+    } finally {
+      if (outputRestoreSequence.current === sequence) {
+        outputRestoringRef.current = false;
+        setOutputRestoring(false);
+      }
     }
   };
 
@@ -4963,22 +5040,6 @@ export function useCaseOrchestrator(
     }
   };
 
-  const persistCaseOutputArtifactReferences = async (
-    caseId: Uuid,
-    references: readonly CaseworkOutputArtifactInput[],
-  ): Promise<void> => {
-    const activeWorkspace = workspace.current;
-    if (activeWorkspace === null) throw new Error("Workspace unavailable.");
-    await activeWorkspace.createDirectory(`cases/${caseId}/outputs`);
-    const saved = await activeWorkspace.writeAtomic(
-      `cases/${caseId}/outputs/artifact-references.json`,
-      new TextEncoder().encode(`${canonicalize(references)}\n`),
-    );
-    if (!saved.ok) {
-      throw new Error("Final-output artifact references could not be saved.");
-    }
-  };
-
   const linkCaseOutputArtifact = async (
     draft: CaseOutputArtifactLinkDraft,
   ): Promise<void> => {
@@ -5005,41 +5066,85 @@ export function useCaseOrchestrator(
       );
       return;
     }
-    const opened = await activeWorkspace.openChunkReader(storagePath);
-    if (!opened.ok) {
-      setCaseOutputLinkMessage(
-        `Workspace artifact could not be opened at ${storagePath}.`,
-      );
+    if (
+      caseOutputGuard.isBusy() ||
+      outputRestoringRef.current ||
+      outputRestoreBlockedRef.current
+    )
       return;
-    }
-    const hashed = await hashChunkReader(opened.value);
-    if (!hashed.ok) {
-      setCaseOutputLinkMessage(hashed.error.safeMessage);
-      return;
-    }
-    if (activeCaseId.current !== activeCase.caseId) return;
-    const linked: CaseworkOutputArtifactInput = {
-      artifactType: draft.artifactType,
-      artifactId,
-      contentSha256: hashed.value.sha256,
-      mediaType,
-      storagePath,
-      description,
-      maturityLevel: draft.maturityLevel,
+    // Supersede a pending restoration before capturing this operation.
+    outputReferencesRevision.current += 1;
+    caseOutputGuard.changed();
+    const token = caseOutputGuard.begin();
+    if (token === null) return;
+    setCaseOutputBusy(true);
+    setCaseOutputLinkMessage(null);
+    const sameCase = (): boolean =>
+      activeCaseId.current === activeCase.caseId &&
+      workspace.current === activeWorkspace;
+    const current = (): boolean => sameCase() && caseOutputGuard.current(token);
+    const requireCurrent = (): void => {
+      if (!current())
+        throw new Error("Case output inputs changed. Link the artifact again.");
     };
-    const next = [
-      ...caseOutputArtifacts.filter(
-        (artifact) => artifact.artifactType !== linked.artifactType,
-      ),
-      linked,
-    ].sort(compareCaseOutputArtifacts);
-    await persistCaseOutputArtifactReferences(activeCase.caseId, next);
-    if (activeCaseId.current !== activeCase.caseId) return;
-    setCaseOutputArtifacts(next);
-    setCaseOutputExportMessage(null);
-    setCaseOutputLinkMessage(
-      `Linked ${linked.artifactType} from ${storagePath} with SHA-256 ${linked.contentSha256}.`,
-    );
+    try {
+      const opened = await activeWorkspace.openChunkReader(storagePath);
+      requireCurrent();
+      if (!opened.ok)
+        throw new Error(
+          `Workspace artifact could not be opened at ${storagePath}.`,
+        );
+      const hashed = await hashChunkReader(opened.value);
+      requireCurrent();
+      if (!hashed.ok) throw new Error(hashed.error.safeMessage);
+      const linked: CaseworkOutputArtifactInput = {
+        artifactType: draft.artifactType,
+        artifactId,
+        contentSha256: hashed.value.sha256,
+        mediaType,
+        storagePath,
+        description,
+        maturityLevel: draft.maturityLevel,
+      };
+      const next = [
+        ...caseOutputArtifacts.filter(
+          (artifact) => artifact.artifactType !== linked.artifactType,
+        ),
+        linked,
+      ].sort(compareCaseOutputArtifacts);
+      await activeWorkspace.createDirectory(
+        `cases/${activeCase.caseId}/outputs`,
+      );
+      requireCurrent();
+      const saved = await activeWorkspace.writeAtomic(
+        `cases/${activeCase.caseId}/outputs/artifact-references.json`,
+        new TextEncoder().encode(`${canonicalize(next)}\n`),
+      );
+      if (!saved.ok)
+        throw new Error("Final-output artifact references could not be saved.");
+      if (!current()) {
+        if (sameCase())
+          setCaseOutputLinkMessage(
+            "Case output inputs changed during the write. The reference file may have been saved; inspect it and link again.",
+          );
+        return;
+      }
+      setCaseOutputArtifacts(next);
+      setCaseOutputExportMessage(null);
+      setCaseOutputLinkMessage(
+        `Linked ${linked.artifactType} from ${storagePath} with SHA-256 ${linked.contentSha256}.`,
+      );
+    } catch (error) {
+      if (sameCase())
+        setCaseOutputLinkMessage(
+          error instanceof Error
+            ? error.message
+            : "The artifact could not be linked.",
+        );
+    } finally {
+      caseOutputGuard.finish(token);
+      setCaseOutputBusy(false);
+    }
   };
 
   const exportCurrentManifest = async (): Promise<void> => {
@@ -6042,44 +6147,90 @@ export function useCaseOrchestrator(
   const exportFinalCaseworkOutputPackage = async (): Promise<void> => {
     const activeWorkspace = workspace.current;
     if (!activeWorkspace || !activeCase) {
-      throw new Error("No active local case is available for export.");
-    }
-    const { createFinalCaseworkOutputPackage: createPackage } =
-      await import("../../domain/case-output/package-builder");
-    const checked = await verifyOutputArtifactReferences(
-      activeWorkspace,
-      activeCase.caseId,
-      caseOutputArtifacts,
-    );
-    if (activeCaseId.current !== activeCase.caseId) return;
-    if (checked.rejected.length > 0) {
-      setCaseOutputArtifacts(checked.verified);
       setCaseOutputExportMessage(
-        "Export stopped: one or more linked files are missing, changed, or outside this case. Check the files and link them again.",
+        "No active local case is available for export.",
       );
       return;
     }
-    const outputInput = createFinalOutputInput({
-      caseRecord: activeCase,
-      manifestSummary,
-      previewRules,
-      populationItems,
-      caseOutputArtifacts: checked.verified,
-      unresolvedItems: evidenceUnresolvedItems,
-      createdAt: dependencies.clock.now(),
-      createdBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
-    });
-    const outputPackage = await createPackage(outputInput);
-    if (activeCaseId.current !== activeCase.caseId) return;
-    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/exports`);
-    const saved = await activeWorkspace.writeAtomic(
-      `cases/${activeCase.caseId}/exports/final-casework-output-package.json`,
-      new TextEncoder().encode(`${canonicalize(outputPackage)}\n`),
-    );
-    if (!saved.ok) throw new Error("Final output package export failed.");
-    setCaseOutputExportMessage(
-      `Final output package exported with status ${outputPackage.deterministicPayload.packageStatus} and hash ${outputPackage.contentSha256}.`,
-    );
+    if (
+      caseOutputGuard.isBusy() ||
+      outputRestoringRef.current ||
+      outputRestoreBlockedRef.current
+    )
+      return;
+    const token = caseOutputGuard.begin();
+    if (token === null) return;
+    setCaseOutputBusy(true);
+    setCaseOutputExportMessage(null);
+    const sameCase = (): boolean =>
+      activeCaseId.current === activeCase.caseId &&
+      workspace.current === activeWorkspace;
+    const current = (): boolean => sameCase() && caseOutputGuard.current(token);
+    const requireCurrent = (): void => {
+      if (!current())
+        throw new Error(
+          "Case output inputs changed. Check the case and export again.",
+        );
+    };
+    try {
+      const { createFinalCaseworkOutputPackage: createPackage } =
+        await import("../../domain/case-output/package-builder");
+      requireCurrent();
+      const checked = await verifyOutputArtifactReferences(
+        activeWorkspace,
+        activeCase.caseId,
+        caseOutputArtifacts,
+      );
+      requireCurrent();
+      if (checked.rejected.length > 0) {
+        setCaseOutputArtifacts(checked.verified);
+        setCaseOutputExportMessage(
+          "Export stopped: one or more linked files are missing, changed, or outside this case. Check the files and link them again.",
+        );
+        return;
+      }
+      const outputInput = createFinalOutputInput({
+        caseRecord: activeCase,
+        manifestSummary,
+        previewRules,
+        populationItems,
+        caseOutputArtifacts: checked.verified,
+        unresolvedItems: evidenceUnresolvedItems,
+        createdAt: dependencies.clock.now(),
+        createdBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
+      });
+      const outputPackage = await createPackage(outputInput);
+      requireCurrent();
+      await activeWorkspace.createDirectory(
+        `cases/${activeCase.caseId}/exports`,
+      );
+      requireCurrent();
+      const saved = await activeWorkspace.writeAtomic(
+        `cases/${activeCase.caseId}/exports/final-casework-output-package.json`,
+        new TextEncoder().encode(`${canonicalize(outputPackage)}\n`),
+      );
+      if (!saved.ok) throw new Error("Final output package export failed.");
+      if (!current()) {
+        if (sameCase())
+          setCaseOutputExportMessage(
+            "Case output inputs changed during the write. The package may have been saved; inspect it and export again.",
+          );
+        return;
+      }
+      setCaseOutputExportMessage(
+        `Final output package exported with status ${outputPackage.deterministicPayload.packageStatus} and hash ${outputPackage.contentSha256}.`,
+      );
+    } catch (error) {
+      if (sameCase())
+        setCaseOutputExportMessage(
+          error instanceof Error
+            ? error.message
+            : "Final output package export failed.",
+        );
+    } finally {
+      caseOutputGuard.finish(token);
+      setCaseOutputBusy(false);
+    }
   };
 
   const finalOutputInput: FinalCaseworkOutputInput | null = activeCase
@@ -6128,6 +6279,8 @@ export function useCaseOrchestrator(
     caseOutputExportMessage,
     caseOutputLinkMessage,
     caseOutputArtifacts,
+    caseOutputBusy: caseOutputBusy || outputRestoring,
+    caseOutputRestoreBlocked: outputRestoreBlocked,
     draftV1Summary,
     draftV1SummaryMessage,
     architectureSelection,

@@ -40,6 +40,12 @@ export async function installSyntheticWorkspace(page: Page) {
             queryPermission: async () => "granted" as PermissionState,
             requestPermission: async () => "granted" as PermissionState,
             getFile: async () => {
+              const gate = (
+                globalThis as unknown as {
+                  __syntheticReadGate?: (path: string) => Promise<void>;
+                }
+              ).__syntheticReadGate;
+              if (gate) await gate(path);
               const stored = Uint8Array.from(
                 files.get(path) ?? new Uint8Array(),
               );
@@ -57,6 +63,12 @@ export async function installSyntheticWorkspace(page: Page) {
               seek: async () => undefined,
               truncate: async () => undefined,
               write: async (data: FileSystemWriteChunkType) => {
+                const gate = (
+                  globalThis as unknown as {
+                    __syntheticWriteGate?: (path: string) => Promise<void>;
+                  }
+                ).__syntheticWriteGate;
+                if (gate) await gate(path);
                 if (data instanceof Uint8Array)
                   files.set(path, Uint8Array.from(data));
                 else if (data instanceof ArrayBuffer)

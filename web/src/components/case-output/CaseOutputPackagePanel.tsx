@@ -41,6 +41,8 @@ export interface CaseOutputArtifactLinkDraft {
 export function CaseOutputPackagePanel({
   payload,
   linkedArtifacts,
+  busy,
+  restoreBlocked,
   exportMessage,
   linkMessage,
   onLinkArtifact,
@@ -48,6 +50,8 @@ export function CaseOutputPackagePanel({
 }: {
   readonly payload: FinalCaseworkOutputDeterministicPayload | null;
   readonly linkedArtifacts: readonly CaseworkOutputArtifactInput[];
+  readonly busy: boolean;
+  readonly restoreBlocked: boolean;
   readonly exportMessage: string | null;
   readonly linkMessage: string | null;
   readonly onLinkArtifact: (
@@ -134,6 +138,12 @@ export function CaseOutputPackagePanel({
         need verification. Section 436 remains required until a verified
         non-applicability decision is supported.
       </p>
+      {busy && (
+        <p role="status">
+          Case output is being checked or saved. Wait before linking or
+          exporting.
+        </p>
+      )}
       <div className="case-output-linker">
         <h3>Link generated artifact</h3>
         <p>
@@ -226,6 +236,7 @@ export function CaseOutputPackagePanel({
         <button
           type="button"
           className="button button-secondary"
+          disabled={busy || restoreBlocked}
           onClick={submitLink}
         >
           Hash and link workspace artifact
@@ -269,6 +280,7 @@ export function CaseOutputPackagePanel({
       <button
         type="button"
         className="button button-primary"
+        disabled={busy || restoreBlocked}
         onClick={() => void onExport()}
       >
         Export final output package
