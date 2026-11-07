@@ -387,13 +387,21 @@ test("governed production path exposes unresolved workbook blockers", async ({
   });
   await rowReview.getByLabel("Source sheet name").fill("Retirees");
   await rowReview.getByLabel("Source row number").fill("2");
-  await rowReview.getByLabel("Explicit field bindings JSON").fill(
-    JSON.stringify([
-      { field: "DOB", column: "A", expectedHeader: "DOB" },
-      { field: "COMP", column: "D", expectedHeader: "COMP" },
-      { field: "FV", column: "E", expectedHeader: "FV" },
-    ]),
-  );
+  for (const [index, field, column] of [
+    [1, "DOB", "A"],
+    [2, "COMP", "D"],
+    [3, "FV", "E"],
+  ] as const) {
+    if (index > 1)
+      await rowReview
+        .getByRole("button", { name: "Add field binding" })
+        .click();
+    await rowReview.getByLabel(`Generic field ${String(index)}`).fill(field);
+    await rowReview.getByLabel(`Source column ${String(index)}`).fill(column);
+    await rowReview
+      .getByLabel(`Exact row-one header ${String(index)}`)
+      .fill(field);
+  }
   await rowReview
     .getByRole("button", { name: "Inspect source row locally" })
     .click();
@@ -413,11 +421,9 @@ test("governed production path exposes unresolved workbook blockers", async ({
   await expect(rowReview.getByLabel("Source row number")).toHaveValue("");
   await rowReview.getByLabel("Source sheet name").fill("Retirees");
   await rowReview.getByLabel("Source row number").fill("2");
-  await rowReview
-    .getByLabel("Explicit field bindings JSON")
-    .fill(
-      JSON.stringify([{ field: "COMP", column: "D", expectedHeader: "COMP" }]),
-    );
+  await rowReview.getByLabel("Generic field 1").fill("COMP");
+  await rowReview.getByLabel("Source column 1").fill("D");
+  await rowReview.getByLabel("Exact row-one header 1").fill("COMP");
   await page.evaluate((sha) => {
     const files = (
       globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }

@@ -5,41 +5,33 @@ import type {
 } from "../../domain/population/record-projection";
 import type { PopulationReviewItem } from "./PopulationReview";
 
-function parseBindings(text: string): readonly PopulationRecordFieldBinding[] {
-  if (text.length > 16_384)
+const emptyBinding = (): PopulationRecordFieldBinding => ({
+  field: "",
+  column: "",
+  expectedHeader: "",
+});
+
+function validateBindings(
+  bindings: readonly PopulationRecordFieldBinding[],
+): readonly PopulationRecordFieldBinding[] {
+  if (JSON.stringify(bindings).length > 16_384)
     throw new Error("Field bindings must be no larger than 16 KiB.");
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text) as unknown;
-  } catch {
-    throw new Error("Field bindings must be a JSON array.");
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0 || parsed.length > 50)
+  if (bindings.length === 0 || bindings.length > 50)
     throw new Error("Provide one to 50 explicit field bindings.");
-  return parsed.map((value: unknown) => {
-    if (value === null || typeof value !== "object" || Array.isArray(value))
-      throw new Error(
-        "Each binding needs field, column, and expectedHeader text.",
-      );
-    const entry = value as Record<string, unknown>;
-    if (
-      Object.keys(entry).sort().join(",") !== "column,expectedHeader,field" ||
-      typeof entry.field !== "string" ||
-      typeof entry.column !== "string" ||
-      typeof entry.expectedHeader !== "string" ||
-      [entry.field, entry.column, entry.expectedHeader].some(
-        (part) => typeof part !== "string" || part.length > 512,
-      )
+  if (
+    bindings.some(
+      ({ field, column, expectedHeader }) =>
+        !field.trim() ||
+        field !== field.trim() ||
+        !/^[A-Z]{1,3}$/u.test(column) ||
+        !expectedHeader.trim() ||
+        [field, column, expectedHeader].some((part) => part.length > 512),
     )
-      throw new Error(
-        "Each binding needs only field, column, and expectedHeader text, up to 512 characters each.",
-      );
-    return {
-      field: entry.field,
-      column: entry.column,
-      expectedHeader: entry.expectedHeader,
-    };
-  });
+  )
+    throw new Error(
+      "Each binding needs a generic field, an uppercase source column, and the exact source header.",
+    );
+  return bindings;
 }
 
 function displayed(value: string | number | boolean): string {
@@ -66,9 +58,9 @@ export function PopulationRecordPreview({
 }) {
   const [sheet, setSheet] = useState("");
   const [row, setRow] = useState("");
-  const [bindings, setBindings] = useState(
-    '[{"field":"","column":"","expectedHeader":""}]',
-  );
+  const [bindings, setBindings] = useState<
+    readonly PopulationRecordFieldBinding[]
+  >([emptyBinding()]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [record, setRecord] = useState<PopulationRecordProjection | null>(null);
@@ -109,7 +101,7 @@ export function PopulationRecordPreview({
       const result = await onPreview(item, {
         sheetName: sheet,
         sourceRow,
-        bindings: parseBindings(bindings),
+        bindings: validateBindings(bindings),
       });
       if (sequence.current === request) setRecord(result);
     } catch (error) {
@@ -164,18 +156,60 @@ export function PopulationRecordPreview({
           autoComplete="off"
         />
       </label>
-      <label>
-        Explicit field bindings JSON
-        <textarea
-          value={bindings}
-          onChange={(event) => {
-            clear();
-            setBindings(event.currentTarget.value);
-          }}
-          rows={3}
-          spellCheck={false}
-        />
-      </label>
+      {bindings.map((binding, index) => (
+        <fieldset key={index}>
+          <legend>Field binding {index + 1}</legend>
+          {(
+            [
+              ["field", "Generic field"],
+              ["column", "Source column"],
+              ["expectedHeader", "Exact row-one header"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key}>
+              {label} {index + 1}
+              <input
+                value={binding[key]}
+                maxLength={512}
+                autoComplete="off"
+                onChange={(event) => {
+                  const value = event.currentTarget.value;
+                  clear();
+                  setBindings((current) =>
+                    current.map((entry, position) =>
+                      position === index ? { ...entry, [key]: value } : entry,
+                    ),
+                  );
+                }}
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={bindings.length === 1}
+            onClick={() => {
+              clear();
+              setBindings((current) =>
+                current.filter((_, position) => position !== index),
+              );
+            }}
+          >
+            Remove field binding {index + 1}
+          </button>
+        </fieldset>
+      ))}
+      <button
+        type="button"
+        className="button button-secondary"
+        disabled={bindings.length >= 50}
+        onClick={() => {
+          clear();
+          setBindings((current) => [...current, emptyBinding()]);
+        }}
+      >
+        Add field binding
+      </button>
       <button
         type="button"
         className="button button-secondary"
@@ -216,7 +250,7 @@ export function PopulationRecordPreview({
               clear();
               setSheet("");
               setRow("");
-              setBindings('[{"field":"","column":"","expectedHeader":""}]');
+              setBindings([emptyBinding()]);
             }}
           >
             Clear local row view
