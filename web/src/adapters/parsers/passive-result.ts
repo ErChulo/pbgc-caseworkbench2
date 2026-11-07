@@ -16,10 +16,11 @@ export function failedPassiveExtraction(
   mediaType: string,
   status: PassiveExtraction["status"],
   limitation: string,
+  parserVersion = "1.0.0",
 ): PassiveExtraction {
   return Object.freeze({
     parserId,
-    parserVersion: "1.0.0",
+    parserVersion,
     status,
     mediaType,
     text: "",

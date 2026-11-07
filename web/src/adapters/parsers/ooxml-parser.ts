@@ -1,4 +1,5 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
+import { readBoundedOoxmlParts } from "./bounded-ooxml-parts";
 
 import {
   failedPassiveExtraction,
@@ -14,8 +15,7 @@ export function parseOoxmlPassive(
   kind: "docx" | "pptx",
 ): PassiveExtraction {
   try {
-    const parts = unzipSync(bytes);
-    const names = Object.keys(parts).sort();
+    const { names, xmlParts } = readBoundedOoxmlParts(bytes);
     const expectedPrefix = kind === "docx" ? "word/" : "ppt/";
     if (!names.some((name) => name.startsWith(expectedPrefix))) {
       return failedPassiveExtraction(
@@ -23,13 +23,18 @@ export function parseOoxmlPassive(
         mediaType(kind),
         "unsupported",
         `Container does not contain the expected ${kind.toUpperCase()} structure.`,
+        "1.1.0",
       );
     }
     const xmlEntries = names
-      .filter((name) => name.endsWith(".xml") || name.endsWith(".rels"))
+      .filter(
+        (name) =>
+          name.toLowerCase().endsWith(".xml") ||
+          name.toLowerCase().endsWith(".rels"),
+      )
       .map((name) => ({
         name,
-        xml: strFromU8(parts[name] ?? new Uint8Array()),
+        xml: strFromU8(xmlParts.get(name) ?? new Uint8Array()),
       }));
     const relevant = xmlEntries.filter(({ name }) =>
       kind === "docx"
@@ -52,7 +57,7 @@ export function parseOoxmlPassive(
     const partRisk = inspectOoxmlPartNames(names);
     const relationshipRisk = inspectOoxmlRelationships(
       xmlEntries
-        .filter(({ name }) => name.endsWith(".rels"))
+        .filter(({ name }) => name.toLowerCase().endsWith(".rels"))
         .map(({ xml }) => xml),
     );
     const riskIndicators = [
@@ -61,7 +66,7 @@ export function parseOoxmlPassive(
     ];
     return Object.freeze({
       parserId: "ooxml-passive",
-      parserVersion: "1.0.0",
+      parserVersion: "1.1.0",
       status: riskIndicators.length > 0 ? "partial" : "success",
       mediaType: mediaType(kind),
       text,
@@ -81,7 +86,8 @@ export function parseOoxmlPassive(
       "ooxml-passive",
       mediaType(kind),
       "unreadable",
-      "OOXML package is corrupt, encrypted, or unsupported; no repair was attempted.",
+      "OOXML package is corrupt, encrypted, unsupported, or exceeds local inspection limits; no repair was attempted.",
+      "1.1.0",
     );
   }
 }
