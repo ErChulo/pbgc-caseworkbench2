@@ -37,6 +37,27 @@ import {
   type PopulationDataResolver,
 } from "./population-data-resolver";
 
+function snapshotFailure(): {
+  ok: false;
+  errors: readonly WorkbookGenerationError[];
+} {
+  return {
+    ok: false,
+    errors: [
+      {
+        code: "INPUT_SNAPSHOT_FAILED",
+        severity: "error",
+        message: "Workbook inputs could not be captured safely.",
+        affectedCells: [],
+        affectedNames: [],
+        detail:
+          "Workbook generation requires a stable, cloneable snapshot of all supplied inputs.",
+        remediation: "Review the supplied inputs and regenerate the workbook.",
+      },
+    ],
+  };
+}
+
 /** Preliminary model builder. Production callers must use buildCompiledWorkbook. */
 export async function buildWorkbook(
   input: WorkbookGenerationInput,
@@ -44,7 +65,13 @@ export async function buildWorkbook(
   | { ok: true; workbook: V1Workbook }
   | { ok: false; errors: readonly WorkbookGenerationError[] }
 > {
-  return buildWorkbookInternal(input);
+  let snapshot: WorkbookGenerationInput;
+  try {
+    snapshot = structuredClone(input);
+  } catch {
+    return snapshotFailure();
+  }
+  return buildWorkbookInternal(snapshot);
 }
 
 /** Verify and independently reproduce compiler output before materializing it. */
@@ -74,12 +101,24 @@ export async function buildCompiledWorkbook(
       },
     ],
   });
-  const artifact = compilation.artifact;
+  // A single snapshot must cover compiler validation, routing guards, and model
+  // construction. Never inspect caller-owned objects after the first await.
+  let capturedInput: WorkbookGenerationInput;
+  let capturedCompilation: CompilationResult;
+  try {
+    capturedInput = structuredClone(input);
+    capturedCompilation = structuredClone(compilation);
+  } catch {
+    return snapshotFailure();
+  }
+  const artifact = capturedCompilation.artifact;
   if (
-    input.buildSpec.formulas.length === 0 ||
-    compilation.status !== "complete" ||
+    capturedInput.buildSpec.formulas.length === 0 ||
+    capturedCompilation.status !== "complete" ||
     artifact === null ||
-    compilation.diagnostics.some((diagnostic) => diagnostic.blocksDownstream)
+    capturedCompilation.diagnostics.some(
+      (diagnostic) => diagnostic.blocksDownstream,
+    )
   )
     return blocked();
   const validation = await validateCompiledArtifact(artifact);
@@ -90,7 +129,7 @@ export async function buildCompiledWorkbook(
   )
     return blocked();
   const fresh = await compileBuildSpec({
-    buildSpec: input.buildSpec,
+    buildSpec: capturedInput.buildSpec,
     compilerVersion: "1.0.0",
     clock: { now: () => artifact.operationalMetadata.generatedAt },
     uuid: { generate: () => artifact.operationalMetadata.compilationRunId },
@@ -127,7 +166,7 @@ export async function buildCompiledWorkbook(
     targets.add(key);
   }
   if (
-    input.buildSpec.cellMappings.some(
+    capturedInput.buildSpec.cellMappings.some(
       (mapping) =>
         mapping.iobClassification === "I" || mapping.iobClassification === "B",
     )
@@ -150,7 +189,7 @@ export async function buildCompiledWorkbook(
       ],
     };
   }
-  return buildWorkbookInternal(input, fresh.artifact);
+  return buildWorkbookInternal(capturedInput, fresh.artifact);
 }
 
 async function buildWorkbookInternal(

@@ -5,7 +5,10 @@ import { validateWorkbook } from "../../../../src/domain/validation-reconciliati
 import { verifyGeneratedXlsx } from "../../../../src/domain/workbook-builder/xlsx-readback";
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { buildCompiledWorkbook } from "../../../../src/domain/workbook-builder/workbook-builder";
+import {
+  buildCompiledWorkbook,
+  buildWorkbook,
+} from "../../../../src/domain/workbook-builder/workbook-builder";
 import {
   buildXLSXSpec,
   writeXLSXBuffer,
@@ -296,6 +299,76 @@ describe("compiled workbook generation", () => {
     const actual = await pending;
     expect(actual).toEqual(expected);
   });
+  it("uses the same captured input and compilation throughout asynchronous generation", async () => {
+    const { input, compilation } = await fixture();
+    const expected = await buildCompiledWorkbook(input, compilation);
+    expect(expected.ok).toBe(true);
+    const mutableInput = structuredClone(input);
+    const mutableCompilation = structuredClone(compilation);
+    const pending = buildCompiledWorkbook(mutableInput, mutableCompilation);
+    (mutableInput.buildSpec as { ruleSetVersion: string }).ruleSetVersion =
+      "changed";
+    (
+      mutableInput.populationProfile as { effectiveDecisionId: string }
+    ).effectiveDecisionId = "changed";
+    (mutableCompilation as { status: string }).status = "blocked";
+    const firstFormula = mutableInput.buildSpec.formulas[0];
+    if (!firstFormula) throw new Error("Missing synthetic formula");
+    (firstFormula as { formulaText: string }).formulaText = "=999";
+    expect(await pending).toEqual(expected);
+  });
+
+  it("does not bypass the routing blocker if an input mapping is removed during compilation", async () => {
+    const { input } = await fixture();
+    const source = await buildSpecV2();
+    const changed = {
+      ...input.buildSpec,
+      formulas: source.formulas,
+      cellMappings: source.cellMappings,
+      executionOrder: source.executionOrder,
+    };
+    const buildSpec = {
+      ...changed,
+      buildSpecContentSha256: await computeContentHash(changed),
+    };
+    const compilation = await compileBuildSpec({
+      buildSpec,
+      compilerVersion: "1.0.0",
+      clock: fixedClock,
+      uuid: fixedUuid,
+    });
+    const mutable = structuredClone({ ...input, buildSpec });
+    const pending = buildCompiledWorkbook(mutable, compilation);
+    (
+      mutable.buildSpec as { cellMappings: typeof buildSpec.cellMappings }
+    ).cellMappings = mutable.buildSpec.cellMappings.filter(
+      (mapping) =>
+        mapping.iobClassification !== "I" && mapping.iobClassification !== "B",
+    );
+    const result = await pending;
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.errors.map((error) => error.code)).toContain(
+        "POPULATION_ROUTING_UNVERIFIED",
+      );
+  });
+
+  it("fails closed on non-cloneable inputs in both builder paths", async () => {
+    const { input, compilation } = await fixture();
+    const unsafe = {
+      ...input,
+      populationData: new Map([["Synthetic", new Map([["X", [() => 1]]])]]),
+    };
+    for (const result of [
+      await buildWorkbook(unsafe),
+      await buildCompiledWorkbook(unsafe, compilation),
+    ]) {
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(result.errors[0]?.code).toBe("INPUT_SNAPSHOT_FAILED");
+    }
+  });
+
   it("rejects incomplete and missing compilation", async () => {
     const { input, compilation } = await fixture();
     for (const candidate of [

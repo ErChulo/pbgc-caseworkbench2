@@ -69,6 +69,29 @@ async function createFixture() {
 }
 
 describe("workbook builder foundation", () => {
+  it("captures nested population maps before asynchronous generation", async () => {
+    const fixture = await createFixture();
+    const input = {
+      ...fixture,
+      generatorVersion: "1.0.0",
+      populationData: new Map([
+        [
+          "RETIREES",
+          new Map([
+            ["COMP", [50000]],
+            ["YOS", [10]],
+          ]),
+        ],
+      ]),
+    };
+    const expected = await buildWorkbook(input);
+    expect(expected.ok).toBe(true);
+    const pending = buildWorkbook(input);
+    input.populationData.get("RETIREES")?.get("COMP")?.splice(0, 1, 99999);
+    (input.buildSpec as { ruleSetVersion: string }).ruleSetVersion = "changed";
+    expect(await pending).toEqual(expected);
+  });
+
   it("builds a deterministic workbook payload from build spec", async () => {
     const fixture = await createFixture();
 
