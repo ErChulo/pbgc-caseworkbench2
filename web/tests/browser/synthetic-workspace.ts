@@ -108,9 +108,10 @@ export async function createSyntheticCase(
   caseNumber: string,
   reviewerId = "synthetic-reviewer",
   reviewerName = "Synthetic Reviewer",
+  url = "/",
 ) {
   await installSyntheticWorkspace(page);
-  await page.goto("/");
+  await page.goto(url);
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill(reviewerId);
   await page.getByLabel("Reviewer display name").fill(reviewerName);

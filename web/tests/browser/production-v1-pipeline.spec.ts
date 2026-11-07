@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import * as XLSX from "xlsx";
+import type { Page } from "@playwright/test";
 
 import { expect, test } from "./fixtures";
 import { createSyntheticCase } from "./synthetic-workspace";
@@ -48,12 +51,36 @@ async function approveSharedPanel(
   return panel;
 }
 
-test("governed production path exposes unresolved workbook blockers", async ({
-  offlinePage: page,
-  outboundRequests,
-}) => {
+async function exercisePipeline(
+  {
+    offlinePage: page,
+    outboundRequests,
+  }: { offlinePage: Page; outboundRequests: string[] },
+  mode: "development" | "file",
+) {
   test.setTimeout(120_000);
-  await createSyntheticCase(page, "PBGC-V1-PRODUCTION-001");
+  const httpRequests: string[] = [];
+  if (mode === "file") {
+    page.on("request", (request) => {
+      if (/^https?:/u.test(request.url())) httpRequests.push(request.url());
+    });
+    await page.route(/^https?:/u, (route) => route.abort());
+  }
+  const url =
+    mode === "file"
+      ? pathToFileURL(
+          resolve(
+            process.env.PBGC_TEST_ARTIFACT ?? "dist/pbgc-caseworkbench.html",
+          ),
+        ).href
+      : "/";
+  await createSyntheticCase(
+    page,
+    "PBGC-V1-PRODUCTION-001",
+    "synthetic-reviewer",
+    "Synthetic Reviewer",
+    url,
+  );
   const oraclePanel = page.getByRole("region", {
     name: "Provisional oracle evidence",
   });
@@ -462,7 +489,9 @@ test("governed production path exposes unresolved workbook blockers", async ({
     .getByLabel("Policy approval rationale")
     .fill("Parsed rule-set semantics reviewed and approved.");
   for (const item of await policy.locator("li").all()) {
-    const approve = item.getByRole("button", { name: "Approve parsed policy" });
+    const approve = item.getByRole("button", {
+      name: "Approve parsed policy",
+    });
     await expect(approve).toBeEnabled();
     await approve.click();
   }
@@ -538,7 +567,9 @@ test("governed production path exposes unresolved workbook blockers", async ({
   ).toBeVisible();
 
   // Formula approval cannot invent test and oracle references.
-  const formulaPanel = page.getByRole("region", { name: "Formula Governance" });
+  const formulaPanel = page.getByRole("region", {
+    name: "Formula Governance",
+  });
   await expect(
     formulaPanel.getByText(
       /Formula approval is blocked until governed test and oracle evidence/u,
@@ -615,4 +646,14 @@ test("governed production path exposes unresolved workbook blockers", async ({
     page.getByText("Select an architecture to review formula governance."),
   ).toBeVisible();
   expect(outboundRequests).toEqual([]);
-});
+  if (mode === "file") expect(httpRequests).toEqual([]);
+}
+
+for (const mode of ["development", "file"] as const) {
+  test(`governed production path exposes unresolved workbook blockers (${mode})`, async ({
+    offlinePage,
+    outboundRequests,
+  }) => {
+    await exercisePipeline({ offlinePage, outboundRequests }, mode);
+  });
+}

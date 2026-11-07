@@ -1,12 +1,24 @@
 import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
-const distDirectory = resolve("dist");
+const args = process.argv.slice(2);
+if (
+  args.length !== 0 &&
+  (args.length !== 2 ||
+    args[0] !== "--dir" ||
+    !args[1] ||
+    args[1].startsWith("--"))
+) {
+  throw new Error(
+    "Usage: node web/tools/verify-single-file.mjs [--dir <build-directory>]",
+  );
+}
+const distDirectory = resolve(args[1] ?? "dist");
 const entries = await readdir(distDirectory);
 
 if (entries.length !== 1 || entries[0] !== "pbgc-caseworkbench.html") {
   throw new Error(
-    `Expected only dist/pbgc-caseworkbench.html; found: ${entries.join(", ") || "(empty)"}`,
+    `Expected only pbgc-caseworkbench.html in ${distDirectory}; found: ${entries.join(", ") || "(empty)"}`,
   );
 }
 
@@ -29,5 +41,5 @@ if (!html.includes("connect-src 'none'")) {
 }
 
 console.log(
-  `Single-file verification passed (${Buffer.byteLength(html)} bytes).`,
+  `Single-file verification passed: ${resolve(distDirectory, entries[0])} (${Buffer.byteLength(html)} bytes).`,
 );
