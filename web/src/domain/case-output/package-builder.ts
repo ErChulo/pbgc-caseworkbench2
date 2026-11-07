@@ -233,30 +233,36 @@ function blockersForStage(
     }
     case "population-profile":
       return input.populationProfileContentSha256 === null
-        ? ["No approved population profile content hash is available."]
+        ? [
+            "No single approved population profile with a matching content hash is available.",
+          ]
         : [];
     case "v1-architecture":
       return input.architecture === null
-        ? ["No governed V1 architecture artifact is available."]
+        ? ["No unambiguous governed V1 architecture artifact is available."]
         : [];
     case "build-spec":
       return input.buildSpec === null
-        ? ["No BuildSpec 2.0.0 artifact is available."]
+        ? ["No unambiguous BuildSpec 2.0.0 artifact is available."]
         : [];
     case "compiled-formulas":
       return input.compiledFormulas === null
-        ? ["No compiled formula artifact is available."]
+        ? ["No unambiguous compiled formula artifact is available."]
         : [];
     case "workbook":
       return input.workbook === null
-        ? ["No generated V1 workbook artifact is available."]
+        ? ["No unambiguous generated V1 workbook artifact is available."]
         : [];
     case "validation-reconciliation": {
       const blockers: string[] = [];
       if (input.validation === null)
-        blockers.push("No validation evidence artifact is available.");
+        blockers.push(
+          "No unambiguous validation evidence artifact is available.",
+        );
       if (input.reconciliation === null)
-        blockers.push("No reconciliation evidence artifact is available.");
+        blockers.push(
+          "No unambiguous reconciliation evidence artifact is available.",
+        );
       // The current input contains references, not validated results, review decisions,
       // or authenticated derivation links. Presence cannot prove readiness.
       blockers.push(
@@ -273,7 +279,7 @@ function blockersForStage(
       }
       if (input.section436 === null) {
         blockers.push(
-          "Section 436 is required but no evaluation artifact is available.",
+          "Section 436 is required but no unambiguous evaluation artifact is available.",
         );
       } else {
         blockers.push(

@@ -86,15 +86,17 @@ function manifestSha256(
 function approvedPopulationProfileHash(
   populationItems: readonly PopulationReviewItem[],
 ): Sha256 | null {
-  for (const item of populationItems) {
-    if (
-      item.projection.status === "approved" &&
-      item.projection.effectiveWorkbookProfileContentSha256 !== null
-    ) {
-      return item.projection.effectiveWorkbookProfileContentSha256;
-    }
-  }
-  return null;
+  const approved = populationItems.filter(
+    (item) => item.projection.status === "approved",
+  );
+  if (approved.length !== 1) return null;
+  const item = approved[0];
+  if (!item) return null;
+  const effective = item.projection.effectiveWorkbookProfileContentSha256;
+  if (effective === null || effective !== item.workbookProfileContentSha256)
+    return null;
+  const parsed = parseSha256(effective);
+  return parsed.ok ? parsed.value : null;
 }
 
 function unresolvedItemSummary(
@@ -114,9 +116,25 @@ function linkedCaseOutputArtifacts(
   CaseworkOutputArtifactInput["artifactType"],
   CaseworkOutputArtifactInput
 > {
-  return new Map(
-    artifacts.map((artifact) => [artifact.artifactType, artifact] as const),
-  );
+  // Never pick a reference by array order when restoration yields duplicates.
+  // Re-linking a type through the UI replaces its existing references.
+  const unique = new Map<
+    CaseworkOutputArtifactInput["artifactType"],
+    CaseworkOutputArtifactInput
+  >();
+  const ambiguous = new Set<CaseworkOutputArtifactInput["artifactType"]>();
+  for (const artifact of artifacts) {
+    if (
+      unique.has(artifact.artifactType) ||
+      ambiguous.has(artifact.artifactType)
+    ) {
+      unique.delete(artifact.artifactType);
+      ambiguous.add(artifact.artifactType);
+    } else {
+      unique.set(artifact.artifactType, artifact);
+    }
+  }
+  return unique;
 }
 
 export function parseCaseOutputArtifactReferences(

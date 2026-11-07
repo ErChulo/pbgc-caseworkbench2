@@ -24,10 +24,10 @@ describe("final casework output package builder", () => {
 
     expect(payload.packageStatus).toBe("blocked");
     expect(stage(payload, "workbook")?.blockers).toContain(
-      "No generated V1 workbook artifact is available.",
+      "No unambiguous generated V1 workbook artifact is available.",
     );
     expect(stage(payload, "section-436")?.blockers).toContain(
-      "Section 436 is required but no evaluation artifact is available.",
+      "Section 436 is required but no unambiguous evaluation artifact is available.",
     );
     expect(
       payload.maturityClaims.some((claim) => claim.externalExecutionClaimed),
@@ -75,7 +75,7 @@ describe("final casework output package builder", () => {
   it("requires both validation and reconciliation", () => {
     const payload = buildFinalCaseworkOutputPayload(completeInput());
     expect(stage(payload, "validation-reconciliation")?.blockers).toContain(
-      "No reconciliation evidence artifact is available.",
+      "No unambiguous reconciliation evidence artifact is available.",
     );
     expect(stage(payload, "section-436")?.status).toBe("blocked");
     expect(payload.section436Required).toBe(true);
