@@ -48,10 +48,22 @@ it("checks two files and clears the result when either file changes", async () =
   expect(
     screen.getByText(/not approval or independent validation/),
   ).toBeVisible();
+  await user.click(
+    screen.getByRole("button", { name: "Prepare provisional review memo" }),
+  );
+  expect(
+    await screen.findByRole("button", {
+      name: "Download provisional review memo",
+    }),
+  ).toBeEnabled();
+  expect(screen.getByText(/Memo file SHA-256:/)).toBeVisible();
   await user.upload(
     screen.getByLabelText(/Original preview input JSON file/),
     file(new TextEncoder().encode("{}"), "wrong.json"),
   );
+  expect(
+    screen.queryByRole("button", { name: "Download provisional review memo" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByText(/Local regeneration matched/),
   ).not.toBeInTheDocument();
@@ -111,4 +123,55 @@ it("ignores pending reads after a file replacement and case switch", async () =>
   expect(
     screen.queryByText(/Local regeneration matched/),
   ).not.toBeInTheDocument();
+});
+
+it("discards a pending memo when the source file changes", async () => {
+  const source = new TextEncoder().encode(section436InputTemplate(id));
+  const preview = await createProvisionalSection436Preview(source, id, at);
+  let resolveRead: ((value: ArrayBuffer) => void) | undefined;
+  let reads = 0;
+  const delayed = new File([preview.bytes], "preview.json", {
+    type: "application/json",
+  });
+  Object.defineProperty(delayed, "arrayBuffer", {
+    value: () => {
+      reads += 1;
+      return reads === 1
+        ? Promise.resolve(preview.bytes.buffer.slice(0))
+        : new Promise<ArrayBuffer>((resolve) => {
+            resolveRead = resolve;
+          });
+    },
+  });
+  const user = userEvent.setup();
+  render(<Section436PreviewVerificationPanel key={id} caseId={id} />);
+  await user.upload(
+    screen.getByLabelText(/Provisional preview JSON file/),
+    delayed,
+  );
+  await user.upload(
+    screen.getByLabelText(/Original preview input JSON file/),
+    file(source, "source.json"),
+  );
+  await user.click(
+    screen.getByRole("button", { name: "Check preview and input" }),
+  );
+  await screen.findByText(/Local regeneration matched/);
+  await user.click(
+    screen.getByRole("button", { name: "Prepare provisional review memo" }),
+  );
+  await user.upload(
+    screen.getByLabelText(/Original preview input JSON file/),
+    file(new TextEncoder().encode("{}"), "replacement.json"),
+  );
+  resolveRead?.(preview.bytes.buffer.slice(0));
+  await waitFor(() => {
+    expect(
+      screen.getByRole("button", { name: "Check preview and input" }),
+    ).toBeEnabled();
+  });
+  expect(
+    screen.queryByRole("button", { name: "Download provisional review memo" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/Memo file SHA-256:/)).not.toBeInTheDocument();
 });

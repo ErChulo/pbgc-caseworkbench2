@@ -183,5 +183,35 @@ test("creates a provisional preview in the built file URL with network blocked",
       /Local regeneration matched. Evaluation status: blocked/,
     ),
   ).toBeVisible();
+  await verification
+    .getByRole("button", { name: "Prepare provisional review memo" })
+    .click();
+  const memoButton = verification.getByRole("button", {
+    name: "Download provisional review memo",
+  });
+  await expect(memoButton).toBeEnabled();
+  const memoEvent = page.waitForEvent("download");
+  await memoButton.click();
+  const memo = await memoEvent;
+  expect(memo.suggestedFilename()).toBe(
+    `provisional-section-436-review-${caseId}.txt`,
+  );
+  const memoPath = await memo.path();
+  if (!memoPath) throw new Error("No memo download");
+  const memoBytes = await readFile(memoPath);
+  expect(memoBytes.toString("utf8")).toContain(
+    "PROVISIONAL SECTION 436 REVIEW MEMO — NOT APPROVED CASEWORK",
+  );
+  expect(memoBytes.toString("utf8")).toContain(
+    "Evaluation status: blocked (provisional)",
+  );
+  await expect(verification.getByText(/Memo file SHA-256:/)).toContainText(
+    createHash("sha256").update(memoBytes).digest("hex"),
+  );
+  await expect(
+    page
+      .locator("li.case-output-stage")
+      .filter({ hasText: "Section 436 evaluation" }),
+  ).toContainText("Required · blocked");
   expect(outboundRequests).toEqual([]);
 });

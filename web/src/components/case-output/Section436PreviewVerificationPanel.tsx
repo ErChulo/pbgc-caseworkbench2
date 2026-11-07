@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createProvisionalSection436Memo } from "../../domain/section-436/provisional-memo";
 import { MAX_SECTION_436_FILE_BYTES } from "../../domain/section-436/replay-verification";
 import {
   MAX_SECTION_436_PREVIEW_BYTES,
@@ -18,6 +19,10 @@ export function Section436PreviewVerificationPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] =
     useState<ProvisionalSection436Verification | null>(null);
+  const [memo, setMemo] = useState<{
+    readonly blob: Blob;
+    readonly hash: string;
+  } | null>(null);
   const sequence = useRef(0);
   useEffect(
     () => () => {
@@ -31,12 +36,14 @@ export function Section436PreviewVerificationPanel({
     setBusy(false);
     setMessage(null);
     setResult(null);
+    setMemo(null);
   }
   async function check() {
     if (!preview || !source || busy) return;
     const request = ++sequence.current;
     setBusy(true);
     setResult(null);
+    setMemo(null);
     setMessage(null);
     try {
       if (
@@ -73,6 +80,65 @@ export function Section436PreviewVerificationPanel({
     } finally {
       if (sequence.current === request) setBusy(false);
     }
+  }
+
+  async function prepareMemo() {
+    if (!preview || !source || !result || busy) return;
+    const request = ++sequence.current;
+    setBusy(true);
+    setMemo(null);
+    setMessage(null);
+    try {
+      const [previewBytes, sourceBytes] = await Promise.all([
+        preview.arrayBuffer(),
+        source.arrayBuffer(),
+      ]);
+      if (
+        previewBytes.byteLength !== preview.size ||
+        sourceBytes.byteLength !== source.size
+      )
+        throw new Error("The selected files could not be read completely.");
+      const generated = await createProvisionalSection436Memo(
+        new Uint8Array(previewBytes),
+        new Uint8Array(sourceBytes),
+        caseId,
+      );
+      if (
+        generated.verification.previewFileSha256 !== result.previewFileSha256 ||
+        generated.verification.sourceFileSha256 !== result.sourceFileSha256 ||
+        generated.verification.previewContentSha256 !==
+          result.previewContentSha256
+      )
+        throw new Error(
+          "The selected files changed. Check them again before preparing a memo.",
+        );
+      if (sequence.current === request)
+        setMemo({
+          blob: new Blob([generated.bytes], {
+            type: "text/plain;charset=utf-8",
+          }),
+          hash: generated.bytesSha256,
+        });
+    } catch (error) {
+      if (sequence.current === request)
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "The provisional memo could not be prepared.",
+        );
+    } finally {
+      if (sequence.current === request) setBusy(false);
+    }
+  }
+
+  function downloadMemo() {
+    if (!memo || busy) return;
+    const url = URL.createObjectURL(memo.blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `provisional-section-436-review-${caseId}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -143,6 +209,36 @@ export function Section436PreviewVerificationPanel({
           <p>
             Preview content SHA-256: <code>{result.previewContentSha256}</code>
           </p>
+          <p>
+            The optional plain-text review memo repeats the unverified facts,
+            rules, and citations. It is provisional, not an approved memo, and
+            may contain case details.
+          </p>
+          <button
+            type="button"
+            className="button button-secondary"
+            disabled={busy}
+            onClick={() => {
+              void prepareMemo();
+            }}
+          >
+            Prepare provisional review memo
+          </button>
+          {memo && (
+            <>
+              <p>
+                Memo file SHA-256: <code>{memo.hash}</code>
+              </p>
+              <button
+                type="button"
+                className="button button-secondary"
+                disabled={busy}
+                onClick={downloadMemo}
+              >
+                Download provisional review memo
+              </button>
+            </>
+          )}
         </div>
       )}
     </section>
