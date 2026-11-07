@@ -46,7 +46,7 @@ export async function verifySection436Replay(
     throw new Error("The file must contain valid UTF-8 JSON.");
   }
   if (
-    !withinRecordLimits(parsed) ||
+    !evaluationWithinRecordLimits(parsed) ||
     !validateContract("section436Evaluation", parsed).valid
   ) {
     throw new Error(
@@ -85,7 +85,7 @@ export async function verifySection436Replay(
   });
 }
 
-function withinRecordLimits(value: unknown): boolean {
+export function evaluationWithinRecordLimits(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value))
     return false;
   const payload: unknown = (value as Record<string, unknown>)

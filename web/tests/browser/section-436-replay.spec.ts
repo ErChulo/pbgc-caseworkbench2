@@ -23,13 +23,11 @@ test("checks a synthetic local Section 436 evaluation without clearing package b
   const panel = page.getByRole("region", {
     name: "Check a Section 436 evaluation",
   });
-  await panel
-    .getByLabel(/Evaluation JSON file/)
-    .setInputFiles({
-      name: "synthetic-evaluation.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(evaluation)),
-    });
+  await panel.getByLabel(/Evaluation JSON file/).setInputFiles({
+    name: "synthetic-evaluation.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(evaluation)),
+  });
   await panel.getByRole("button", { name: "Check local evaluation" }).click();
   await expect(
     panel.getByText(/Local replay matched. Evaluation status: blocked/),
@@ -48,13 +46,11 @@ test("checks a synthetic local Section 436 evaluation without clearing package b
       conclusionCode: "restriction-applies",
     },
   };
-  await panel
-    .getByLabel(/Evaluation JSON file/)
-    .setInputFiles({
-      name: "altered.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(JSON.stringify(altered)),
-    });
+  await panel.getByLabel(/Evaluation JSON file/).setInputFiles({
+    name: "altered.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(altered)),
+  });
   await expect(panel.getByText(/Local replay matched/)).not.toBeVisible();
   await panel.getByRole("button", { name: "Check local evaluation" }).click();
   await expect(panel.getByRole("alert")).toContainText(

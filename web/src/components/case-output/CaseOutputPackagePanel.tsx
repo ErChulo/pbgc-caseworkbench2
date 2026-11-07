@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Section436PreviewPanel } from "./Section436PreviewPanel";
 import { Section436ReplayPanel } from "./Section436ReplayPanel";
 
 import type {
@@ -242,7 +243,14 @@ export function CaseOutputPackagePanel({
           </ul>
         </div>
       ) : null}
-      <Section436ReplayPanel key={payload.caseId} caseId={payload.caseId} />
+      <Section436PreviewPanel
+        key={`preview-${payload.caseId}`}
+        caseId={payload.caseId}
+      />
+      <Section436ReplayPanel
+        key={`replay-${payload.caseId}`}
+        caseId={payload.caseId}
+      />
       <ol className="case-output-stage-list">
         {payload.stages.map((stage) => (
           <CaseOutputStageItem key={stage.stageKey} stage={stage} />
