@@ -201,3 +201,52 @@ describe("explicit population record projection", () => {
     ).toMatchObject({ ok: false, code: "SOURCE_CELLS_INVALID" });
   });
 });
+
+describe("population record snapshot safety", () => {
+  it("binds the digest, selected row, bindings and decision to the same input snapshot", async () => {
+    const input = await fixture();
+    const expected = await projectPopulationRecord(input);
+    if (!expected.ok) throw new Error("Invalid fixture");
+    const pending = projectPopulationRecord(input);
+    const sheet = input.workbook.sheets[0];
+    if (!sheet) throw new Error("Missing fixture sheet");
+    const cellToChange = sheet.cells.find(
+      (candidate) => candidate.address === "A2",
+    );
+    if (!cellToChange) throw new Error("Missing fixture cell");
+    (cellToChange as { storedValue: unknown }).storedValue =
+      "changed during hash";
+    const binding = input.bindings[0];
+    if (!binding) throw new Error("Missing fixture binding");
+    binding.field = "DIFFERENT";
+    input.populationDecision.effectiveDecisionId = "different-decision";
+    input.sourceRow = 10;
+    const result = await pending;
+    expect(result).toEqual(expected);
+    if (!result.ok) throw new Error("Projection failed");
+    expect(Object.isFrozen(result.record)).toBe(true);
+    expect(Object.isFrozen(result.record.fields)).toBe(true);
+    expect(result.record.fields.every(Object.isFrozen)).toBe(true);
+    expect(Object.isFrozen(input.workbook)).toBe(false);
+    expect(Object.isFrozen(input.bindings)).toBe(false);
+  });
+
+  it("fails closed if the input cannot be safely snapshotted", async () => {
+    const input = await fixture();
+    const sheet = input.workbook.sheets[0];
+    if (!sheet) throw new Error("Missing fixture sheet");
+    const unsafe = {
+      ...input,
+      workbook: {
+        ...input.workbook,
+        sheets: [
+          { ...sheet, cells: [...sheet.cells, cell("E2", () => undefined)] },
+        ],
+      },
+    };
+    expect(await projectPopulationRecord(unsafe)).toMatchObject({
+      ok: false,
+      code: "INPUT_SNAPSHOT_FAILED",
+    });
+  });
+});

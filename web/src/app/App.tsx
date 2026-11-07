@@ -464,6 +464,9 @@ export function App({
           }}
         />
         <PopulationReview
+          caseId={orchestrator.activeCase?.caseId ?? null}
+          reviewRevision={orchestrator.populationReviewRevision}
+          onPreviewRecord={orchestrator.previewPopulationRecord}
           items={orchestrator.populationItems}
           reviewer={orchestrator.sharedReviewer}
           rationale={orchestrator.sharedRationale}

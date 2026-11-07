@@ -17,6 +17,11 @@ import {
 import { verifyPopulationSourceInWorkspace } from "../../adapters/filesystem/verified-population-source";
 import { populationReviewBlocker } from "../utilities/population-review-guard";
 import {
+  projectPopulationRecord,
+  type PopulationRecordFieldBinding,
+  type PopulationRecordProjection,
+} from "../../domain/population/record-projection";
+import {
   isCaseOutputPath,
   verifyOutputArtifactReferences,
 } from "../../adapters/filesystem/output-artifact-verification";
@@ -1075,6 +1080,15 @@ export interface CaseOrchestrator {
     reviewer: string,
     rationale: string,
   ) => Promise<void>;
+  readonly populationReviewRevision: number;
+  readonly previewPopulationRecord: (
+    item: PopulationReviewItem,
+    selection: {
+      readonly sheetName: string;
+      readonly sourceRow: number;
+      readonly bindings: readonly PopulationRecordFieldBinding[];
+    },
+  ) => Promise<PopulationRecordProjection>;
   readonly recordPopulationDecision: (
     item: PopulationReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
@@ -1155,6 +1169,7 @@ export function useCaseOrchestrator(
       setter(value);
     };
   const architectureBuildSequence = useRef(0);
+  const [populationReviewRevision, setPopulationReviewRevision] = useState(0);
   const populationDecisionInFlight = useRef(false);
   const priorSnapshot = useRef<PackageSnapshot | null>(null);
   const inventoryCheckpoints = useRef(
@@ -1348,6 +1363,7 @@ export function useCaseOrchestrator(
       preserveArchitecture,
       supersedeBuild: () => {
         architectureBuildSequence.current += 1;
+        setPopulationReviewRevision((revision) => revision + 1);
       },
       clearArchitecture: () => {
         setV1Architecture(null);
@@ -2780,6 +2796,103 @@ export function useCaseOrchestrator(
     } finally {
       populationDecisionInFlight.current = false;
     }
+  };
+
+  const previewPopulationRecord = async (
+    item: PopulationReviewItem,
+    selection: {
+      readonly sheetName: string;
+      readonly sourceRow: number;
+      readonly bindings: readonly PopulationRecordFieldBinding[];
+    },
+  ): Promise<PopulationRecordProjection> => {
+    const activeWorkspace = workspace.current;
+    const snapshot = priorSnapshot.current;
+    const reviewState = caseReviewState.current;
+    const caseId = activeCaseId.current;
+    const revision = architectureBuildSequence.current;
+    const requireCurrent = (): void => {
+      if (
+        activeWorkspace === null ||
+        snapshot === null ||
+        caseId === null ||
+        workspace.current !== activeWorkspace ||
+        priorSnapshot.current !== snapshot ||
+        activeCaseId.current !== caseId ||
+        caseReviewState.current !== reviewState ||
+        architectureBuildSequence.current !== revision ||
+        populationDecisionInFlight.current
+      )
+        throw new Error(
+          "Case evidence or review changed. Select the record again.",
+        );
+    };
+    requireCurrent();
+    if (activeWorkspace === null || snapshot === null)
+      throw new Error("Active evidence checkpoint is unavailable.");
+    if (selection.bindings.length === 0 || selection.bindings.length > 50)
+      throw new Error("Provide one to 50 explicit field bindings.");
+    const capturedSelection = structuredClone(selection);
+    const selectedItem = structuredClone(item);
+    const matching = reviewState.populationItems.filter(
+      (candidate) =>
+        candidate.candidate.candidateKey ===
+        selectedItem.candidate.candidateKey,
+    );
+    if (
+      matching.length !== 1 ||
+      canonicalize(matching[0]) !== canonicalize(selectedItem)
+    )
+      throw new Error("Population review is stale or ambiguous.");
+    if (
+      selectedItem.projection.status !== "approved" ||
+      selectedItem.workbook === undefined ||
+      selectedItem.namedRanges === undefined
+    )
+      throw new Error("A reviewed workbook population profile is required.");
+    const history =
+      populationHistory.current.get(selectedItem.candidate.candidateKey) ?? [];
+    if (
+      canonicalize(history) !==
+      canonicalize(
+        reviewState.populationDecisions.filter(
+          (decision) =>
+            decision.candidateKey === selectedItem.candidate.candidateKey,
+        ),
+      )
+    )
+      throw new Error("Population decision history is stale. Reload the case.");
+    const verified = await verifyPopulationSourceInWorkspace({
+      workspace: activeWorkspace,
+      snapshot,
+      candidate: selectedItem.candidate,
+      observations: selectedItem.evidenceObservations ?? [],
+      decisions: history,
+      storedWorkbook: selectedItem.workbook,
+      storedNamedRanges: selectedItem.namedRanges,
+      storedProfileHash: selectedItem.workbookProfileContentSha256,
+    });
+    requireCurrent();
+    if (!verified.ok)
+      throw new Error(`Population source check blocked: ${verified.message}`);
+    if (
+      canonicalize(verified.value.populationDecision) !==
+      canonicalize(selectedItem.projection)
+    )
+      throw new Error(
+        "Population decision no longer matches the source review.",
+      );
+    const projected = await projectPopulationRecord({
+      workbook: verified.value.workbook,
+      namedRanges: verified.value.namedRanges,
+      populationDecision: verified.value.populationDecision,
+      sheetName: capturedSelection.sheetName,
+      sourceRow: capturedSelection.sourceRow,
+      bindings: capturedSelection.bindings,
+    });
+    requireCurrent();
+    if (!projected.ok) throw new Error(projected.message);
+    return projected.record;
   };
 
   const persistPlanRuleRecord = async (
@@ -6328,6 +6441,8 @@ export function useCaseOrchestrator(
     recordClassificationDecision,
     recordRelationshipDecision,
     recordDateSelection,
+    populationReviewRevision,
+    previewPopulationRecord,
     recordPopulationDecision,
     linkCaseOutputArtifact,
     exportFinalCaseworkOutputPackage,

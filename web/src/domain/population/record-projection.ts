@@ -53,9 +53,21 @@ export async function projectPopulationRecord(input: {
     code,
     message,
   });
-  const decision = input.populationDecision;
+  // The profile digest and the selected row must come from the same snapshot.
+  // Hashing is asynchronous, so caller-owned cells and bindings cannot be read
+  // again after awaiting the digest.
+  let snapshot: typeof input;
+  try {
+    snapshot = structuredClone(input);
+  } catch {
+    return fail(
+      "INPUT_SNAPSHOT_FAILED",
+      "The selected population record could not be captured safely.",
+    );
+  }
+  const decision = snapshot.populationDecision;
   if (
-    input.workbook.status !== "profiled" ||
+    snapshot.workbook.status !== "profiled" ||
     decision.status !== "approved" ||
     !decision.effectiveDecisionId?.trim() ||
     decision.effectiveWorkbookProfileContentSha256 === null
@@ -68,8 +80,8 @@ export async function projectPopulationRecord(input: {
   let profileHash: Sha256;
   try {
     profileHash = await workbookProfileContentHash(
-      input.workbook,
-      input.namedRanges,
+      snapshot.workbook,
+      snapshot.namedRanges,
     );
   } catch {
     return fail(
@@ -83,17 +95,17 @@ export async function projectPopulationRecord(input: {
       "The workbook profile does not match the population decision.",
     );
   if (
-    !Number.isInteger(input.sourceRow) ||
-    input.sourceRow < 2 ||
-    input.sourceRow > 1_048_576 ||
-    input.bindings.length === 0
+    !Number.isInteger(snapshot.sourceRow) ||
+    snapshot.sourceRow < 2 ||
+    snapshot.sourceRow > 1_048_576 ||
+    snapshot.bindings.length === 0
   )
     return fail(
       "SELECTION_INVALID",
       "Select a data row and at least one explicit field binding.",
     );
-  const sheets = input.workbook.sheets.filter(
-    (sheet) => sheet.name === input.sheetName,
+  const sheets = snapshot.workbook.sheets.filter(
+    (sheet) => sheet.name === snapshot.sheetName,
   );
   if (sheets.length !== 1)
     return fail(
@@ -125,7 +137,7 @@ export async function projectPopulationRecord(input: {
   const fields: PopulationRecordProjection["fields"][number][] = [];
   const usedFields = new Set<string>();
   const usedColumns = new Set<string>();
-  for (const binding of input.bindings) {
+  for (const binding of snapshot.bindings) {
     const column = binding.column;
     const field = binding.field;
     if (
@@ -152,7 +164,7 @@ export async function projectPopulationRecord(input: {
         "HEADER_MISMATCH",
         "A selected field does not match its observed source header.",
       );
-    const sourceAddress = `${column}${String(input.sourceRow)}`;
+    const sourceAddress = `${column}${String(snapshot.sourceRow)}`;
     const cell = cells.get(sourceAddress);
     let state: PopulationRecordProjection["fields"][number]["state"] =
       "missing";
@@ -186,17 +198,22 @@ export async function projectPopulationRecord(input: {
     workbookProfileContentSha256: profileHash,
     populationDecisionId: decision.effectiveDecisionId,
     sheetName: sheet.name,
-    sourceRow: input.sourceRow,
+    sourceRow: snapshot.sourceRow,
     fields,
     hasOnlyValues: fields.every((field) => field.state === "value"),
   };
+  const recordContentSha256 = (await hashTyped(payload, {
+    typeName: "PopulationRecordProjection",
+  })) as Sha256;
+  const frozenFields = Object.freeze(
+    fields.map((field) => Object.freeze(field)),
+  );
   return {
     ok: true,
-    record: {
+    record: Object.freeze({
       ...payload,
-      recordContentSha256: (await hashTyped(payload, {
-        typeName: "PopulationRecordProjection",
-      })) as Sha256,
-    },
+      fields: frozenFields,
+      recordContentSha256,
+    }),
   };
 }

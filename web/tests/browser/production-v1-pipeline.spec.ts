@@ -381,6 +381,72 @@ test("governed production path exposes unresolved workbook blockers", async ({
     populationCandidate.getByText("Approved", { exact: true }),
   ).toBeVisible();
 
+  // Explicit local row inspection does not approve routing or alter the source.
+  const rowReview = populationCandidate.getByRole("region", {
+    name: "Local population record inspection",
+  });
+  await rowReview.getByLabel("Source sheet name").fill("Retirees");
+  await rowReview.getByLabel("Source row number").fill("2");
+  await rowReview.getByLabel("Explicit field bindings JSON").fill(
+    JSON.stringify([
+      { field: "DOB", column: "A", expectedHeader: "DOB" },
+      { field: "COMP", column: "D", expectedHeader: "COMP" },
+      { field: "FV", column: "E", expectedHeader: "FV" },
+    ]),
+  );
+  await rowReview
+    .getByRole("button", { name: "Inspect source row locally" })
+    .click();
+  await expect(
+    rowReview.getByText(
+      /Local inspection only; no authorization or routing approval/,
+    ),
+  ).toBeVisible();
+  await expect(
+    rowReview.locator("li").filter({ hasText: '"COMP"' }),
+  ).toContainText("D2: value — 42000");
+  await expect(
+    rowReview.locator("li").filter({ hasText: '"FV"' }),
+  ).toContainText("E2: formula");
+  await rowReview.getByRole("button", { name: "Clear local row view" }).click();
+  await expect(rowReview.getByText(/Source row: 2/)).not.toBeVisible();
+  await expect(rowReview.getByLabel("Source row number")).toHaveValue("");
+  await rowReview.getByLabel("Source sheet name").fill("Retirees");
+  await rowReview.getByLabel("Source row number").fill("2");
+  await rowReview
+    .getByLabel("Explicit field bindings JSON")
+    .fill(
+      JSON.stringify([{ field: "COMP", column: "D", expectedHeader: "COMP" }]),
+    );
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const value = files.get(path);
+    if (!value) throw new Error("Synthetic workbook object not found");
+    const altered = Uint8Array.from(value);
+    altered[0] = (altered[0] ?? 0) ^ 1;
+    files.set(path, altered);
+  }, workbookHash);
+  await rowReview
+    .getByRole("button", { name: "Inspect source row locally" })
+    .click();
+  await expect(rowReview.getByRole("alert")).toContainText(
+    "Population source check blocked",
+  );
+  await page.evaluate((sha) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    const path = `objects/sha256/${sha.slice(0, 2)}/${sha}`;
+    const value = files.get(path);
+    if (!value) throw new Error("Synthetic workbook object not found");
+    const original = Uint8Array.from(value);
+    original[0] = (original[0] ?? 0) ^ 1;
+    files.set(path, original);
+  }, workbookHash);
+
   // 5. Architecture policy approval: approve all four parsed rule sets.
   const policy = page.locator("section").filter({
     has: page.getByRole("heading", { name: "Architecture policy approval" }),

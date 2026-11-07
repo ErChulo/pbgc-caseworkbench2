@@ -1,4 +1,9 @@
 import { useState } from "react";
+import { PopulationRecordPreview } from "./PopulationRecordPreview";
+import type {
+  PopulationRecordFieldBinding,
+  PopulationRecordProjection,
+} from "../../domain/population/record-projection";
 import type {
   PopulationCandidateProfile,
   PopulationDecisionProjection,
@@ -36,8 +41,21 @@ export function PopulationReview({
   onReviewerChange,
   onRationaleChange,
   onDecision,
+  onPreviewRecord,
+  caseId,
+  reviewRevision,
 }: {
   readonly items: readonly PopulationReviewItem[];
+  readonly caseId: string | null;
+  readonly reviewRevision: number;
+  readonly onPreviewRecord: (
+    item: PopulationReviewItem,
+    selection: {
+      readonly sheetName: string;
+      readonly sourceRow: number;
+      readonly bindings: readonly PopulationRecordFieldBinding[];
+    },
+  ) => Promise<PopulationRecordProjection>;
   readonly reviewer: string;
   readonly rationale: string;
   readonly onReviewerChange: (value: string) => void;
@@ -186,6 +204,16 @@ export function PopulationReview({
                 </Tooltip>
               ))}
             </div>
+            {caseId !== null &&
+              item.projection.status === "approved" &&
+              item.workbook !== undefined &&
+              item.namedRanges !== undefined && (
+                <PopulationRecordPreview
+                  key={`${caseId}-${item.candidate.candidateKey}-${String(reviewRevision)}`}
+                  item={item}
+                  onPreview={onPreviewRecord}
+                />
+              )}
           </li>
         ))}
       </ul>
