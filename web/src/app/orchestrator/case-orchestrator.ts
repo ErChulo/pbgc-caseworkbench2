@@ -1,4 +1,9 @@
 import {
+  EVIDENCE_TEXT_RECORD_MAX_BYTES,
+  requireCorrectionTextSize,
+  requireEvidenceTextRecordSize,
+} from "./evidence-text-limits";
+import {
   CASE_RESTORE_POINTER_MAX_BYTES,
   CASE_RESTORE_RECORD_MAX_BYTES,
   requireRestorableRecordSize,
@@ -3084,6 +3089,10 @@ export function useCaseOrchestrator(
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) throw new Error("Workspace unavailable.");
     const extraction = await createEvidenceExtraction(artifactSha256, passive);
+    const extractionBytes = new TextEncoder().encode(
+      `${canonicalize(extraction)}\n`,
+    );
+    requireEvidenceTextRecordSize(extractionBytes);
     await activeWorkspace.createDirectory(`cases/${caseId}/extractions`);
     await activeWorkspace.createDirectory(
       `cases/${caseId}/extractions/${artifactSha256}`,
@@ -3096,7 +3105,10 @@ export function useCaseOrchestrator(
         parsed = await parseEvidenceExtraction(
           JSON.parse(
             new TextDecoder("utf-8", { fatal: true }).decode(
-              await readAllBytes(existing.value),
+              await readBoundedLocalBytes(
+                existing.value,
+                EVIDENCE_TEXT_RECORD_MAX_BYTES,
+              ),
             ),
           ) as unknown,
         );
@@ -3116,10 +3128,22 @@ export function useCaseOrchestrator(
       }
       const saved = await activeWorkspace.createImmutable(
         extractionPath,
-        bytesReader(new TextEncoder().encode(`${canonicalize(extraction)}\n`)),
+        bytesReader(extractionBytes),
       );
       if (!saved.ok)
         throw new Error("Evidence extraction could not be preserved.");
+      const reopened = await activeWorkspace.openChunkReader(extractionPath);
+      if (!reopened.ok)
+        throw new Error("Evidence extraction could not be reopened.");
+      const readback = await readBoundedLocalBytes(
+        reopened.value,
+        EVIDENCE_TEXT_RECORD_MAX_BYTES,
+      );
+      if (
+        readback.length !== extractionBytes.length ||
+        readback.some((byte, index) => byte !== extractionBytes[index])
+      )
+        throw new Error("Evidence extraction failed post-write verification.");
     }
     const pointerSaved = await activeWorkspace.writeAtomic(
       `cases/${caseId}/extractions/${artifactSha256}/current.json`,
@@ -3152,7 +3176,10 @@ export function useCaseOrchestrator(
     const pointer = parseEvidenceExtractionPointer(
       JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(pointerOpened.value),
+          await readBoundedLocalBytes(
+            pointerOpened.value,
+            CASE_RESTORE_POINTER_MAX_BYTES,
+          ),
         ),
       ) as unknown,
     );
@@ -3165,7 +3192,10 @@ export function useCaseOrchestrator(
     const parsed = await parseEvidenceExtraction(
       JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(extractionOpened.value),
+          await readBoundedLocalBytes(
+            extractionOpened.value,
+            EVIDENCE_TEXT_RECORD_MAX_BYTES,
+          ),
         ),
       ) as unknown,
     );
@@ -3190,6 +3220,10 @@ export function useCaseOrchestrator(
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) throw new Error("Workspace unavailable.");
     const artifactSha256 = correction.artifactSha256;
+    const correctionBytes = new TextEncoder().encode(
+      `${canonicalize(correction)}\n`,
+    );
+    requireEvidenceTextRecordSize(correctionBytes);
     await activeWorkspace.createDirectory(`cases/${caseId}/corrections`);
     await activeWorkspace.createDirectory(
       `cases/${caseId}/corrections/${artifactSha256}`,
@@ -3202,15 +3236,32 @@ export function useCaseOrchestrator(
       }
       const saved = await activeWorkspace.createImmutable(
         correctionPath,
-        bytesReader(new TextEncoder().encode(`${canonicalize(correction)}\n`)),
+        bytesReader(correctionBytes),
       );
       if (!saved.ok)
         throw new Error("Evidence correction could not be preserved.");
+      const reopened = await activeWorkspace.openChunkReader(correctionPath);
+      if (!reopened.ok)
+        throw new Error("Evidence correction could not be reopened.");
+      const readback = await readBoundedLocalBytes(
+        reopened.value,
+        EVIDENCE_TEXT_RECORD_MAX_BYTES,
+      );
+      if (
+        readback.length !== correctionBytes.length ||
+        readback.some((byte, index) => byte !== correctionBytes[index])
+      )
+        throw new Error(
+          "Evidence correction failed post-write verification. An unreferenced record may remain.",
+        );
     } else {
       const parsed = await parseEvidenceTextCorrection(
         JSON.parse(
           new TextDecoder("utf-8", { fatal: true }).decode(
-            await readAllBytes(existing.value),
+            await readBoundedLocalBytes(
+              existing.value,
+              EVIDENCE_TEXT_RECORD_MAX_BYTES,
+            ),
           ),
         ) as unknown,
       );
@@ -3257,7 +3308,10 @@ export function useCaseOrchestrator(
     const pointer = parseEvidenceCorrectionPointer(
       JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(pointerOpened.value),
+          await readBoundedLocalBytes(
+            pointerOpened.value,
+            CASE_RESTORE_POINTER_MAX_BYTES,
+          ),
         ),
       ) as unknown,
     );
@@ -3270,7 +3324,10 @@ export function useCaseOrchestrator(
     const parsed = await parseEvidenceTextCorrection(
       JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(correctionOpened.value),
+          await readBoundedLocalBytes(
+            correctionOpened.value,
+            EVIDENCE_TEXT_RECORD_MAX_BYTES,
+          ),
         ),
       ) as unknown,
     );
@@ -5593,6 +5650,7 @@ export function useCaseOrchestrator(
           "Case evidence or review changed. Open the source and review the correction again.",
         );
     };
+    requireCorrectionTextSize(correctedText);
     correctionSaveInFlight.current = true;
     const writeState: { attempted: boolean } = { attempted: false };
     try {

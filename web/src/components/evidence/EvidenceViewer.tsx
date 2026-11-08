@@ -141,7 +141,8 @@ function CorrectionEditor({
       <p>
         Edit only when the machine extraction differs from the visible original.
         This creates a separate immutable correction and never changes source
-        bytes or machine output.
+        bytes or machine output. Corrections are limited to 8,388,608 UTF-16
+        code units, and saved text records to 64 MiB.
       </p>
       <textarea
         id="evidence-corrected-text"
