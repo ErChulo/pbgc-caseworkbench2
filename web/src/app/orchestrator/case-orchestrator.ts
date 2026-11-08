@@ -1,4 +1,5 @@
 import { sha256Bytes } from "../../domain/shared/digest";
+import { hasConsistentIntakeEventHistory } from "./intake-event-history";
 import {
   decisionCoversFindings,
   gateEligibilityByCurrentFindings,
@@ -4542,6 +4543,8 @@ export function useCaseOrchestrator(
     "Evidence restoration is unavailable because preserved evidence could not be verified. No files were changed.";
   const INVALID_SNAPSHOT_RESTORE_MESSAGE =
     "Evidence restoration is unavailable because the standalone inventory snapshot is missing or does not match the checkpoint. No files were changed.";
+  const INVALID_INTAKE_HISTORY_RESTORE_MESSAGE =
+    "Evidence restoration is unavailable because the intake event history is missing or does not match the checkpoint. No files were changed.";
 
   const loadEvidenceManifest = async (
     caseRecord: CaseRecord,
@@ -4654,6 +4657,28 @@ export function useCaseOrchestrator(
       }
     } catch {
       reportRestoreFailure(INVALID_SNAPSHOT_RESTORE_MESSAGE);
+      return;
+    }
+    const intakeHistory = await activeWorkspace.openChunkReader(
+      `cases/${caseRecord.caseId}/intake/events.jsonl`,
+    );
+    try {
+      if (
+        !intakeHistory.ok ||
+        !hasConsistentIntakeEventHistory(
+          await readBoundedLocalBytes(
+            intakeHistory.value,
+            CASE_RESTORE_RECORD_MAX_BYTES,
+          ),
+          caseRecord.caseId,
+          current.snapshot.snapshotId,
+        )
+      ) {
+        reportRestoreFailure(INVALID_INTAKE_HISTORY_RESTORE_MESSAGE);
+        return;
+      }
+    } catch {
+      reportRestoreFailure(INVALID_INTAKE_HISTORY_RESTORE_MESSAGE);
       return;
     }
     for (const entry of current.snapshot.entries) {
@@ -7126,6 +7151,18 @@ export function useCaseOrchestrator(
           CASE_RESTORE_RECORD_MAX_BYTES,
         )
       : new Uint8Array();
+    const prior = priorSnapshot.current;
+    if (
+      prior === null
+        ? previousEvents.ok
+        : !previousEvents.ok ||
+          !hasConsistentIntakeEventHistory(
+            previousBytes,
+            activeCase.caseId,
+            prior.snapshotId,
+          )
+    )
+      throw new Error("Intake event history is inconsistent with the case.");
     if (
       previousBytes.byteLength + eventBytes.byteLength >
       CASE_RESTORE_RECORD_MAX_BYTES

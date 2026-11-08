@@ -319,3 +319,159 @@ for (const fault of ["missing", "mismatch", "oversized"] as const) {
     );
   });
 }
+
+for (const fault of [
+  "missing",
+  "malformed",
+  "mismatch",
+  "oversized",
+] as const) {
+  test(`blocks restoration with ${fault} intake event history`, async ({
+    offlinePage: page,
+  }) => {
+    const caseNumber = `PBGC-HISTORY-RESTORE-${fault.toUpperCase()}`;
+    await createSyntheticCase(page, caseNumber);
+    const picker = page.getByLabel("Add evidence files");
+    await picker.setInputFiles({
+      name: "synthetic.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic history evidence."),
+    });
+    await expect(page.getByText("File inventory complete")).toBeVisible();
+    await expect(picker).toBeEnabled();
+    const caseId = await page.getByTestId("current-case-id").textContent();
+    if (!caseId) throw new Error("Case ID missing");
+    await page
+      .getByRole("button", { name: "Return to workspace home" })
+      .click();
+    const path = await page.evaluate(
+      ({ id, kind }) => {
+        const files = (
+          globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+        ).__syntheticFiles;
+        const path = `cases/${id}/intake/events.jsonl`;
+        const bytes = files.get(path);
+        if (!bytes) throw new Error("History missing before test");
+        if (kind === "missing") files.delete(path);
+        else if (kind === "oversized")
+          files.set(path, new Uint8Array(16 * 1024 * 1024 + 1));
+        else if (kind === "malformed")
+          files.set(path, new TextEncoder().encode("invalid\n"));
+        else {
+          const event = JSON.parse(new TextDecoder().decode(bytes)) as {
+            resultingSnapshotId: string;
+          };
+          event.resultingSnapshotId = "b".repeat(64);
+          files.set(
+            path,
+            new TextEncoder().encode(`${JSON.stringify(event)}\n`),
+          );
+        }
+        return path;
+      },
+      { id: caseId, kind: fault },
+    );
+    await page.getByRole("button", { name: `Open ${caseNumber}` }).click();
+    await expect(
+      page.getByText(/intake event history is missing or does not match/),
+    ).toBeVisible();
+    await expect(picker).toBeDisabled();
+    const exists = await page.evaluate(
+      (historyPath) =>
+        (
+          globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+        ).__syntheticFiles.has(historyPath),
+      path,
+    );
+    expect(exists).toBe(fault !== "missing");
+  });
+}
+
+test("does not append to a changed intake history in the same session", async ({
+  offlinePage: page,
+}) => {
+  await createSyntheticCase(page, "PBGC-HISTORY-BEFORE-APPEND");
+  const picker = page.getByLabel("Add evidence files");
+  const file = {
+    name: "synthetic.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Synthetic history evidence."),
+  };
+  await picker.setInputFiles(file);
+  await expect(page.getByText("File inventory complete")).toBeVisible();
+  await expect(picker).toBeEnabled();
+  const caseId = await page.getByTestId("current-case-id").textContent();
+  if (!caseId) throw new Error("Case ID missing");
+  await page.evaluate((id) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    files.set(
+      `cases/${id}/intake/events.jsonl`,
+      new TextEncoder().encode("invalid\n"),
+    );
+  }, caseId);
+  await picker.setInputFiles(file);
+  await expect(
+    page.getByText(
+      /Intake did not finish. Some files or records may have been saved/,
+    ),
+  ).toBeVisible();
+  await expect(picker).toBeDisabled();
+  expect(
+    await page.evaluate((id) => {
+      const bytes = (
+        globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+      ).__syntheticFiles.get(`cases/${id}/intake/events.jsonl`);
+      return bytes ? new TextDecoder().decode(bytes) : null;
+    }, caseId),
+  ).toBe("invalid\n");
+});
+
+test("blocks malformed intake history on restoring the offline file", async ({
+  offlinePage: page,
+  outboundRequests,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (/^https?:/u.test(request.url())) requests.push(request.url());
+  });
+  await page.route(/^https?:/u, (route) => route.abort());
+  const url = pathToFileURL(
+    resolve(process.env.PBGC_TEST_ARTIFACT ?? "dist/pbgc-caseworkbench.html"),
+  ).href;
+  await createSyntheticCase(
+    page,
+    "PBGC-HISTORY-OFFLINE",
+    "synthetic-reviewer",
+    "Synthetic Reviewer",
+    url,
+  );
+  const picker = page.getByLabel("Add evidence files");
+  await picker.setInputFiles({
+    name: "synthetic.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Synthetic offline evidence."),
+  });
+  await expect(page.getByText("File inventory complete")).toBeVisible();
+  await expect(picker).toBeEnabled();
+  const caseId = await page.getByTestId("current-case-id").textContent();
+  if (!caseId) throw new Error("Case ID missing");
+  await page.getByRole("button", { name: "Return to workspace home" }).click();
+  await page.evaluate((id) => {
+    const files = (
+      globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+    ).__syntheticFiles;
+    files.set(
+      `cases/${id}/intake/events.jsonl`,
+      new TextEncoder().encode("invalid\n"),
+    );
+  }, caseId);
+  await page.getByRole("button", { name: "Open PBGC-HISTORY-OFFLINE" }).click();
+  await expect(
+    page.getByText(/intake event history is missing or does not match/),
+  ).toBeVisible();
+  await expect(picker).toBeDisabled();
+  expect(requests).toEqual([]);
+  expect(outboundRequests).toEqual([]);
+});
