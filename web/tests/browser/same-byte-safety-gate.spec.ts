@@ -50,6 +50,7 @@ for (const mode of ["development", "file"] as const) {
       .filter({ hasText: "synthetic-plan.txt" });
     await item.getByRole("button", { name: "Approve governed use" }).click();
     await expect(item.getByText("Eligible", { exact: true })).toBeVisible();
+    await expect(picker).toBeEnabled();
     await picker.setInputFiles({
       name: "synthetic-script.ps1",
       mimeType: "text/plain",

@@ -1,3 +1,4 @@
+import { sha256Bytes } from "../../domain/shared/digest";
 import {
   decisionCoversFindings,
   gateEligibilityByCurrentFindings,
@@ -300,6 +301,7 @@ const ruleSourceArtifacts = [
 ] as const;
 
 interface InventoryCheckpointReference {
+  readonly manifestContentSha256: Sha256;
   readonly attemptId: Uuid;
   readonly snapshot: PackageSnapshot;
   readonly inventoryItems: readonly ArtifactInventoryItem[];
@@ -4591,14 +4593,15 @@ export function useCaseOrchestrator(
       return;
     }
     let manifestValue: unknown;
+    let restoredManifestHash: Sha256;
     try {
+      const manifestBytes = await readBoundedLocalBytes(
+        manifestOpened.value,
+        CASE_RESTORE_RECORD_MAX_BYTES,
+      );
+      restoredManifestHash = await sha256Bytes(manifestBytes);
       manifestValue = JSON.parse(
-        new TextDecoder("utf-8", { fatal: true }).decode(
-          await readBoundedLocalBytes(
-            manifestOpened.value,
-            CASE_RESTORE_RECORD_MAX_BYTES,
-          ),
-        ),
+        new TextDecoder("utf-8", { fatal: true }).decode(manifestBytes),
       ) as unknown;
     } catch {
       reportRestoreFailure(INVALID_CHECKPOINT_RESTORE_MESSAGE);
@@ -4648,6 +4651,7 @@ export function useCaseOrchestrator(
     invalidateArchitectureBuild();
     priorSnapshot.current = current.snapshot;
     lastCheckpoint.current = {
+      manifestContentSha256: restoredManifestHash,
       attemptId: current.attemptId,
       snapshot: current.snapshot,
       inventoryItems: current.inventoryItems,
@@ -4657,6 +4661,7 @@ export function useCaseOrchestrator(
     };
     inventoryCheckpoints.current.clear();
     inventoryCheckpoints.current.set(current.snapshot.snapshotId, {
+      manifestContentSha256: restoredManifestHash,
       attemptId: current.attemptId,
       snapshot: current.snapshot,
       inventoryItems: current.inventoryItems,
@@ -6836,12 +6841,13 @@ export function useCaseOrchestrator(
         await activeWorkspace.openChunkReader(manifestPath);
       if (existingManifest.ok) {
         try {
+          const existingManifestBytes = await readBoundedLocalBytes(
+            existingManifest.value,
+            CASE_RESTORE_RECORD_MAX_BYTES,
+          );
           const value = JSON.parse(
             new TextDecoder("utf-8", { fatal: true }).decode(
-              await readBoundedLocalBytes(
-                existingManifest.value,
-                CASE_RESTORE_RECORD_MAX_BYTES,
-              ),
+              existingManifestBytes,
             ),
           ) as unknown;
           const parsed = parsePersistedCheckpoint(value);
@@ -6855,6 +6861,7 @@ export function useCaseOrchestrator(
             throw new Error("Existing inventory checkpoint is invalid.");
           }
           checkpointReference = {
+            manifestContentSha256: await sha256Bytes(existingManifestBytes),
             attemptId: parsed.value.attemptId,
             snapshot: parsed.value.snapshot,
             inventoryItems: parsed.value.inventoryItems,
@@ -6948,6 +6955,10 @@ export function useCaseOrchestrator(
         `cases/${activeCase.caseId}/snapshots`,
       );
       const snapshotPath = `cases/${activeCase.caseId}/snapshots/${snapshot.snapshotId}.json`;
+      const snapshotBytes = new TextEncoder().encode(
+        `${canonicalize(snapshot)}\n`,
+      );
+      requireRestorableRecordSize(snapshotBytes);
       const snapshotStored = await activeWorkspace.stat(snapshotPath);
       if (!snapshotStored.ok) {
         if (snapshotStored.error.code !== "NOT_FOUND") {
@@ -6955,9 +6966,15 @@ export function useCaseOrchestrator(
         }
         const saved = await activeWorkspace.createImmutable(
           snapshotPath,
-          bytesReader(new TextEncoder().encode(`${canonicalize(snapshot)}\n`)),
+          bytesReader(snapshotBytes),
         );
         if (!saved.ok) throw new Error("Snapshot could not be preserved.");
+        await verifyLocalBytes(
+          activeWorkspace,
+          snapshotPath,
+          snapshotBytes,
+          CASE_RESTORE_RECORD_MAX_BYTES,
+        );
       }
       await activeWorkspace.createDirectory(
         `cases/${activeCase.caseId}/manifests`,
@@ -6968,7 +6985,14 @@ export function useCaseOrchestrator(
       );
       if (!saved.ok)
         throw new Error("Inventory checkpoint could not be preserved.");
+      await verifyLocalBytes(
+        activeWorkspace,
+        manifestPath,
+        manifestBytes,
+        CASE_RESTORE_RECORD_MAX_BYTES,
+      );
       checkpointReference = {
+        manifestContentSha256: await sha256Bytes(manifestBytes),
         attemptId: checkpoint.attemptId,
         snapshot: checkpoint.snapshot,
         inventoryItems: checkpoint.inventoryItems,
@@ -6977,6 +7001,67 @@ export function useCaseOrchestrator(
         artifacts: checkpoint.artifacts,
       };
     }
+    const selectedCheckpoint = checkpointReference;
+    const snapshotPath = `cases/${activeCase.caseId}/snapshots/${selectedCheckpoint.snapshot.snapshotId}.json`;
+    const verifyCheckpointFiles = async (): Promise<void> => {
+      const openedManifest =
+        await activeWorkspace.openChunkReader(manifestPath);
+      const openedSnapshot =
+        await activeWorkspace.openChunkReader(snapshotPath);
+      if (!openedManifest.ok || !openedSnapshot.ok)
+        throw new Error("Inventory checkpoint files could not be reopened.");
+      const verifiedManifestBytes = await readBoundedLocalBytes(
+        openedManifest.value,
+        CASE_RESTORE_RECORD_MAX_BYTES,
+      );
+      if (
+        (await sha256Bytes(verifiedManifestBytes)) !==
+        selectedCheckpoint.manifestContentSha256
+      )
+        throw new Error("Inventory manifest changed since it was observed.");
+      const manifestValue = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(verifiedManifestBytes),
+      ) as unknown;
+      const parsed = parsePersistedCheckpoint(manifestValue);
+      const snapshotValue = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          await readBoundedLocalBytes(
+            openedSnapshot.value,
+            CASE_RESTORE_RECORD_MAX_BYTES,
+          ),
+        ),
+      ) as unknown;
+      if (
+        !parsed.ok ||
+        parsed.value.caseId !== activeCase.caseId ||
+        parsed.value.snapshot.snapshotId !==
+          selectedCheckpoint.snapshot.snapshotId ||
+        (await computePackageSnapshotId(parsed.value.snapshot.entries)) !==
+          selectedCheckpoint.snapshot.snapshotId ||
+        canonicalize(snapshotValue) !==
+          canonicalize(selectedCheckpoint.snapshot) ||
+        canonicalize({
+          attemptId: parsed.value.attemptId,
+          snapshot: parsed.value.snapshot,
+          inventoryItems: parsed.value.inventoryItems,
+          packageStatus: parsed.value.packageStatus,
+          receipts: parsed.value.receipts,
+          artifacts: parsed.value.artifacts,
+        }) !==
+          canonicalize({
+            attemptId: selectedCheckpoint.attemptId,
+            snapshot: selectedCheckpoint.snapshot,
+            inventoryItems: selectedCheckpoint.inventoryItems,
+            packageStatus: selectedCheckpoint.packageStatus,
+            receipts: selectedCheckpoint.receipts,
+            artifacts: selectedCheckpoint.artifacts,
+          })
+      )
+        throw new Error(
+          "Inventory checkpoint files failed readback verification.",
+        );
+    };
+    await verifyCheckpointFiles();
     // Do not publish a checkpoint that already has a review snapshot too large
     // to reopen. A concurrent review can still change the state before saving.
     const reviewPreflight = await createCaseReviewSnapshot({
@@ -6988,24 +7073,57 @@ export function useCaseOrchestrator(
     requireRestorableRecordSize(
       new TextEncoder().encode(`${canonicalize(reviewPreflight)}\n`),
     );
-    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/intake`);
-    const intakeEventSaved = await activeWorkspace.append(
-      `cases/${activeCase.caseId}/intake/events.jsonl`,
-      new TextEncoder().encode(
-        `${canonicalize({
-          schemaVersion: "1.0.0",
-          eventId: dependencies.uuid.generate(),
-          caseId: activeCase.caseId,
-          recordedAt: dependencies.clock.now(),
-          resultingSnapshotId: checkpointReference.snapshot.snapshotId,
-          items: attemptedItems,
-          receivedEntries,
-        })}\n`,
-      ),
+    const intakeDir = await activeWorkspace.createDirectory(
+      `cases/${activeCase.caseId}/intake`,
     );
-    if (!intakeEventSaved.ok) {
+    if (!intakeDir.ok)
+      throw new Error("Evidence intake directory could not be preserved.");
+    const intakeEventPath = `cases/${activeCase.caseId}/intake/events.jsonl`;
+    const eventBytes = new TextEncoder().encode(
+      `${canonicalize({
+        schemaVersion: "1.0.0",
+        eventId: dependencies.uuid.generate(),
+        caseId: activeCase.caseId,
+        recordedAt: dependencies.clock.now(),
+        resultingSnapshotId: selectedCheckpoint.snapshot.snapshotId,
+        items: attemptedItems,
+        receivedEntries,
+      })}\n`,
+    );
+    const previousEvents =
+      await activeWorkspace.openChunkReader(intakeEventPath);
+    if (!previousEvents.ok && previousEvents.error.code !== "NOT_FOUND")
+      throw new Error("Intake event history could not be inspected.");
+    const previousBytes = previousEvents.ok
+      ? await readBoundedLocalBytes(
+          previousEvents.value,
+          CASE_RESTORE_RECORD_MAX_BYTES,
+        )
+      : new Uint8Array();
+    if (
+      previousBytes.byteLength + eventBytes.byteLength >
+      CASE_RESTORE_RECORD_MAX_BYTES
+    )
+      throw new Error(
+        "Intake event history exceeds the supported local limit.",
+      );
+    const expectedEvents = new Uint8Array(
+      previousBytes.byteLength + eventBytes.byteLength,
+    );
+    expectedEvents.set(previousBytes);
+    expectedEvents.set(eventBytes, previousBytes.byteLength);
+    const intakeEventSaved = await activeWorkspace.append(
+      intakeEventPath,
+      eventBytes,
+    );
+    if (!intakeEventSaved.ok)
       throw new Error("Evidence intake provenance could not be preserved.");
-    }
+    await verifyLocalBytes(
+      activeWorkspace,
+      intakeEventPath,
+      expectedEvents,
+      CASE_RESTORE_RECORD_MAX_BYTES,
+    );
     const pointerBytes = new TextEncoder().encode(
       `${canonicalize({
         checkpointSnapshotId: checkpointReference.snapshot.snapshotId,
@@ -7019,11 +7137,26 @@ export function useCaseOrchestrator(
     if (!pointerSaved.ok) {
       throw new Error("Inventory checkpoint pointer could not be preserved.");
     }
+    const manifestPointerPath = `cases/${activeCase.caseId}/manifests/current.json`;
+    await verifyLocalBytes(
+      activeWorkspace,
+      manifestPointerPath,
+      pointerBytes,
+      CASE_RESTORE_POINTER_MAX_BYTES,
+    );
+    await verifyCheckpointFiles();
     await persistCaseReviewState(
       activeCase.caseId,
       checkpointReference.snapshot.snapshotId,
       caseReviewState.current,
     );
+    await verifyLocalBytes(
+      activeWorkspace,
+      manifestPointerPath,
+      pointerBytes,
+      CASE_RESTORE_POINTER_MAX_BYTES,
+    );
+    await verifyCheckpointFiles();
 
     invalidateArchitectureBuild();
     priorSnapshot.current = checkpointReference.snapshot;

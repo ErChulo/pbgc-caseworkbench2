@@ -59,6 +59,7 @@ test("separates accounting, provisional security, and typed human disposition", 
   await expect(
     quarantine.getByText("Safety hold released", { exact: true }),
   ).toBeVisible();
+  await expect(picker).toBeEnabled();
   await picker.setInputFiles({
     name: "synthetic-risk-copy.exe",
     mimeType: "application/octet-stream",
@@ -74,6 +75,7 @@ test("separates accounting, provisional security, and typed human disposition", 
     inheritedItem.getByText("Safety hold released", { exact: true }),
   ).toBeVisible();
 
+  await expect(picker).toBeEnabled();
   await picker.setInputFiles({
     name: "synthetic-risk-changed.exe",
     mimeType: "application/octet-stream",
