@@ -133,7 +133,9 @@ export async function createDraftV1SummaryArtifact(
       cellCount: selected.reference.cellCount,
       uniqueFieldCount: selected.reference.uniqueFieldCount,
       formulaCellCount: selected.reference.formulaCellCount,
-      fieldPreview: selected.reference.genericFields.slice(0, 50),
+      fieldPreview: selected.reference.genericFields
+        .slice(0, 50)
+        .filter((field) => field.length > 0),
       omittedCellsReason:
         "Draft artifact preserves scaffold selection metadata only; full cell mappings require governed plan rules, population profile, BuildSpec controls, formula compilation, and human review.",
     },

@@ -45,9 +45,9 @@ export function DraftV1SummaryPanel({
         <span className="status-chip status-chip-warning">Draft only</span>
       </div>
       <p>
-        Upload an R5 summary JSON to match it against approved V1 summary
-        reference metadata and preserve a blocked draft scaffold artifact in the
-        active local case workspace.
+        Upload an R5 summary JSON up to 8 MiB to match it against approved V1
+        summary reference metadata and preserve a blocked draft scaffold
+        artifact in the active local case workspace.
       </p>
       <label className="file-picker">
         <span>Select R5 summary JSON</span>

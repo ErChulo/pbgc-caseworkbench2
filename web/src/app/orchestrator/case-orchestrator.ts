@@ -1,3 +1,5 @@
+import { readBoundedLocalBytes } from "../../adapters/filesystem/bounded-local-read";
+import { verifyDraftV1SummaryArtifact } from "../../domain/draft-v1-summary/verification";
 import { readVerifiedChunkSnapshot } from "../../adapters/filesystem/verified-chunk-snapshot";
 import {
   MAX_INTAKE_INSPECTION_BYTES,
@@ -1280,6 +1282,8 @@ export function useCaseOrchestrator(
   const [caseOutputArtifacts, setCaseOutputArtifactsState] = useState<
     readonly CaseworkOutputArtifactInput[]
   >([]);
+  const draftV1Sequence = useRef(0);
+  const draftV1SaveInFlight = useRef(false);
   const [draftV1Summary, setDraftV1Summary] =
     useState<DraftV1SummaryArtifact | null>(null);
   const [draftV1SummaryMessage, setDraftV1SummaryMessage] = useState<
@@ -1569,6 +1573,7 @@ export function useCaseOrchestrator(
   };
 
   const resetCaseScopedState = (previewMode: boolean): void => {
+    draftV1Sequence.current += 1;
     evidenceViewerSequence.current += 1;
     outputRestoreSequence.current += 1;
     outputRestoringRef.current = false;
@@ -4305,105 +4310,172 @@ export function useCaseOrchestrator(
   ): Promise<void> => {
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) return;
-    const opened = await activeWorkspace.openChunkReader(
-      `cases/${caseRecord.caseId}/outputs/draft-v1-summary.json`,
-    );
-    if (!opened.ok) {
-      if (opened.error.code !== "NOT_FOUND") {
-        setDraftV1SummaryMessage(
-          "Existing draft V1 summary artifact could not be read.",
-        );
-      }
-      return;
-    }
+    const request = ++draftV1Sequence.current;
+    const current = () =>
+      draftV1Sequence.current === request &&
+      workspace.current === activeWorkspace &&
+      activeCaseId.current === caseRecord.caseId;
     try {
-      const value = JSON.parse(
-        new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(opened.value),
-        ),
-      ) as unknown;
-      const validation = validateContract("draftV1Summary", value);
-      if (!validation.valid) {
+      const opened = await activeWorkspace.openChunkReader(
+        `cases/${caseRecord.caseId}/outputs/draft-v1-summary.json`,
+      );
+      if (!current()) return;
+      if (!opened.ok) {
+        if (opened.error.code !== "NOT_FOUND")
+          setDraftV1SummaryMessage(
+            "Existing draft V1 summary artifact could not be read.",
+          );
+        return;
+      }
+      const bytes = await readBoundedLocalBytes(opened.value, 4 * 1024 * 1024);
+      const value: unknown = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      );
+      const verified = await verifyDraftV1SummaryArtifact(
+        value,
+        caseRecord.caseId,
+      );
+      if (!current()) return;
+      if (verified === null) {
         setDraftV1SummaryMessage(
-          "Existing draft V1 summary artifact failed runtime validation and was ignored.",
+          "Existing draft V1 summary failed case, contract, or content-hash checks and was ignored.",
         );
         return;
       }
-      setDraftV1Summary(value as DraftV1SummaryArtifact);
+      setDraftV1Summary(verified);
     } catch {
-      setDraftV1SummaryMessage(
-        "Existing draft V1 summary artifact is not valid UTF-8 JSON and was ignored.",
-      );
+      if (current())
+        setDraftV1SummaryMessage(
+          "Existing draft V1 summary could not be read or verified and was ignored.",
+        );
     }
   };
 
   const generateDraftV1Summary = async (file: File): Promise<void> => {
     const activeWorkspace = workspace.current;
-    if (activeWorkspace === null || activeCase === null) {
+    const selectedCase = activeCase;
+    if (
+      activeWorkspace === null ||
+      activeCaseId.current !== selectedCase?.caseId
+    ) {
       setDraftV1SummaryMessage(
         "Select an active local case before generating a draft V1 summary.",
       );
       return;
     }
+    if (draftV1SaveInFlight.current)
+      throw new Error("Another draft summary operation is in progress.");
+    draftV1SaveInFlight.current = true;
+    const request = ++draftV1Sequence.current;
+    const reviewer = sharedReviewer.trim() || null;
+    const current = () =>
+      draftV1Sequence.current === request &&
+      workspace.current === activeWorkspace &&
+      activeCaseId.current === selectedCase.caseId;
+    let writeAttempted = false;
+    setDraftV1Summary(null);
     setDraftV1SummaryMessage(null);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    let r5Summary: unknown;
     try {
-      r5Summary = JSON.parse(
-        new TextDecoder("utf-8", { fatal: true })
-          .decode(bytes)
-          .replace(/^\uFEFF/u, ""),
+      if (file.size <= 0 || file.size > 8 * 1024 * 1024)
+        throw new Error("Select a nonempty R5 JSON file no larger than 8 MiB.");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      if (!current()) return;
+      if (bytes.length !== file.size)
+        throw new Error("The selected R5 file could not be read completely.");
+      let r5Summary: unknown;
+      try {
+        r5Summary = JSON.parse(
+          new TextDecoder("utf-8", { fatal: true })
+            .decode(bytes)
+            .replace(/^\uFEFF/u, ""),
+        ) as unknown;
+      } catch {
+        throw new Error("The selected R5 summary must be valid UTF-8 JSON.");
+      }
+      const hashed = await hashChunkReader(bytesReader(bytes));
+      if (!current()) return;
+      if (!hashed.ok) throw new Error(hashed.error.safeMessage);
+      const artifact = await createDraftV1SummaryArtifact({
+        caseId: selectedCase.caseId,
+        r5Summary,
+        r5SummaryContentSha256: hashed.value.sha256,
+        r5SummaryFileName: file.name,
+        generatedAt: dependencies.clock.now(),
+        generatedBy: reviewer,
+      });
+      const verified = await verifyDraftV1SummaryArtifact(
+        artifact,
+        selectedCase.caseId,
       );
-    } catch {
+      if (!current()) return;
+      if (verified === null)
+        throw new Error(
+          "Draft V1 summary failed its contract or content-hash checks.",
+        );
+      await activeWorkspace.createDirectory(
+        `cases/${selectedCase.caseId}/outputs`,
+      );
+      if (!current()) return;
+      const storagePath = `cases/${selectedCase.caseId}/outputs/draft-v1-summary.json`;
+      const expectedText = `${canonicalize(verified)}\n`;
+      const encoded = new TextEncoder().encode(expectedText);
+      if (encoded.length > 4 * 1024 * 1024)
+        throw new Error("Draft V1 summary exceeds the storage limit.");
+      writeAttempted = true;
+      const saved = await activeWorkspace.writeAtomic(storagePath, encoded);
+      if (!current()) return;
+      if (!saved.ok)
+        throw new Error("Draft V1 summary artifact could not be saved.");
+      const reopened = await activeWorkspace.openChunkReader(storagePath);
+      if (!current()) return;
+      if (!reopened.ok)
+        throw new Error("Draft V1 summary could not be reopened.");
+      const readback = await readBoundedLocalBytes(
+        reopened.value,
+        4 * 1024 * 1024,
+      );
+      if (!current()) return;
+      if (
+        new TextDecoder("utf-8", { fatal: true }).decode(readback) !==
+        expectedText
+      )
+        throw new Error("Draft V1 summary failed post-write verification.");
+      const event = await activeWorkspace.append(
+        `cases/${selectedCase.caseId}/reviews/events.jsonl`,
+        new TextEncoder().encode(
+          `${canonicalize({
+            eventType: "draft-v1-summary-generated",
+            artifactType: verified.artifactType,
+            draftContentSha256: verified.contentSha256,
+            r5SourceSha256:
+              verified.deterministicPayload.r5Source.contentSha256,
+            selectedReferenceSha256:
+              verified.deterministicPayload.selectedScaffold
+                .referenceContentSha256,
+            generatedAt: verified.operationalMetadata.generatedAt,
+            schemaVersion: "1.0.0",
+          })}\n`,
+        ),
+      );
+      if (!current()) return;
+      if (!event.ok)
+        throw new Error("Draft summary review event could not be preserved.");
+      setDraftV1Summary(verified);
       setDraftV1SummaryMessage(
-        "The selected R5 summary must be valid UTF-8 JSON.",
+        `Blocked draft V1 summary saved to ${storagePath} with scaffold ${verified.deterministicPayload.selectedScaffold.workbookName} and hash ${verified.contentSha256}.`,
       );
-      return;
+    } catch (error) {
+      if (current())
+        setDraftV1SummaryMessage(
+          writeAttempted
+            ? "The draft or its review event may have been saved. Inspect the case before retrying."
+            : error instanceof Error
+              ? error.message
+              : "Draft V1 summary could not be generated.",
+        );
+    } finally {
+      draftV1SaveInFlight.current = false;
     }
-    const hashed = await hashChunkReader(bytesReader(bytes));
-    if (!hashed.ok) {
-      setDraftV1SummaryMessage(hashed.error.safeMessage);
-      return;
-    }
-    const artifact = await createDraftV1SummaryArtifact({
-      caseId: activeCase.caseId,
-      r5Summary,
-      r5SummaryContentSha256: hashed.value.sha256,
-      r5SummaryFileName: file.name,
-      generatedAt: dependencies.clock.now(),
-      generatedBy: sharedReviewer.trim() === "" ? null : sharedReviewer.trim(),
-    });
-    const validation = validateContract("draftV1Summary", artifact);
-    if (!validation.valid) {
-      setDraftV1SummaryMessage(
-        `Draft V1 summary failed runtime validation: ${validation.issues[0]?.message ?? "unknown issue"}`,
-      );
-      return;
-    }
-    await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/outputs`);
-    const storagePath = `cases/${activeCase.caseId}/outputs/draft-v1-summary.json`;
-    const saved = await activeWorkspace.writeAtomic(
-      storagePath,
-      new TextEncoder().encode(`${canonicalize(artifact)}\n`),
-    );
-    if (!saved.ok) {
-      setDraftV1SummaryMessage("Draft V1 summary artifact could not be saved.");
-      return;
-    }
-    await appendReviewEvent({
-      eventType: "draft-v1-summary-generated",
-      artifactType: artifact.artifactType,
-      draftContentSha256: artifact.contentSha256,
-      r5SourceSha256: artifact.deterministicPayload.r5Source.contentSha256,
-      selectedReferenceSha256:
-        artifact.deterministicPayload.selectedScaffold.referenceContentSha256,
-      generatedAt: artifact.operationalMetadata.generatedAt,
-      schemaVersion: "1.0.0",
-    });
-    setDraftV1Summary(artifact);
-    setDraftV1SummaryMessage(
-      `Draft V1 summary saved to ${storagePath} with scaffold ${artifact.deterministicPayload.selectedScaffold.workbookName} and hash ${artifact.contentSha256}.`,
-    );
   };
 
   const initializePlanSummary = async (): Promise<void> => {
