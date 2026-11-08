@@ -1,3 +1,4 @@
+import { OfficialFieldCatalogPanel } from "../components/field-catalog/OfficialFieldCatalogPanel";
 import { ProvisionalOraclePanel } from "../components/formula-governance/ProvisionalOraclePanel";
 import {
   CaseCreation,
@@ -258,6 +259,7 @@ export function App({
           <FeasibilityStatus />
         </section>
         {orchestrator.activeCase === null ? <HelpPanel /> : null}
+        <OfficialFieldCatalogPanel />
         <StageNavigation
           stages={CASWORK_STAGES}
           activeStage="intake"
