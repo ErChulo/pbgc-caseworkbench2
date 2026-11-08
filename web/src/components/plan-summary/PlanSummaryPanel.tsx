@@ -9,6 +9,8 @@ import { PLAN_SUMMARY_SECTIONS } from "../../domain/plan-summary/models";
 interface PlanSummaryPanelProps {
   readonly enabled: boolean;
   readonly record: PlanSummaryRecord | null;
+  readonly canInitialize: boolean;
+  readonly busy: boolean;
   readonly message: string | null;
   readonly reviewer: string;
   readonly onReviewerChange: (value: string) => void;
@@ -23,6 +25,8 @@ interface PlanSummaryPanelProps {
 export function PlanSummaryPanel({
   enabled,
   record,
+  canInitialize,
+  busy,
   message,
   reviewer,
   onReviewerChange,
@@ -125,17 +129,18 @@ export function PlanSummaryPanel({
       {enabled && !record && (
         <div className="plan-summary-init">
           <p>
-            Initialize the Plan Summary to begin documenting plan attributes
-            from approved evidence.
+            After evidence intake, initialize an empty local Plan Summary draft.
+            Attribute authoring and review are not yet available here.
           </p>
           <button
             type="button"
             className="button button-primary"
+            disabled={!canInitialize || busy}
             onClick={() => {
               void onInitialize();
             }}
           >
-            Initialize Plan Summary
+            {busy ? "Saving draft…" : "Initialize Plan Summary"}
           </button>
         </div>
       )}
@@ -206,8 +211,8 @@ export function PlanSummaryPanel({
               {currentSection.attributes.length === 0 ? (
                 <div className="empty-section">
                   <p>
-                    No attributes extracted for this section. Attributes will be
-                    added as plan evidence is reviewed.
+                    No attributes are in this draft. Attribute authoring and
+                    review are not yet available in this panel.
                   </p>
                 </div>
               ) : (

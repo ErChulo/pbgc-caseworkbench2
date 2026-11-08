@@ -1,3 +1,4 @@
+import { verifyEmptyPlanSummaryDraft } from "../../domain/plan-summary/empty-draft-verification";
 import {
   EVIDENCE_TEXT_RECORD_MAX_BYTES,
   requireCorrectionTextSize,
@@ -990,6 +991,8 @@ export interface CaseOrchestrator {
   readonly draftV1Summary: DraftV1SummaryArtifact | null;
   readonly draftV1SummaryMessage: string | null;
   readonly planSummaryRecord: PlanSummaryRecord | null;
+  readonly planSummaryCanInitialize: boolean;
+  readonly planSummaryBusy: boolean;
   readonly planSummaryMessage: string | null;
   readonly planSummaryDecisions: readonly PlanSummaryDecision[];
   readonly formulaApprovalRecords: readonly FormulaApprovalRecord[];
@@ -1356,6 +1359,8 @@ export function useCaseOrchestrator(
     setV1Diagnostic(diagnostic);
   };
   const [v1OutputMessage, setV1OutputMessage] = useState<string | null>(null);
+  const planSummaryInFlight = useRef(false);
+  const [planSummaryBusy, setPlanSummaryBusy] = useState(false);
   const [planSummaryRecord, setPlanSummaryRecord] =
     useState<PlanSummaryRecord | null>(null);
   const [planSummaryMessage, setPlanSummaryMessage] = useState<string | null>(
@@ -3400,6 +3405,26 @@ export function useCaseOrchestrator(
         throw new Error("Review snapshot binding is invalid.");
       }
       const restored = parsed.value;
+      const verifiedPlanSummary =
+        restored.planSummaryRecord === null
+          ? null
+          : await verifyEmptyPlanSummaryDraft(
+              restored.planSummaryRecord,
+              caseRecord.caseId,
+            );
+      if (
+        restored.planSummaryDecisions.length !== 0 ||
+        (restored.planSummaryRecord !== null && verifiedPlanSummary === null)
+      ) {
+        if (activeCaseId.current === caseRecord.caseId) {
+          evidenceRestoreBlockedRef.current = true;
+          setEvidenceRestoreBlocked(true);
+          setEvidenceRestoreMessage(
+            "The saved Plan Summary is not a verified empty draft or has review history. Populated-summary restoration is not yet supported. Inspect the workspace before proceeding.",
+          );
+        }
+        return;
+      }
       const restoredQuarantineHistory = new Map<string, QuarantineDecision[]>();
       const projectedQuarantineItems: QuarantineQueueItem[] = [];
       for (const item of restored.quarantineItems) {
@@ -3613,6 +3638,8 @@ export function useCaseOrchestrator(
       setPopulationItems(projectedPopulationItems);
       setArchitecturePolicyApprovals(restored.architecturePolicyApprovals);
       setCaseControls(restored.authenticatedCaseControls);
+      setPlanSummaryRecord(verifiedPlanSummary);
+      setPlanSummaryDecisions([]);
     } catch {
       failReviewRestore();
     }
@@ -4590,33 +4617,152 @@ export function useCaseOrchestrator(
   };
 
   const initializePlanSummary = async (): Promise<void> => {
-    if (activeCase === null) {
+    const selectedCase = activeCase;
+    const selectedWorkspace = workspace.current;
+    const selectedSnapshot = priorSnapshot.current;
+    const review = caseReviewState.current;
+    if (planSummaryInFlight.current) return;
+    if (
+      selectedCase === null ||
+      selectedWorkspace === null ||
+      selectedSnapshot === null ||
+      selectedSnapshot.entries.length === 0 ||
+      activeCaseId.current !== selectedCase.caseId ||
+      caseRestoringRef.current ||
+      evidenceRestoreBlockedRef.current
+    ) {
       setPlanSummaryMessage(
-        "Select an active case before initializing Plan Summary.",
+        "Complete evidence intake before initializing a local Plan Summary draft.",
       );
       return;
     }
+    if (
+      review.planSummaryRecord !== null ||
+      review.planSummaryDecisions.length !== 0
+    ) {
+      setPlanSummaryMessage(
+        "An existing Plan Summary or review history must be inspected; it will not be replaced.",
+      );
+      return;
+    }
+    const requireCurrent = (): void => {
+      if (
+        activeCaseId.current !== selectedCase.caseId ||
+        workspace.current !== selectedWorkspace ||
+        priorSnapshot.current !== selectedSnapshot ||
+        caseReviewState.current !== review ||
+        caseRestoringRef.current ||
+        evidenceRestoreBlockedRef.current
+      )
+        throw new Error(
+          "Case evidence or review changed. Reopen the case before retrying.",
+        );
+    };
+    planSummaryInFlight.current = true;
+    setPlanSummaryBusy(true);
     setPlanSummaryMessage(null);
+    let writeAttempted = false;
     try {
-      const record = await createEmptyPlanSummaryRecord(activeCase.caseId, {
+      const record = await createEmptyPlanSummaryRecord(selectedCase.caseId, {
         uuid: { generate: () => dependencies.uuid.generate() },
         clock: { now: () => dependencies.clock.now() },
       });
-      setPlanSummaryRecord(record);
-      invalidateArchitectureBuild();
-      caseReviewState.current = {
-        ...caseReviewState.current,
+      if (
+        (await verifyEmptyPlanSummaryDraft(record, selectedCase.caseId)) ===
+        null
+      )
+        throw new Error("Plan Summary draft could not be verified.");
+      requireCurrent();
+      const nextState: CaseReviewState = {
+        ...review,
         planSummaryRecord: record,
       };
+      const expectedSnapshot = await createCaseReviewSnapshot({
+        schemaVersion: "1.0.0",
+        caseId: selectedCase.caseId,
+        evidenceSnapshotId: selectedSnapshot.snapshotId,
+        ...nextState,
+      });
+      requireCurrent();
+      writeAttempted = true;
+      await persistCaseReviewState(
+        selectedCase.caseId,
+        selectedSnapshot.snapshotId,
+        nextState,
+        requireCurrent,
+      );
+      requireCurrent();
+      const pointerOpened = await selectedWorkspace.openChunkReader(
+        `cases/${selectedCase.caseId}/reviews/current.json`,
+      );
+      if (!pointerOpened.ok)
+        throw new Error("Review pointer could not be reopened.");
+      const pointer = parseCaseReviewPointer(
+        JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(
+            await readBoundedLocalBytes(
+              pointerOpened.value,
+              CASE_RESTORE_POINTER_MAX_BYTES,
+            ),
+          ),
+        ) as unknown,
+      );
+      if (
+        !pointer.ok ||
+        pointer.value.reviewSnapshotId !== expectedSnapshot.reviewSnapshotId
+      )
+        throw new Error("Review pointer failed readback verification.");
+      const snapshotOpened = await selectedWorkspace.openChunkReader(
+        `cases/${selectedCase.caseId}/reviews/snapshots/${pointer.value.reviewSnapshotId}.json`,
+      );
+      if (!snapshotOpened.ok)
+        throw new Error("Review snapshot could not be reopened.");
+      const restored = await parseCaseReviewSnapshot(
+        JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(
+            await readBoundedLocalBytes(
+              snapshotOpened.value,
+              CASE_RESTORE_RECORD_MAX_BYTES,
+            ),
+          ),
+        ) as unknown,
+      );
+      if (
+        !restored.ok ||
+        restored.value.reviewSnapshotId !== expectedSnapshot.reviewSnapshotId ||
+        restored.value.caseId !== selectedCase.caseId ||
+        restored.value.evidenceSnapshotId !== selectedSnapshot.snapshotId
+      )
+        throw new Error("Review snapshot failed readback verification.");
+      requireCurrent();
+      caseReviewState.current = nextState;
+      invalidateArchitectureBuild();
+      setPlanSummaryRecord(record);
       setPlanSummaryMessage(
-        "Plan Summary initialized. Add attributes from approved evidence.",
+        "Empty Plan Summary draft saved locally. It is not an approval.",
       );
     } catch (error) {
-      setPlanSummaryMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to initialize Plan Summary.",
-      );
+      if (
+        activeCaseId.current === selectedCase.caseId &&
+        workspace.current === selectedWorkspace
+      ) {
+        if (writeAttempted) {
+          evidenceRestoreBlockedRef.current = true;
+          setEvidenceRestoreBlocked(true);
+          setEvidenceRestoreMessage(
+            "The Plan Summary draft or review pointer may have been saved. Inspect the workspace and reopen the case before retrying.",
+          );
+        } else {
+          setPlanSummaryMessage(
+            error instanceof Error
+              ? error.message
+              : "Failed to initialize Plan Summary.",
+          );
+        }
+      }
+    } finally {
+      planSummaryInFlight.current = false;
+      setPlanSummaryBusy(false);
     }
   };
 
@@ -6801,6 +6947,11 @@ export function useCaseOrchestrator(
     exportCurrentManifest,
     generateDraftV1Summary,
     planSummaryRecord,
+    planSummaryCanInitialize:
+      evidencePackageSummary?.snapshotId != null &&
+      evidenceItems.some((item) => item.sha256 !== null) &&
+      planSummaryRecord === null,
+    planSummaryBusy,
     planSummaryMessage,
     planSummaryDecisions,
     formulaApprovalRecords,

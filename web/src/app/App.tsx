@@ -330,6 +330,8 @@ export function App({
                 orchestrator.workspaceReady && orchestrator.activeCase !== null
               }
               record={orchestrator.planSummaryRecord}
+              canInitialize={orchestrator.planSummaryCanInitialize}
+              busy={orchestrator.planSummaryBusy}
               message={orchestrator.planSummaryMessage}
               reviewer={orchestrator.sharedReviewer}
               onReviewerChange={orchestrator.setSharedReviewer}

@@ -43,12 +43,18 @@ test.describe("V1 Pipeline End-to-End", () => {
       page.getByRole("region", { name: "Plan Summary" }),
     ).toBeVisible();
 
-    await expect(
-      page.getByText(
-        "Initialize the Plan Summary to begin documenting plan attributes from approved evidence.",
-      ),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Initialize Plan Summary" }).click();
+    const initialize = page.getByRole("button", {
+      name: "Initialize Plan Summary",
+    });
+    await expect(initialize).toBeDisabled();
+    await page.getByLabel("Add evidence files").setInputFiles({
+      name: "synthetic.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic evidence."),
+    });
+    await expect(page.getByText("File inventory complete")).toBeVisible();
+    await expect(initialize).toBeEnabled();
+    await initialize.click();
     const summary = page.getByRole("region", { name: "Plan Summary" });
     await expect(summary.getByLabel("Plan Summary reviewer")).toBeVisible();
     await expect(

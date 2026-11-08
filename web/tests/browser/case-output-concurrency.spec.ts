@@ -79,6 +79,12 @@ test("does not save a stale link or export when case inputs change during local 
     name: "Export final output package",
   });
   await expect(link).toBeEnabled();
+  await page.getByLabel("Add evidence files").setInputFiles({
+    name: "synthetic.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Synthetic evidence."),
+  });
+  await expect(page.getByText("File inventory complete")).toBeVisible();
   await page.getByRole("button", { name: "Initialize Plan Summary" }).click();
   const reviewer = page.getByLabel("Plan Summary reviewer");
   await output.getByLabel("Artifact ID").fill("synthetic");
