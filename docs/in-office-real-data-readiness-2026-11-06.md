@@ -17,3 +17,5 @@ Recent synthetic tests cover case intake/review, source-bound population inspect
 A local, hash-pinned Data Dictionary lookup is now available as session-only reference metadata (see `local-approved-field-lookup-2026-11-05.md`). It does not authorize mappings or close the remaining readiness gates.
 
 Same-byte safety findings now constrain current eligibility and block unsupported review-history inheritance; see `same-byte-safety-gate-2026-11-05.md`. A governed migration/reapproval workflow and cross-window concurrency controls remain open.
+
+Same-session exclusion now covers the principal review snapshot writes, intake, corrections and empty Plan Summary initialization as described in `same-session-review-write-lock-2026-11-05.md`. Other operations, cross-window coordination, recovery, native office filesystem testing and approval gates remain open. The full Chromium browser suite passed 106 tests on the isolated build and synthetic workspace; this is not real-data testing.

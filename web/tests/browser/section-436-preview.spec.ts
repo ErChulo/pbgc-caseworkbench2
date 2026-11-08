@@ -124,7 +124,11 @@ test("creates a provisional preview in the built file URL with network blocked",
   const { pathToFileURL } = await import("node:url");
   await page.route(/^https?:/u, (route) => route.abort());
   await installSyntheticWorkspace(page);
-  await page.goto(pathToFileURL(resolve("dist/pbgc-caseworkbench.html")).href);
+  await page.goto(
+    pathToFileURL(
+      resolve(process.env.PBGC_TEST_ARTIFACT ?? "dist/pbgc-caseworkbench.html"),
+    ).href,
+  );
   await page.getByRole("button", { name: "Select local workspace" }).click();
   await page.getByLabel("Reviewer identifier").fill("synthetic-reviewer");
   await page.getByLabel("Reviewer display name").fill("Synthetic Reviewer");

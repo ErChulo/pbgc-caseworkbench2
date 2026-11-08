@@ -1049,6 +1049,7 @@ export interface CaseOrchestrator {
   readonly evidenceViewerError: string | null;
   readonly intakeBusy: boolean;
   readonly safetyReviewBusy: boolean;
+  readonly correctionBusy: boolean;
   readonly caseRestoring: boolean;
   readonly evidenceRestoreBlocked: boolean;
   readonly beginEvidenceIntake: () => boolean;
@@ -1259,6 +1260,7 @@ export function useCaseOrchestrator(
   const [evidenceRestoreBlocked, setEvidenceRestoreBlocked] = useState(false);
   const evidenceViewerSequence = useRef(0);
   const correctionSaveInFlight = useRef(false);
+  const [correctionBusy, setCorrectionBusy] = useState(false);
   const [evidenceViewerError, setEvidenceViewerError] = useState<string | null>(
     null,
   );
@@ -2549,10 +2551,12 @@ export function useCaseOrchestrator(
       safetyReviewInFlight.current ||
       intakeInFlight.current ||
       caseRestoringRef.current ||
-      evidenceRestoreBlockedRef.current
+      evidenceRestoreBlockedRef.current ||
+      planSummaryInFlight.current ||
+      correctionSaveInFlight.current
     ) {
       throw new Error(
-        "Finish the current intake, restoration, or safety review before recording a decision.",
+        "Finish the current intake, restoration, correction, summary, or review before recording a decision.",
       );
     }
     safetyReviewInFlight.current = true;
@@ -2573,7 +2577,7 @@ export function useCaseOrchestrator(
         recordArtifactEligibilityDecisionUnchecked(...args),
       );
 
-  const recordClassificationDecision = async (
+  const recordClassificationDecisionUnchecked = async (
     item: ClassificationReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
     reviewer: string,
@@ -2656,7 +2660,11 @@ export function useCaseOrchestrator(
     await refreshGovernedEvidenceRecords(activeCase.caseId);
   };
 
-  const recordRelationshipDecision = async (
+  const recordClassificationDecision: typeof recordClassificationDecisionUnchecked =
+    async (...args) =>
+      runSafetyReview(() => recordClassificationDecisionUnchecked(...args));
+
+  const recordRelationshipDecisionUnchecked = async (
     item: RelationshipReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
     reviewer: string,
@@ -2747,7 +2755,11 @@ export function useCaseOrchestrator(
     setRelationshipItems(nextItems);
   };
 
-  const recordDateSelection = async (
+  const recordRelationshipDecision: typeof recordRelationshipDecisionUnchecked =
+    async (...args) =>
+      runSafetyReview(() => recordRelationshipDecisionUnchecked(...args));
+
+  const recordDateSelectionUnchecked = async (
     item: DateCandidateReviewItem,
     reviewer: string,
     rationale: string,
@@ -2808,7 +2820,11 @@ export function useCaseOrchestrator(
     setDateCandidateItems(nextItems);
   };
 
-  const recordPopulationDecision = async (
+  const recordDateSelection: typeof recordDateSelectionUnchecked = async (
+    ...args
+  ) => runSafetyReview(() => recordDateSelectionUnchecked(...args));
+
+  const recordPopulationDecisionUnchecked = async (
     item: PopulationReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
     reviewer: string,
@@ -2951,6 +2967,10 @@ export function useCaseOrchestrator(
       populationDecisionInFlight.current = false;
     }
   };
+
+  const recordPopulationDecision: typeof recordPopulationDecisionUnchecked =
+    async (...args) =>
+      runSafetyReview(() => recordPopulationDecisionUnchecked(...args));
 
   const previewPopulationRecord = async (
     item: PopulationReviewItem,
@@ -4744,6 +4764,16 @@ export function useCaseOrchestrator(
     const review = caseReviewState.current;
     if (planSummaryInFlight.current) return;
     if (
+      intakeInFlight.current ||
+      safetyReviewInFlight.current ||
+      correctionSaveInFlight.current
+    ) {
+      setPlanSummaryMessage(
+        "Finish the current intake, correction, or review before initializing a draft.",
+      );
+      return;
+    }
+    if (
       selectedCase === null ||
       selectedWorkspace === null ||
       selectedSnapshot === null ||
@@ -5410,7 +5440,7 @@ export function useCaseOrchestrator(
     setArchitecturePolicyItems(policyItems);
   };
 
-  const recordArchitecturePolicyApproval = async (
+  const recordArchitecturePolicyApprovalUnchecked = async (
     item: ArchitecturePolicyReviewItem,
     reviewer: string,
     rationale: string,
@@ -5500,7 +5530,11 @@ export function useCaseOrchestrator(
     }
   };
 
-  const recordCaseControls = async (draft: {
+  const recordArchitecturePolicyApproval: typeof recordArchitecturePolicyApprovalUnchecked =
+    async (...args) =>
+      runSafetyReview(() => recordArchitecturePolicyApprovalUnchecked(...args));
+
+  const recordCaseControlsUnchecked = async (draft: {
     readonly singleCalculation: boolean;
     readonly startDate: string;
     readonly endDate: string | null;
@@ -5560,6 +5594,10 @@ export function useCaseOrchestrator(
       );
     }
   };
+
+  const recordCaseControls: typeof recordCaseControlsUnchecked = async (
+    ...args
+  ) => runSafetyReview(() => recordCaseControlsUnchecked(...args));
 
   const downloadV1Workbook = (): void => {
     const blob = v1XlsxBlobRef.current;
@@ -5878,6 +5916,14 @@ export function useCaseOrchestrator(
   const saveEvidenceCorrection = async (
     correctedText: string,
   ): Promise<void> => {
+    if (
+      intakeInFlight.current ||
+      safetyReviewInFlight.current ||
+      planSummaryInFlight.current
+    )
+      throw new Error(
+        "Finish the current intake, summary, or review before saving a correction.",
+      );
     if (correctionSaveInFlight.current)
       throw new Error(
         "Another correction save is in progress. Wait for it to finish.",
@@ -5919,6 +5965,7 @@ export function useCaseOrchestrator(
     };
     requireCorrectionTextSize(correctedText);
     correctionSaveInFlight.current = true;
+    setCorrectionBusy(true);
     const writeState: { attempted: boolean } = { attempted: false };
     try {
       requireCurrent();
@@ -6083,6 +6130,7 @@ export function useCaseOrchestrator(
       throw error;
     } finally {
       correctionSaveInFlight.current = false;
+      setCorrectionBusy(false);
     }
   };
 
@@ -6090,6 +6138,8 @@ export function useCaseOrchestrator(
     if (
       intakeInFlight.current ||
       safetyReviewInFlight.current ||
+      planSummaryInFlight.current ||
+      correctionSaveInFlight.current ||
       caseRestoringRef.current ||
       evidenceRestoreBlockedRef.current ||
       workspace.current === null ||
@@ -7078,6 +7128,7 @@ export function useCaseOrchestrator(
     evidenceViewerError,
     intakeBusy,
     safetyReviewBusy,
+    correctionBusy,
     caseRestoring,
     evidenceRestoreBlocked,
     beginEvidenceIntake,

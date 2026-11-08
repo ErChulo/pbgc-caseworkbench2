@@ -21,12 +21,14 @@ export function EvidenceViewer({
   loading,
   error,
   onSaveCorrection,
+  correctionDisabled = false,
   onClose,
 }: {
   readonly artifact: EvidenceViewerArtifact | null;
   readonly loading: boolean;
   readonly error: string | null;
   readonly onSaveCorrection: (correctedText: string) => Promise<void>;
+  readonly correctionDisabled?: boolean;
   readonly onClose: () => void;
 }) {
   if (!loading && error === null && artifact === null) return null;
@@ -90,6 +92,7 @@ export function EvidenceViewer({
                   key={artifact.sha256}
                   extraction={artifact.extraction}
                   correction={artifact.correction}
+                  disabled={correctionDisabled}
                   onSave={onSaveCorrection}
                 />
               ) : null}
@@ -104,10 +107,12 @@ export function EvidenceViewer({
 function CorrectionEditor({
   extraction,
   correction,
+  disabled,
   onSave,
 }: {
   readonly extraction: EvidenceExtraction;
   readonly correction: EvidenceTextCorrection | null;
+  readonly disabled: boolean;
   readonly onSave: (correctedText: string) => Promise<void>;
 }) {
   const [value, setValue] = useState(
@@ -148,7 +153,7 @@ function CorrectionEditor({
         id="evidence-corrected-text"
         rows={12}
         value={value}
-        disabled={saving}
+        disabled={saving || disabled}
         onChange={(event) => {
           setMessage(null);
           setError(null);
@@ -158,7 +163,7 @@ function CorrectionEditor({
       <button
         type="button"
         className="button button-primary"
-        disabled={saving}
+        disabled={saving || disabled}
         onClick={() => void save()}
       >
         {saving ? "Saving correction…" : "Save corrected text"}

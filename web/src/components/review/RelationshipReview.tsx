@@ -22,6 +22,7 @@ export interface RelationshipReviewItem {
 
 export function RelationshipReview({
   items,
+  disabled = false,
   reviewer: sharedReviewer,
   rationale: sharedRationale,
   onReviewerChange,
@@ -29,6 +30,7 @@ export function RelationshipReview({
   onDecision,
 }: {
   readonly items: readonly RelationshipReviewItem[];
+  readonly disabled?: boolean;
   readonly reviewer: string;
   readonly rationale: string;
   readonly onReviewerChange: (value: string) => void;
@@ -122,6 +124,7 @@ export function RelationshipReview({
                     type="button"
                     className="button button-secondary"
                     disabled={
+                      disabled ||
                       !sharedReviewer.trim() ||
                       !sharedRationale.trim() ||
                       (action === "revoke" &&

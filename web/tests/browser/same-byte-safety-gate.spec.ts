@@ -117,6 +117,7 @@ test("new findings cannot inherit an earlier same-byte safety release", async ({
   const item = eligibility.locator("li").filter({ hasText: "first.ps1" });
   await item.getByRole("button", { name: "Approve governed use" }).click();
   await expect(item.getByText("Eligible", { exact: true })).toBeVisible();
+  await expect(picker).toBeEnabled();
   await picker.setInputFiles({
     name: "second.js",
     mimeType: "text/plain",
@@ -201,5 +202,73 @@ test("safety review blocks same-session intake and case switching until it finis
     ).__releaseSafetyGate?.(),
   );
   await expect(item.getByText("Eligible", { exact: true })).toBeVisible();
+  await expect(picker).toBeEnabled();
+});
+
+test("classification review and intake cannot overlap in the same session", async ({
+  offlinePage: page,
+}) => {
+  await createSyntheticCase(page, "PBGC-REVIEW-LOCK");
+  const picker = page.getByLabel("Add evidence files");
+  await picker.setInputFiles({
+    name: "synthetic-plan.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      "Synthetic executed plan document effective 2020-01-01.",
+    ),
+  });
+  await expect(page.getByText("File inventory complete")).toBeVisible();
+  const classification = page.getByRole("region", {
+    name: "Classification review",
+  });
+  await expect(picker).toBeEnabled();
+  await classification.getByLabel("Reviewer name").fill("synthetic-reviewer");
+  await classification.getByLabel("Rationale").fill("Synthetic review.");
+  await expect(classification.getByLabel("Rationale")).toHaveValue(
+    "Synthetic review.",
+  );
+  await page.evaluate(() => {
+    const g = globalThis as unknown as {
+      __syntheticWriteGate?: (path: string) => Promise<void>;
+      __reviewGateEntered?: boolean;
+      __releaseReviewGate?: () => void;
+    };
+    g.__syntheticWriteGate = async (path) => {
+      if (path.endsWith("/reviews/events.jsonl")) {
+        g.__reviewGateEntered = true;
+        await new Promise<void>((done) => {
+          g.__releaseReviewGate = done;
+        });
+        delete g.__syntheticWriteGate;
+      }
+    };
+  });
+  const first = classification.locator("li").first();
+  await first.getByRole("button", { name: "Approve" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (globalThis as unknown as { __reviewGateEntered?: boolean })
+            .__reviewGateEntered,
+      ),
+    )
+    .toBe(true);
+  await expect(picker).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Return to workspace home" }),
+  ).toBeDisabled();
+  await expect(
+    page
+      .getByRole("region", { name: "Artifact eligibility review" })
+      .getByRole("button", { name: "Approve governed use" })
+      .first(),
+  ).toBeDisabled();
+  await page.evaluate(() =>
+    (
+      globalThis as unknown as { __releaseReviewGate?: () => void }
+    ).__releaseReviewGate?.(),
+  );
+  await expect(first.getByText("Approved", { exact: true })).toBeVisible();
   await expect(picker).toBeEnabled();
 });

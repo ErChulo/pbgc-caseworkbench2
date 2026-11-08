@@ -11,11 +11,13 @@ export interface CaseControlsDraft {
 
 export function CaseControlsReview({
   enabled,
+  disabled = false,
   message,
   approved,
   onApprove,
 }: {
   readonly enabled: boolean;
+  readonly disabled?: boolean;
   readonly message: string | null;
   readonly approved: AuthenticatedCaseControls | null;
   readonly onApprove: (draft: CaseControlsDraft) => Promise<void>;
@@ -48,7 +50,8 @@ export function CaseControlsReview({
     reviewer.trim() !== "" &&
     rationale.trim() !== "" &&
     startDate !== "" &&
-    !busy;
+    !busy &&
+    !disabled;
 
   return (
     <section

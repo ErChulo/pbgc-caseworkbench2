@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/require-await */
-import type { Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
 
 export async function installSyntheticWorkspace(page: Page) {
   await page.addInitScript(() => {
@@ -118,4 +118,6 @@ export async function createSyntheticCase(
   await page.getByRole("button", { name: "Establish identity" }).click();
   await page.getByLabel("Case number").fill(caseNumber);
   await page.getByRole("button", { name: "Create production case" }).click();
+  // A freshly created case may still be restoring.
+  await expect(page.getByLabel("Add evidence files")).toBeEnabled();
 }

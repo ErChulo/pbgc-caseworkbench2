@@ -4,7 +4,9 @@ import { pathToFileURL } from "node:url";
 import { expect, test } from "./fixtures";
 import { installSyntheticWorkspace } from "./synthetic-workspace";
 
-const ARTIFACT_PATH = resolve("dist/pbgc-caseworkbench.html");
+const ARTIFACT_PATH = resolve(
+  process.env.PBGC_TEST_ARTIFACT ?? "dist/pbgc-caseworkbench.html",
+);
 
 test.describe("Direct-file production acceptance", () => {
   test("loads the built artifact from file:// without console errors or outbound requests", async ({
@@ -78,6 +80,7 @@ test.describe("Direct-file production acceptance", () => {
     await page.getByLabel("Case number").fill("PBGC-DIRECT-FILE-002");
     await page.getByRole("button", { name: "Create production case" }).click();
 
+    await expect(page.getByLabel("Add evidence files")).toBeEnabled();
     await page.getByLabel("Add evidence files").setInputFiles({
       name: "direct-file-evidence.txt",
       mimeType: "text/plain",
@@ -104,6 +107,7 @@ test.describe("Direct-file production acceptance", () => {
     await page.getByLabel("Case number").fill("PBGC-DIRECT-FILE-003");
     await page.getByRole("button", { name: "Create production case" }).click();
 
+    await expect(page.getByLabel("Add evidence files")).toBeEnabled();
     await page.getByLabel("Add evidence files").setInputFiles({
       name: "review-evidence.txt",
       mimeType: "text/plain",
@@ -149,6 +153,7 @@ test.describe("Direct-file production acceptance", () => {
     await page.getByLabel("Case number").fill("PBGC-DIRECT-FILE-005");
     await page.getByRole("button", { name: "Create production case" }).click();
 
+    await expect(page.getByLabel("Add evidence files")).toBeEnabled();
     await page.getByLabel("Add evidence files").setInputFiles({
       name: "network-test.txt",
       mimeType: "text/plain",

@@ -82,7 +82,7 @@ test("closing during correction save stops the stale pointer before publication"
   expect(outboundRequests).toEqual([]);
 });
 
-test("warns of a partial save when review changes during a correction pointer write", async ({
+test("blocks review changes while a correction pointer is being written", async ({
   offlinePage: page,
 }) => {
   await createSyntheticCase(page, "PBGC-CORRECTION-REVIEW-RACE");
@@ -102,6 +102,13 @@ test("warns of a partial save when review changes during a correction pointer wr
   await page
     .getByLabel("Human-corrected text")
     .fill("Synthetic corrected plan document.");
+  const classification = page.locator("section").filter({
+    has: page.getByRole("heading", { name: "Classification review" }),
+  });
+  await classification.getByLabel("Reviewer name").fill("Synthetic Reviewer");
+  await classification
+    .getByLabel("Rationale")
+    .fill("Synthetic classification review.");
   await page.evaluate(() => {
     const g = globalThis as unknown as {
       __syntheticWriteGate?: (path: string) => Promise<void>;
@@ -127,28 +134,16 @@ test("warns of a partial save when review changes during a correction pointer wr
       ),
     )
     .toBe(true);
-  const classification = page.locator("section").filter({
-    has: page.getByRole("heading", { name: "Classification review" }),
-  });
-  await classification.getByLabel("Reviewer name").fill("Synthetic Reviewer");
-  await classification
-    .getByLabel("Rationale")
-    .fill("Synthetic classification review.");
   const first = classification.locator("li").first();
-  await first.getByRole("button", { name: "Approve" }).click();
-  await expect(first.getByText("Approved", { exact: true })).toBeVisible();
+  await expect(first.getByRole("button", { name: "Approve" })).toBeDisabled();
+  await expect(page.getByLabel("Add evidence files")).toBeDisabled();
   await page.evaluate(() =>
     (
       globalThis as unknown as { __releasePointer?: () => void }
     ).__releasePointer?.(),
   );
-  await expect(
-    page.getByRole("alert").filter({ hasText: "may have been saved" }),
-  ).toBeVisible();
-  await expect(first.getByText("Approved", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText(/Corrected text saved separately/),
-  ).not.toBeVisible();
+  await expect(page.getByText(/Corrected text saved separately/)).toBeVisible();
+  await expect(first.getByRole("button", { name: "Approve" })).toBeEnabled();
 });
 
 test("saves a synthetic correction from the built file with HTTP blocked", async ({

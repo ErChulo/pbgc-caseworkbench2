@@ -1,0 +1,13 @@
+# Same-session review-write exclusion
+
+## Change
+
+The same-session safety-review lock now also serializes classification, date selection, relationship, population, architecture-policy and case-control review writes with quarantine and artifact-eligibility writes. Intake and case switching wait for those review operations. Plan Summary initialization and evidence-correction saves cannot begin during intake or these review writes; intake and review writes likewise cannot begin while a Plan Summary initialization or correction save is in flight. Their existing case-switch and freshness safeguards remain in place. Review action buttons and the file picker reflect these exclusions; editable reviewer/rationale fields remain available.
+
+The change prevents these specified same-session snapshot writers from overwriting one another or an intake-generated safety hold merely because their asynchronous writes overlapped. It does not cover every app operation, cancel an already-started operation in another window, make filesystem writes atomic, authenticate the reviewer, or prevent an external process from changing files. A hung protected operation blocks further protected operations until it finishes or the app is reloaded. A failed append or pointer write may leave an orphan or partial history; a governed recovery and cross-window concurrency policy remain necessary. Plan Summary and correction operations retain their existing case-switch behavior and partial-write warnings. No real-data release approval is implied.
+
+## Evidence
+
+A synthetic browser test delays a classification decision at the review event write and checks that intake, safety approval and case switching remain disabled until the decision finishes. Another delays a correction pointer write and checks that classification and intake cannot start until it finishes. Existing safety, case-switch, restoration and correction tests also pass. The initial browser run exposed three test-harness problems: two tests used the pre-existing `dist` file instead of the specified isolated build, and one attempted intake before case restoration finished. The tests now consistently use the isolated artifact where applicable and wait for the evidence picker to become enabled; the full Chromium rerun passed all 106 tests. The tests use synthetic data and an in-memory workspace; this is not native office filesystem, security or actuarial validation.
+
+The full automated unit/integration/contract suite passed 1,212 tests in 158 files with the approved local Data Dictionary. Typecheck, lint, formatting, schema and contract validation passed; an isolated single-file build and verifier passed. The previously modified `dist/pbgc-caseworkbench.html` was not replaced.

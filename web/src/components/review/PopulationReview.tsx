@@ -36,6 +36,7 @@ export interface PopulationReviewItem {
 
 export function PopulationReview({
   items,
+  disabled = false,
   reviewer: sharedReviewer,
   rationale: sharedRationale,
   onReviewerChange,
@@ -46,6 +47,7 @@ export function PopulationReview({
   reviewRevision,
 }: {
   readonly items: readonly PopulationReviewItem[];
+  readonly disabled?: boolean;
   readonly caseId: string | null;
   readonly reviewRevision: number;
   readonly onPreviewRecord: (
@@ -189,6 +191,7 @@ export function PopulationReview({
                     type="button"
                     className="button button-secondary"
                     disabled={
+                      disabled ||
                       busy ||
                       sharedReviewer.trim().length === 0 ||
                       sharedRationale.trim().length === 0 ||

@@ -30,6 +30,7 @@ export interface DateCandidateReviewItem {
 
 export function ClassificationReview({
   items,
+  disabled = false,
   dateCandidates,
   reviewer: sharedReviewer,
   rationale: sharedRationale,
@@ -39,6 +40,7 @@ export function ClassificationReview({
   onDateSelect,
 }: {
   readonly items: readonly ClassificationReviewItem[];
+  readonly disabled?: boolean;
   readonly dateCandidates: readonly DateCandidateReviewItem[];
   readonly reviewer: string;
   readonly rationale: string;
@@ -147,6 +149,7 @@ export function ClassificationReview({
                     type="button"
                     className="button button-secondary"
                     disabled={
+                      disabled ||
                       !sharedReviewer.trim() ||
                       !sharedRationale.trim() ||
                       (action === "revoke" &&
@@ -213,6 +216,7 @@ export function ClassificationReview({
                   type="button"
                   className="button button-secondary"
                   disabled={
+                    disabled ||
                     !sharedReviewer.trim() ||
                     !sharedRationale.trim() ||
                     !item.candidate.valid

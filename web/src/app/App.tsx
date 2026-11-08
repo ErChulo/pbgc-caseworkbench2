@@ -242,7 +242,7 @@ export function App({
             <p id="intake-switch-note" role="status">
               {orchestrator.intakeBusy
                 ? "Stop or finish file intake before switching cases."
-                : "Finish safety review before switching cases."}
+                : "Finish the current review before switching cases."}
             </p>
           )}
           {orchestrator.caseRestoring && (
@@ -305,7 +305,9 @@ export function App({
               orchestrator.workspaceReady &&
               orchestrator.activeCase !== null &&
               !orchestrator.evidenceRestoreBlocked &&
-              !orchestrator.safetyReviewBusy
+              !orchestrator.safetyReviewBusy &&
+              !orchestrator.planSummaryBusy &&
+              !orchestrator.correctionBusy
             }
             restoreBlocked={orchestrator.evidenceRestoreBlocked}
             items={orchestrator.evidenceItems}
@@ -320,6 +322,11 @@ export function App({
           />
           <div hidden={orchestrator.evidenceRestoreBlocked}>
             <EvidenceViewer
+              correctionDisabled={
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy
+              }
               artifact={orchestrator.evidenceViewerArtifact}
               loading={orchestrator.evidenceViewerLoading}
               error={orchestrator.evidenceViewerError}
@@ -340,7 +347,12 @@ export function App({
               }
               record={orchestrator.planSummaryRecord}
               canInitialize={orchestrator.planSummaryCanInitialize}
-              busy={orchestrator.planSummaryBusy}
+              busy={
+                orchestrator.planSummaryBusy ||
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.correctionBusy
+              }
               message={orchestrator.planSummaryMessage}
               reviewer={orchestrator.sharedReviewer}
               onReviewerChange={orchestrator.setSharedReviewer}
@@ -370,7 +382,10 @@ export function App({
             />
             <QuarantineQueue
               disabled={
-                orchestrator.intakeBusy || orchestrator.safetyReviewBusy
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
               }
               items={orchestrator.quarantineItems}
               reviewer={orchestrator.sharedReviewer}
@@ -388,7 +403,10 @@ export function App({
             />
             <ArtifactEligibilityReview
               disabled={
-                orchestrator.intakeBusy || orchestrator.safetyReviewBusy
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
               }
               items={orchestrator.eligibilityItems}
               reviewer={orchestrator.sharedReviewer}
@@ -405,6 +423,12 @@ export function App({
               }}
             />
             <ClassificationReview
+              disabled={
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
+              }
               items={orchestrator.classificationItems}
               dateCandidates={orchestrator.dateCandidateItems}
               reviewer={orchestrator.sharedReviewer}
@@ -427,6 +451,7 @@ export function App({
                 );
               }}
             />
+
             <div
               className="evidence-review-stage"
               aria-labelledby="evidence-review-stage-title"
@@ -502,6 +527,12 @@ export function App({
               <div id="evidence-review-content">{evidenceReviewContent}</div>
             </div>
             <RelationshipReview
+              disabled={
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
+              }
               items={orchestrator.relationshipItems}
               reviewer={orchestrator.sharedReviewer}
               rationale={orchestrator.sharedRationale}
@@ -517,6 +548,12 @@ export function App({
               }}
             />
             <PopulationReview
+              disabled={
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
+              }
               caseId={orchestrator.activeCase?.caseId ?? null}
               reviewRevision={orchestrator.populationReviewRevision}
               onPreviewRecord={orchestrator.previewPopulationRecord}
@@ -541,6 +578,12 @@ export function App({
               }}
             />
             <ArchitecturePolicyReview
+              disabled={
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
+              }
               items={orchestrator.architecturePolicyItems}
               reviewer={orchestrator.sharedReviewer}
               rationale={orchestrator.sharedRationale}
@@ -557,6 +600,12 @@ export function App({
             <CaseControlsReview
               enabled={
                 orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              disabled={
+                orchestrator.intakeBusy ||
+                orchestrator.safetyReviewBusy ||
+                orchestrator.planSummaryBusy ||
+                orchestrator.correctionBusy
               }
               message={orchestrator.caseControlsMessage}
               approved={orchestrator.caseControls}

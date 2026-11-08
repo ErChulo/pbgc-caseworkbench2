@@ -10,6 +10,7 @@ export interface ArchitecturePolicyReviewItem {
 
 export function ArchitecturePolicyReview({
   items,
+  disabled = false,
   reviewer,
   rationale,
   onReviewerChange,
@@ -17,6 +18,7 @@ export function ArchitecturePolicyReview({
   onApprove,
 }: {
   readonly items: readonly ArchitecturePolicyReviewItem[];
+  readonly disabled?: boolean;
   readonly reviewer: string;
   readonly rationale: string;
   readonly onReviewerChange: (value: string) => void;
@@ -99,6 +101,7 @@ export function ArchitecturePolicyReview({
               type="button"
               className="button button-secondary"
               disabled={
+                disabled ||
                 !item.eligibility ||
                 item.approval.status === "approved" ||
                 reviewer.trim() === "" ||
