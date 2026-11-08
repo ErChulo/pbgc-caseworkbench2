@@ -1206,6 +1206,7 @@ export function useCaseOrchestrator(
   const [populationReviewRevision, setPopulationReviewRevision] = useState(0);
   const populationDecisionInFlight = useRef(false);
   const priorSnapshot = useRef<PackageSnapshot | null>(null);
+  const intakeHistoryHash = useRef<Sha256 | null>(null);
   const inventoryCheckpoints = useRef(
     new Map<string, InventoryCheckpointReference>(),
   );
@@ -1616,6 +1617,7 @@ export function useCaseOrchestrator(
     outputRestoreBlockedRef.current = false;
     setOutputRestoreBlocked(false);
     priorSnapshot.current = null;
+    intakeHistoryHash.current = null;
     inventoryCheckpoints.current.clear();
     lastCheckpoint.current = null;
     quarantineHistory.current.clear();
@@ -4662,14 +4664,19 @@ export function useCaseOrchestrator(
     const intakeHistory = await activeWorkspace.openChunkReader(
       `cases/${caseRecord.caseId}/intake/events.jsonl`,
     );
+    let restoredIntakeHistoryHash: Sha256;
     try {
+      if (!intakeHistory.ok) {
+        reportRestoreFailure(INVALID_INTAKE_HISTORY_RESTORE_MESSAGE);
+        return;
+      }
+      const historyBytes = await readBoundedLocalBytes(
+        intakeHistory.value,
+        CASE_RESTORE_RECORD_MAX_BYTES,
+      );
       if (
-        !intakeHistory.ok ||
         !hasConsistentIntakeEventHistory(
-          await readBoundedLocalBytes(
-            intakeHistory.value,
-            CASE_RESTORE_RECORD_MAX_BYTES,
-          ),
+          historyBytes,
           caseRecord.caseId,
           current.snapshot.snapshotId,
         )
@@ -4677,6 +4684,7 @@ export function useCaseOrchestrator(
         reportRestoreFailure(INVALID_INTAKE_HISTORY_RESTORE_MESSAGE);
         return;
       }
+      restoredIntakeHistoryHash = await sha256Bytes(historyBytes);
     } catch {
       reportRestoreFailure(INVALID_INTAKE_HISTORY_RESTORE_MESSAGE);
       return;
@@ -4701,6 +4709,7 @@ export function useCaseOrchestrator(
     if (activeCaseId.current !== caseRecord.caseId) return;
     invalidateArchitectureBuild();
     priorSnapshot.current = current.snapshot;
+    intakeHistoryHash.current = restoredIntakeHistoryHash;
     lastCheckpoint.current = {
       manifestContentSha256: restoredManifestHash,
       attemptId: current.attemptId,
@@ -7154,8 +7163,10 @@ export function useCaseOrchestrator(
     const prior = priorSnapshot.current;
     if (
       prior === null
-        ? previousEvents.ok
+        ? previousEvents.ok || intakeHistoryHash.current !== null
         : !previousEvents.ok ||
+          intakeHistoryHash.current === null ||
+          (await sha256Bytes(previousBytes)) !== intakeHistoryHash.current ||
           !hasConsistentIntakeEventHistory(
             previousBytes,
             activeCase.caseId,
@@ -7226,9 +7237,11 @@ export function useCaseOrchestrator(
       expectedEvents,
       CASE_RESTORE_RECORD_MAX_BYTES,
     );
+    const updatedIntakeHistoryHash = await sha256Bytes(expectedEvents);
 
     invalidateArchitectureBuild();
     priorSnapshot.current = checkpointReference.snapshot;
+    intakeHistoryHash.current = updatedIntakeHistoryHash;
     inventoryCheckpoints.current.set(
       checkpointReference.snapshot.snapshotId,
       checkpointReference,

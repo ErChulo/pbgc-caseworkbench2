@@ -475,3 +475,67 @@ test("blocks malformed intake history on restoring the offline file", async ({
   expect(requests).toEqual([]);
   expect(outboundRequests).toEqual([]);
 });
+
+for (const restored of [false, true]) {
+  test(`blocks valid-looking intake history changes ${restored ? "after restore" : "in the same session"}`, async ({
+    offlinePage: page,
+  }) => {
+    const caseNumber = restored
+      ? "PBGC-HISTORY-PIN-RESTORED"
+      : "PBGC-HISTORY-PIN-LIVE";
+    await createSyntheticCase(page, caseNumber);
+    const picker = page.getByLabel("Add evidence files");
+    const file = {
+      name: "synthetic.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic pinned history."),
+    };
+    await picker.setInputFiles(file);
+    await expect(page.getByText("File inventory complete")).toBeVisible();
+    await expect(picker).toBeEnabled();
+    const caseId = await page.getByTestId("current-case-id").textContent();
+    if (!caseId) throw new Error("Case ID missing");
+    if (restored) {
+      await page
+        .getByRole("button", { name: "Return to workspace home" })
+        .click();
+      await page.getByRole("button", { name: `Open ${caseNumber}` }).click();
+      await expect(
+        page.getByText(
+          "Evidence restored from this case's persisted manifest.",
+        ),
+      ).toBeVisible();
+      await expect(picker).toBeEnabled();
+    }
+    const changed = await page.evaluate((id) => {
+      const files = (
+        globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+      ).__syntheticFiles;
+      const path = `cases/${id}/intake/events.jsonl`;
+      const bytes = files.get(path);
+      if (!bytes) throw new Error("History missing");
+      const event = JSON.parse(new TextDecoder().decode(bytes)) as {
+        items: unknown[];
+      };
+      if (!event.items.length) throw new Error("Expected an intake item");
+      event.items = [];
+      const changed = `${JSON.stringify(event)}\n`;
+      files.set(path, new TextEncoder().encode(changed));
+      return changed;
+    }, caseId);
+    await picker.setInputFiles(file);
+    await expect(
+      page.getByText(
+        /Intake did not finish. Some files or records may have been saved/,
+      ),
+    ).toBeVisible();
+    await expect(picker).toBeDisabled();
+    const after = await page.evaluate((id) => {
+      const bytes = (
+        globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+      ).__syntheticFiles.get(`cases/${id}/intake/events.jsonl`);
+      return bytes ? new TextDecoder().decode(bytes) : null;
+    }, caseId);
+    expect(after).toBe(changed);
+  });
+}

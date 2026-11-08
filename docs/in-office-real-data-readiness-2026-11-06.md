@@ -29,3 +29,5 @@ A later intake readback pass also detects changes to the event history during th
 Restoration now blocks when the standalone inventory snapshot is missing, oversized or inconsistent with the manifest; existing cases needing repair remain blocked pending governed recovery. The latest synthetic Chromium run passed 123 tests with 3 skipped. This does not authenticate case files or establish office readiness.
 
 Intake event envelopes and the terminal checkpoint are now checked on restore and before a subsequent append. This is not authenticated history or full replay, and cases with missing or inconsistent history need governed recovery. The latest full synthetic suite passed 1,215 unit/integration tests and 129 Chromium tests with 3 skipped; office readiness remains blocked.
+
+Intake-history bytes are now pinned for the active session and rechecked before subsequent appends; this does not authenticate the initially restored history. Latest synthetic results: 1,215 unit/integration tests and 131 Chromium tests passed, with 3 skipped. Office readiness remains blocked.
