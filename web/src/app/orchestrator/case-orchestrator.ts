@@ -1,3 +1,4 @@
+import { readVerifiedChunkSnapshot } from "../../adapters/filesystem/verified-chunk-snapshot";
 import {
   MAX_INTAKE_INSPECTION_BYTES,
   readVerifiedIntakeBytes,
@@ -1223,6 +1224,7 @@ export function useCaseOrchestrator(
   const [evidenceViewerArtifact, setEvidenceViewerArtifact] =
     useState<EvidenceViewerArtifact | null>(null);
   const [evidenceViewerLoading, setEvidenceViewerLoading] = useState(false);
+  const evidenceViewerSequence = useRef(0);
   const [evidenceViewerError, setEvidenceViewerError] = useState<string | null>(
     null,
   );
@@ -1561,6 +1563,7 @@ export function useCaseOrchestrator(
   };
 
   const resetCaseScopedState = (previewMode: boolean): void => {
+    evidenceViewerSequence.current += 1;
     outputRestoreSequence.current += 1;
     outputRestoringRef.current = false;
     setOutputRestoring(false);
@@ -3930,14 +3933,20 @@ export function useCaseOrchestrator(
         );
         return;
       }
-      const verified = await hashChunkReader(opened.value);
-      if (!verified.ok || verified.value.sha256 !== artifact.sha256) {
+      let sourceBytes: Uint8Array<ArrayBuffer>;
+      try {
+        sourceBytes = await readVerifiedChunkSnapshot(
+          opened.value,
+          artifact.sha256,
+          opened.value.sizeBytes,
+          MAX_INTAKE_INSPECTION_BYTES,
+        );
+      } catch {
         clearGovernedEvidenceRecords(
-          "Candidate extraction failed preserved-byte verification.",
+          "Candidate extraction failed preserved-byte verification or size limits.",
         );
         return;
       }
-      const sourceBytes = await readAllBytes(opened.value);
       let passive = inspectPassive(artifact.locator, sourceBytes);
       if (
         passive.status === "success" &&
@@ -5287,8 +5296,20 @@ export function useCaseOrchestrator(
   };
 
   const openEvidence = async (item: ArtifactInventoryItem): Promise<void> => {
+    const request = ++evidenceViewerSequence.current;
+    setEvidenceViewerArtifact(null);
+    setEvidenceViewerLoading(false);
+    setEvidenceViewerError(null);
     const activeWorkspace = workspace.current;
     const selectedCase = activeCase;
+    const selectedSnapshot = priorSnapshot.current;
+    const selectedPath = item.path;
+    const selectedSize = item.sizeBytes;
+    const isCurrent = () =>
+      evidenceViewerSequence.current === request &&
+      workspace.current === activeWorkspace &&
+      activeCaseId.current === selectedCase?.caseId &&
+      priorSnapshot.current === selectedSnapshot;
     if (
       activeWorkspace === null ||
       selectedCase === null ||
@@ -5302,7 +5323,11 @@ export function useCaseOrchestrator(
       setEvidenceViewerError("The artifact identity is invalid.");
       return;
     }
-    if (item.sizeBytes > 128 * 1024 * 1024) {
+    if (
+      !Number.isSafeInteger(selectedSize) ||
+      selectedSize < 0 ||
+      selectedSize > 128 * 1024 * 1024
+    ) {
       setEvidenceViewerError(
         "This artifact exceeds the 128 MiB bounded in-app preview limit. Its original bytes remain preserved.",
       );
@@ -5315,14 +5340,16 @@ export function useCaseOrchestrator(
       const opened = await activeWorkspace.openChunkReader(
         contentObjectPath(artifactSha256.value),
       );
-      if (!opened.ok || opened.value.sizeBytes !== item.sizeBytes) {
+      if (!opened.ok || opened.value.sizeBytes !== selectedSize) {
         throw new Error("Preserved evidence could not be opened or sized.");
       }
-      const verified = await hashChunkReader(opened.value);
-      if (!verified.ok || verified.value.sha256 !== artifactSha256.value) {
-        throw new Error("Preserved evidence failed SHA-256 verification.");
-      }
-      const bytes = await readAllBytes(opened.value);
+      const bytes = await readVerifiedChunkSnapshot(
+        opened.value,
+        artifactSha256.value,
+        selectedSize,
+        128 * 1024 * 1024,
+      );
+      if (!isCurrent()) return;
       let extraction: EvidenceExtraction | null = null;
       let correction: EvidenceTextCorrection | null = null;
       let extractionWarning: string | null = null;
@@ -5344,38 +5371,39 @@ export function useCaseOrchestrator(
         extraction = null;
         correction = null;
       }
-      if (activeCaseId.current !== selectedCase.caseId) return;
+      if (!isCurrent()) return;
       const declaredMediaType = priorSnapshot.current?.entries.find(
         (entry) =>
           entry.sha256 === artifactSha256.value &&
-          entry.observedRelativePath === item.path,
+          entry.observedRelativePath === selectedPath,
       )?.declaredMediaType;
       setEvidenceViewerArtifact({
-        path: item.path,
+        path: selectedPath,
         sha256: artifactSha256.value,
         mediaType:
           extraction?.mediaType ??
           (declaredMediaType === "" ? null : declaredMediaType) ??
-          inferEvidenceMediaType(item.path),
+          inferEvidenceMediaType(selectedPath),
         bytes,
         extraction,
         correction,
       });
       setEvidenceViewerError(extractionWarning);
     } catch {
-      if (activeCaseId.current === selectedCase.caseId) {
+      if (isCurrent()) {
         setEvidenceViewerError(
           "Evidence could not be opened because its preserved bytes failed local integrity verification.",
         );
       }
     } finally {
-      if (activeCaseId.current === selectedCase.caseId) {
+      if (isCurrent()) {
         setEvidenceViewerLoading(false);
       }
     }
   };
 
   const closeEvidence = (): void => {
+    evidenceViewerSequence.current += 1;
     setEvidenceViewerArtifact(null);
     setEvidenceViewerError(null);
     setEvidenceViewerLoading(false);
@@ -5386,6 +5414,7 @@ export function useCaseOrchestrator(
   ): Promise<void> => {
     const selectedCase = activeCase;
     const artifact = evidenceViewerArtifact;
+    const viewerRequest = evidenceViewerSequence.current;
     const evidenceSnapshotId = priorSnapshot.current?.snapshotId ?? null;
     if (
       selectedCase === null ||
@@ -5539,8 +5568,10 @@ export function useCaseOrchestrator(
     setDateCandidateItems(nextDateItems);
     setRelationshipItems(nextRelationshipItems);
     setPopulationItems(nextPopulationItems);
-    setEvidenceViewerArtifact({ ...artifact, correction });
-    setEvidenceViewerError(null);
+    if (viewerRequest === evidenceViewerSequence.current) {
+      setEvidenceViewerArtifact({ ...artifact, correction });
+      setEvidenceViewerError(null);
+    }
     await refreshGovernedEvidenceRecords(selectedCase.caseId);
   };
 
@@ -5553,6 +5584,7 @@ export function useCaseOrchestrator(
     if (activeWorkspace === null || activeCase === null) {
       throw new Error("Controlled workspace is unavailable.");
     }
+    closeEvidence();
     const priorEntries = priorSnapshot.current?.entries ?? [];
     const selections = files
       .map((file) => ({
