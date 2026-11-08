@@ -30,6 +30,18 @@ describe("case review persistence", () => {
     });
   });
 
+  it("does not hash an old snapshot ID into a new snapshot", async () => {
+    const first = await createCaseReviewSnapshot(payload());
+    const next = await createCaseReviewSnapshot({
+      ...first,
+      dateSelections: [],
+    });
+    expect(next.reviewSnapshotId).toBe(first.reviewSnapshotId);
+    await expect(
+      parseCaseReviewSnapshot(JSON.parse(JSON.stringify(next)) as unknown),
+    ).resolves.toMatchObject({ ok: true });
+  });
+
   it("rejects review content that no longer matches its content hash", async () => {
     const snapshot = await createCaseReviewSnapshot(payload());
     const tampered = {

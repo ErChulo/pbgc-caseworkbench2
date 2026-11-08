@@ -101,10 +101,17 @@ export function createEmptyCaseReviewState(): CaseReviewState {
 export async function createCaseReviewSnapshot(
   payload: CaseReviewSnapshotPayload,
 ): Promise<PersistedCaseReviewSnapshot> {
+  // A structurally typed caller can accidentally pass a restored snapshot,
+  // including its old ID. Never hash that prior envelope into the new ID.
+  const { reviewSnapshotId: oldId, ...cleanPayload } =
+    payload as CaseReviewSnapshotPayload & {
+      readonly reviewSnapshotId?: unknown;
+    };
+  void oldId;
   const reviewSnapshotId = asSha256(
-    await hashTyped(payload, { typeName: "CaseReviewSnapshot" }),
+    await hashTyped(cleanPayload, { typeName: "CaseReviewSnapshot" }),
   );
-  return Object.freeze({ ...payload, reviewSnapshotId });
+  return Object.freeze({ ...cleanPayload, reviewSnapshotId });
 }
 
 export async function parseCaseReviewSnapshot(

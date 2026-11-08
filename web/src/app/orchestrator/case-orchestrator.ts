@@ -2544,6 +2544,8 @@ export function useCaseOrchestrator(
     await refreshGovernedEvidenceRecords(activeCase.caseId);
   };
 
+  const isReviewRestoreBlocked = (): boolean =>
+    evidenceRestoreBlockedRef.current;
   const runSafetyReview = async (
     operation: () => Promise<void>,
   ): Promise<void> => {
@@ -2563,6 +2565,10 @@ export function useCaseOrchestrator(
     setSafetyReviewBusy(true);
     try {
       await operation();
+    } catch (error) {
+      // A failed persisted write has already put the case into a visible
+      // blocked state. Do not surface it as an unhandled UI promise rejection.
+      if (!isReviewRestoreBlocked()) throw error;
     } finally {
       safetyReviewInFlight.current = false;
       setSafetyReviewBusy(false);
@@ -3133,14 +3139,80 @@ export function useCaseOrchestrator(
     return true;
   };
 
+  const blockUnverifiedReviewWrite = (
+    caseId: Uuid,
+    selectedWorkspace: BrowserDirectoryWorkspace,
+  ): void => {
+    if (
+      activeCaseId.current !== caseId ||
+      workspace.current !== selectedWorkspace
+    )
+      return;
+    evidenceRestoreBlockedRef.current = true;
+    setEvidenceRestoreBlocked(true);
+    setEvidenceRestoreMessage(
+      "The review event or snapshot may have been saved but could not be verified. Inspect the workspace and reopen the case before retrying.",
+    );
+    clearGovernedEvidenceRecords(
+      "Review persistence could not be verified. Governed evidence is blocked.",
+    );
+  };
+
+  const verifyLocalBytes = async (
+    selectedWorkspace: BrowserDirectoryWorkspace,
+    path: string,
+    expected: Uint8Array,
+    maxBytes: number,
+  ): Promise<void> => {
+    const reopened = await selectedWorkspace.openChunkReader(path);
+    if (!reopened.ok) throw new Error("Review record could not be reopened.");
+    const actual = await readBoundedLocalBytes(reopened.value, maxBytes);
+    if (
+      actual.byteLength !== expected.byteLength ||
+      actual.some((byte, index) => byte !== expected[index])
+    )
+      throw new Error("Review record failed byte-for-byte readback.");
+  };
+
   const appendReviewEvent = async (event: object): Promise<void> => {
     const activeWorkspace = workspace.current;
-    if (!activeWorkspace) throw new Error("Workspace unavailable.");
-    const saved = await activeWorkspace.append(
-      `cases/${activeCase?.caseId ?? "unavailable"}/reviews/events.jsonl`,
-      new TextEncoder().encode(`${canonicalize(event)}\n`),
-    );
-    if (!saved.ok) throw new Error("Review event could not be preserved.");
+    const caseId = activeCaseId.current;
+    if (!activeWorkspace || caseId === null)
+      throw new Error("Workspace or active case unavailable.");
+    try {
+      const path = `cases/${caseId}/reviews/events.jsonl`;
+      const eventBytes = new TextEncoder().encode(`${canonicalize(event)}\n`);
+      const opened = await activeWorkspace.openChunkReader(path);
+      if (!opened.ok && opened.error.code !== "NOT_FOUND")
+        throw new Error("Review event history could not be inspected.");
+      const prior = opened.ok
+        ? await readBoundedLocalBytes(
+            opened.value,
+            CASE_RESTORE_RECORD_MAX_BYTES,
+          )
+        : new Uint8Array();
+      if (
+        prior.byteLength + eventBytes.byteLength >
+        CASE_RESTORE_RECORD_MAX_BYTES
+      )
+        throw new Error(
+          "Review event history exceeds the supported local limit.",
+        );
+      const expected = new Uint8Array(prior.byteLength + eventBytes.byteLength);
+      expected.set(prior);
+      expected.set(eventBytes, prior.byteLength);
+      const saved = await activeWorkspace.append(path, eventBytes);
+      if (!saved.ok) throw new Error("Review event could not be preserved.");
+      await verifyLocalBytes(
+        activeWorkspace,
+        path,
+        expected,
+        CASE_RESTORE_RECORD_MAX_BYTES,
+      );
+    } catch (error) {
+      blockUnverifiedReviewWrite(caseId, activeWorkspace);
+      throw error;
+    }
   };
 
   const persistCaseReviewState = async (
@@ -3151,64 +3223,98 @@ export function useCaseOrchestrator(
   ): Promise<void> => {
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) throw new Error("Workspace unavailable.");
-    const snapshot = await createCaseReviewSnapshot({
-      schemaVersion: "1.0.0",
-      caseId,
-      evidenceSnapshotId,
-      ...state,
-    });
-    const snapshotBytes = new TextEncoder().encode(
-      `${canonicalize(snapshot)}\n`,
-    );
-    requireRestorableRecordSize(snapshotBytes);
-    await activeWorkspace.createDirectory(`cases/${caseId}/reviews`);
-    await activeWorkspace.createDirectory(`cases/${caseId}/reviews/snapshots`);
-    const snapshotPath = `cases/${caseId}/reviews/snapshots/${snapshot.reviewSnapshotId}.json`;
-    const existing = await activeWorkspace.openChunkReader(snapshotPath);
-    if (existing.ok) {
-      let parsed: Awaited<ReturnType<typeof parseCaseReviewSnapshot>>;
-      try {
-        parsed = await parseCaseReviewSnapshot(
+    try {
+      const snapshot = await createCaseReviewSnapshot({
+        ...state,
+        schemaVersion: "1.0.0",
+        caseId,
+        evidenceSnapshotId,
+      });
+      const snapshotBytes = new TextEncoder().encode(
+        `${canonicalize(snapshot)}\n`,
+      );
+      requireRestorableRecordSize(snapshotBytes);
+      const directory = await activeWorkspace.createDirectory(
+        `cases/${caseId}/reviews`,
+      );
+      const snapshotDirectory = await activeWorkspace.createDirectory(
+        `cases/${caseId}/reviews/snapshots`,
+      );
+      if (!directory.ok || !snapshotDirectory.ok)
+        throw new Error("Review directories could not be created.");
+      const snapshotPath = `cases/${caseId}/reviews/snapshots/${snapshot.reviewSnapshotId}.json`;
+      const existing = await activeWorkspace.openChunkReader(snapshotPath);
+      if (existing.ok) {
+        const bytes = await readBoundedLocalBytes(
+          existing.value,
+          CASE_RESTORE_RECORD_MAX_BYTES,
+        );
+        const parsed = await parseCaseReviewSnapshot(
           JSON.parse(
-            new TextDecoder("utf-8", { fatal: true }).decode(
-              await readBoundedLocalBytes(
-                existing.value,
-                CASE_RESTORE_RECORD_MAX_BYTES,
-              ),
-            ),
+            new TextDecoder("utf-8", { fatal: true }).decode(bytes),
           ) as unknown,
         );
-      } catch {
-        throw new Error("Existing review snapshot is invalid.");
+        if (
+          !parsed.ok ||
+          parsed.value.reviewSnapshotId !== snapshot.reviewSnapshotId ||
+          canonicalize(parsed.value) !== canonicalize(snapshot)
+        )
+          throw new Error("Existing review snapshot is invalid.");
+      } else {
+        if (existing.error.code !== "NOT_FOUND")
+          throw new Error("Review snapshot could not be inspected.");
+        const saved = await activeWorkspace.createImmutable(
+          snapshotPath,
+          bytesReader(snapshotBytes),
+        );
+        if (!saved.ok)
+          throw new Error("Review snapshot could not be preserved.");
+        await verifyLocalBytes(
+          activeWorkspace,
+          snapshotPath,
+          snapshotBytes,
+          CASE_RESTORE_RECORD_MAX_BYTES,
+        );
       }
-      if (
-        !parsed.ok ||
-        parsed.value.reviewSnapshotId !== snapshot.reviewSnapshotId
-      ) {
-        throw new Error("Existing review snapshot is invalid.");
-      }
-    } else {
-      if (existing.error.code !== "NOT_FOUND") {
-        throw new Error("Review snapshot could not be inspected.");
-      }
-      const saved = await activeWorkspace.createImmutable(
-        snapshotPath,
-        bytesReader(snapshotBytes),
+      requireCurrent?.();
+      const pointerPath = `cases/${caseId}/reviews/current.json`;
+      const pointerBytes = new TextEncoder().encode(
+        `${canonicalize({ reviewSnapshotId: snapshot.reviewSnapshotId, writtenAt: dependencies.clock.now() })}\n`,
       );
-      if (!saved.ok) throw new Error("Review snapshot could not be preserved.");
+      const pointerSaved = await activeWorkspace.writeAtomic(
+        pointerPath,
+        pointerBytes,
+      );
+      if (!pointerSaved.ok)
+        throw new Error("Review pointer could not be preserved.");
+      await verifyLocalBytes(
+        activeWorkspace,
+        pointerPath,
+        pointerBytes,
+        CASE_RESTORE_POINTER_MAX_BYTES,
+      );
+      // Verify the exact snapshot again after pointer publication. Existing
+      // equivalent snapshots may have noncanonical whitespace, so parse them.
+      const confirmed = await activeWorkspace.openChunkReader(snapshotPath);
+      if (!confirmed.ok)
+        throw new Error("Review snapshot could not be reopened.");
+      const checked = await parseCaseReviewSnapshot(
+        JSON.parse(
+          new TextDecoder("utf-8", { fatal: true }).decode(
+            await readBoundedLocalBytes(
+              confirmed.value,
+              CASE_RESTORE_RECORD_MAX_BYTES,
+            ),
+          ),
+        ) as unknown,
+      );
+      if (!checked.ok || canonicalize(checked.value) !== canonicalize(snapshot))
+        throw new Error("Review snapshot failed readback verification.");
+      requireCurrent?.();
+    } catch (error) {
+      blockUnverifiedReviewWrite(caseId, activeWorkspace);
+      throw error;
     }
-    requireCurrent?.();
-    const pointerSaved = await activeWorkspace.writeAtomic(
-      `cases/${caseId}/reviews/current.json`,
-      new TextEncoder().encode(
-        `${canonicalize({
-          reviewSnapshotId: snapshot.reviewSnapshotId,
-          writtenAt: dependencies.clock.now(),
-        })}\n`,
-      ),
-    );
-    if (!pointerSaved.ok)
-      throw new Error("Review pointer could not be preserved.");
   };
 
   const persistEvidenceExtraction = async (
@@ -3755,8 +3861,19 @@ export function useCaseOrchestrator(
         }),
       );
       if (activeCaseId.current !== caseRecord.caseId) return;
+      const {
+        reviewSnapshotId: discardedReviewId,
+        caseId: discardedCaseId,
+        evidenceSnapshotId: discardedEvidenceId,
+        schemaVersion: discardedSchema,
+        ...restoredState
+      } = restored;
+      void discardedReviewId;
+      void discardedCaseId;
+      void discardedEvidenceId;
+      void discardedSchema;
       const projectedState: CaseReviewState = {
-        ...restored,
+        ...restoredState,
         quarantineItems: projectedQuarantineWithEligibility,
         eligibilityItems: projectedEligibilityItems,
         classificationItems: projectedClassificationItems,
@@ -4829,10 +4946,10 @@ export function useCaseOrchestrator(
         planSummaryRecord: record,
       };
       const expectedSnapshot = await createCaseReviewSnapshot({
+        ...nextState,
         schemaVersion: "1.0.0",
         caseId: selectedCase.caseId,
         evidenceSnapshotId: selectedSnapshot.snapshotId,
-        ...nextState,
       });
       requireCurrent();
       writeAttempted = true;
@@ -6863,10 +6980,10 @@ export function useCaseOrchestrator(
     // Do not publish a checkpoint that already has a review snapshot too large
     // to reopen. A concurrent review can still change the state before saving.
     const reviewPreflight = await createCaseReviewSnapshot({
+      ...caseReviewState.current,
       schemaVersion: "1.0.0",
       caseId: activeCase.caseId,
       evidenceSnapshotId: checkpointReference.snapshot.snapshotId,
-      ...caseReviewState.current,
     });
     requireRestorableRecordSize(
       new TextEncoder().encode(`${canonicalize(reviewPreflight)}\n`),
