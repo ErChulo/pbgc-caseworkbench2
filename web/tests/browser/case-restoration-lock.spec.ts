@@ -95,7 +95,7 @@ test("blocks intake when the existing evidence pointer cannot be verified", asyn
   await expect(page.getByLabel("Add evidence files")).toBeDisabled();
   await expect(
     page.getByText(
-      /File intake and case actions are blocked because case restoration could not be verified/,
+      /File intake and case actions are blocked because case state could not be verified/,
     ),
   ).toBeVisible();
   await expect(

@@ -1,3 +1,8 @@
+import {
+  CASE_RESTORE_POINTER_MAX_BYTES,
+  CASE_RESTORE_RECORD_MAX_BYTES,
+  requireRestorableRecordSize,
+} from "./case-restoration-limits";
 import { readBoundedLocalBytes } from "../../adapters/filesystem/bounded-local-read";
 import { verifyDraftV1SummaryArtifact } from "../../domain/draft-v1-summary/verification";
 import { readVerifiedChunkSnapshot } from "../../adapters/filesystem/verified-chunk-snapshot";
@@ -3017,6 +3022,10 @@ export function useCaseOrchestrator(
       evidenceSnapshotId,
       ...state,
     });
+    const snapshotBytes = new TextEncoder().encode(
+      `${canonicalize(snapshot)}\n`,
+    );
+    requireRestorableRecordSize(snapshotBytes);
     await activeWorkspace.createDirectory(`cases/${caseId}/reviews`);
     await activeWorkspace.createDirectory(`cases/${caseId}/reviews/snapshots`);
     const snapshotPath = `cases/${caseId}/reviews/snapshots/${snapshot.reviewSnapshotId}.json`;
@@ -3027,7 +3036,10 @@ export function useCaseOrchestrator(
         parsed = await parseCaseReviewSnapshot(
           JSON.parse(
             new TextDecoder("utf-8", { fatal: true }).decode(
-              await readAllBytes(existing.value),
+              await readBoundedLocalBytes(
+                existing.value,
+                CASE_RESTORE_RECORD_MAX_BYTES,
+              ),
             ),
           ) as unknown,
         );
@@ -3046,7 +3058,7 @@ export function useCaseOrchestrator(
       }
       const saved = await activeWorkspace.createImmutable(
         snapshotPath,
-        bytesReader(new TextEncoder().encode(`${canonicalize(snapshot)}\n`)),
+        bytesReader(snapshotBytes),
       );
       if (!saved.ok) throw new Error("Review snapshot could not be preserved.");
     }
@@ -3300,7 +3312,10 @@ export function useCaseOrchestrator(
       const pointer = parseCaseReviewPointer(
         JSON.parse(
           new TextDecoder("utf-8", { fatal: true }).decode(
-            await readAllBytes(pointerOpened.value),
+            await readBoundedLocalBytes(
+              pointerOpened.value,
+              CASE_RESTORE_POINTER_MAX_BYTES,
+            ),
           ),
         ) as unknown,
       );
@@ -3312,7 +3327,10 @@ export function useCaseOrchestrator(
       const parsed = await parseCaseReviewSnapshot(
         JSON.parse(
           new TextDecoder("utf-8", { fatal: true }).decode(
-            await readAllBytes(snapshotOpened.value),
+            await readBoundedLocalBytes(
+              snapshotOpened.value,
+              CASE_RESTORE_RECORD_MAX_BYTES,
+            ),
           ),
         ) as unknown,
       );
@@ -4204,7 +4222,10 @@ export function useCaseOrchestrator(
     try {
       pointerValue = JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(pointerOpened.value),
+          await readBoundedLocalBytes(
+            pointerOpened.value,
+            CASE_RESTORE_POINTER_MAX_BYTES,
+          ),
         ),
       ) as unknown;
     } catch {
@@ -4231,7 +4252,10 @@ export function useCaseOrchestrator(
     try {
       manifestValue = JSON.parse(
         new TextDecoder("utf-8", { fatal: true }).decode(
-          await readAllBytes(manifestOpened.value),
+          await readBoundedLocalBytes(
+            manifestOpened.value,
+            CASE_RESTORE_RECORD_MAX_BYTES,
+          ),
         ),
       ) as unknown;
     } catch {
@@ -6284,7 +6308,10 @@ export function useCaseOrchestrator(
         try {
           const value = JSON.parse(
             new TextDecoder("utf-8", { fatal: true }).decode(
-              await readAllBytes(existingManifest.value),
+              await readBoundedLocalBytes(
+                existingManifest.value,
+                CASE_RESTORE_RECORD_MAX_BYTES,
+              ),
             ),
           ) as unknown;
           const parsed = parsePersistedCheckpoint(value);
@@ -6383,6 +6410,10 @@ export function useCaseOrchestrator(
         reconciliation,
         downstreamBlocked: true,
       });
+      const manifestBytes = new TextEncoder().encode(
+        `${canonicalize(checkpoint)}\n`,
+      );
+      requireRestorableRecordSize(manifestBytes);
       await activeWorkspace.createDirectory(
         `cases/${activeCase.caseId}/snapshots`,
       );
@@ -6401,9 +6432,6 @@ export function useCaseOrchestrator(
       await activeWorkspace.createDirectory(
         `cases/${activeCase.caseId}/manifests`,
       );
-      const manifestBytes = new TextEncoder().encode(
-        `${canonicalize(checkpoint)}\n`,
-      );
       const saved = await activeWorkspace.createImmutable(
         manifestPath,
         bytesReader(manifestBytes),
@@ -6419,6 +6447,17 @@ export function useCaseOrchestrator(
         artifacts: checkpoint.artifacts,
       };
     }
+    // Do not publish a checkpoint that already has a review snapshot too large
+    // to reopen. A concurrent review can still change the state before saving.
+    const reviewPreflight = await createCaseReviewSnapshot({
+      schemaVersion: "1.0.0",
+      caseId: activeCase.caseId,
+      evidenceSnapshotId: checkpointReference.snapshot.snapshotId,
+      ...caseReviewState.current,
+    });
+    requireRestorableRecordSize(
+      new TextEncoder().encode(`${canonicalize(reviewPreflight)}\n`),
+    );
     await activeWorkspace.createDirectory(`cases/${activeCase.caseId}/intake`);
     const intakeEventSaved = await activeWorkspace.append(
       `cases/${activeCase.caseId}/intake/events.jsonl`,
@@ -6711,7 +6750,18 @@ export function useCaseOrchestrator(
     approvePlanSummaryAttribute: approvePlanSummaryAttributeAction,
     approveFormula: approveFormulaAction,
     recordArchitectureSelection,
-    processPackage,
+    processPackage: async (files, signal, update) => {
+      try {
+        return await processPackage(files, signal, update);
+      } catch (error) {
+        evidenceRestoreBlockedRef.current = true;
+        setEvidenceRestoreBlocked(true);
+        setEvidenceRestoreMessage(
+          "Intake did not finish. Some files or records may have been saved. Return to workspace home, inspect the workspace, and reopen the case before retrying.",
+        );
+        throw error;
+      }
+    },
     openEvidence,
     saveEvidenceCorrection,
     closeEvidence,

@@ -117,7 +117,7 @@ export function PackageIntake({
       {!enabled && (
         <p className="form-message form-message-warning">
           {restoreBlocked
-            ? "File intake and case actions are blocked because case restoration could not be verified. Inspect the workspace and reopen the case."
+            ? "File intake and case actions are blocked because case state could not be verified. Inspect the workspace and reopen the case. Restoration accepts pointers up to 64 KiB and records up to 16 MiB."
             : "Create or resume a case before adding files."}
         </p>
       )}
