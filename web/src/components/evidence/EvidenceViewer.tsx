@@ -147,7 +147,10 @@ function CorrectionEditor({
         id="evidence-corrected-text"
         rows={12}
         value={value}
+        disabled={saving}
         onChange={(event) => {
+          setMessage(null);
+          setError(null);
           setValue(event.target.value);
         }}
       />

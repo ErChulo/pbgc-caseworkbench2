@@ -1225,6 +1225,7 @@ export function useCaseOrchestrator(
     useState<EvidenceViewerArtifact | null>(null);
   const [evidenceViewerLoading, setEvidenceViewerLoading] = useState(false);
   const evidenceViewerSequence = useRef(0);
+  const correctionSaveInFlight = useRef(false);
   const [evidenceViewerError, setEvidenceViewerError] = useState<string | null>(
     null,
   );
@@ -3144,7 +3145,10 @@ export function useCaseOrchestrator(
   const persistEvidenceCorrection = async (
     caseId: Uuid,
     correction: EvidenceTextCorrection,
+    requireCurrent: () => void,
+    beforePointerWrite: () => void,
   ): Promise<EvidenceTextCorrection> => {
+    requireCurrent();
     const activeWorkspace = workspace.current;
     if (activeWorkspace === null) throw new Error("Workspace unavailable.");
     const artifactSha256 = correction.artifactSha256;
@@ -3180,6 +3184,8 @@ export function useCaseOrchestrator(
         throw new Error("Existing evidence correction is invalid.");
       }
     }
+    requireCurrent();
+    beforePointerWrite();
     const pointerSaved = await activeWorkspace.writeAtomic(
       `cases/${caseId}/corrections/${artifactSha256}/current.json`,
       new TextEncoder().encode(
@@ -3192,6 +3198,7 @@ export function useCaseOrchestrator(
     if (!pointerSaved.ok) {
       throw new Error("Evidence correction pointer could not be preserved.");
     }
+    requireCurrent();
     return correction;
   };
 
@@ -5412,12 +5419,19 @@ export function useCaseOrchestrator(
   const saveEvidenceCorrection = async (
     correctedText: string,
   ): Promise<void> => {
+    if (correctionSaveInFlight.current)
+      throw new Error(
+        "Another correction save is in progress. Wait for it to finish.",
+      );
     const selectedCase = activeCase;
+    const selectedWorkspace = workspace.current;
+    const selectedSnapshot = priorSnapshot.current;
     const artifact = evidenceViewerArtifact;
     const viewerRequest = evidenceViewerSequence.current;
     const evidenceSnapshotId = priorSnapshot.current?.snapshotId ?? null;
     if (
       selectedCase === null ||
+      selectedWorkspace === null ||
       artifact?.extraction == null ||
       reviewerIdentity === null ||
       evidenceSnapshotId === null
@@ -5429,61 +5443,79 @@ export function useCaseOrchestrator(
     const artifactSha256 = parseSha256(artifact.sha256);
     if (!artifactSha256.ok) throw new Error("Artifact identity is invalid.");
     const reviewState = caseReviewState.current;
-    const quarantineDecisions = [
-      ...(quarantineHistory.current.get(artifact.sha256) ?? []),
-    ];
-    const sensitiveRisk = await screenSensitiveText(
-      correctedText,
-      artifactSha256.value,
-      {
-        authorizedRealPii: false,
-        expectedFields: [],
-        maximumSensitiveMatches: 8,
-      },
-    );
-    const blockingFindings = sensitiveRisk.findings.filter(
-      (finding) => finding.blocksDownstream,
-    );
-    if (blockingFindings.length > 0) {
-      const release = await replayQuarantineDecisions(
-        artifactSha256.value,
-        quarantineDecisions,
-      );
-      const effectiveDecision = release.ok
-        ? quarantineDecisions.find(
-            (decision) =>
-              decision.decisionId === release.value.effectiveDecisionId,
-          )
-        : undefined;
+    const history = quarantineHistory.current.get(artifact.sha256);
+    const quarantineDecisions = [...(history ?? [])];
+    const requireCurrent = () => {
       if (
-        !release.ok ||
-        !release.value.eligible ||
-        effectiveDecision === undefined ||
-        blockingFindings.some(
-          (finding) =>
-            !effectiveDecision.findingIds.includes(finding.findingId),
-        )
-      ) {
+        activeCaseId.current !== selectedCase.caseId ||
+        workspace.current !== selectedWorkspace ||
+        priorSnapshot.current !== selectedSnapshot ||
+        evidenceViewerSequence.current !== viewerRequest ||
+        caseReviewState.current !== reviewState ||
+        quarantineHistory.current.get(artifact.sha256) !== history
+      )
         throw new Error(
-          "Corrected text was not saved because it introduced sensitive-data findings that are not covered by an effective same-artifact release.",
+          "Case evidence or review changed. Open the source and review the correction again.",
         );
+    };
+    correctionSaveInFlight.current = true;
+    const writeState: { attempted: boolean } = { attempted: false };
+    try {
+      requireCurrent();
+      const sensitiveRisk = await screenSensitiveText(
+        correctedText,
+        artifactSha256.value,
+        {
+          authorizedRealPii: false,
+          expectedFields: [],
+          maximumSensitiveMatches: 8,
+        },
+      );
+      const blockingFindings = sensitiveRisk.findings.filter(
+        (finding) => finding.blocksDownstream,
+      );
+      if (blockingFindings.length > 0) {
+        const release = await replayQuarantineDecisions(
+          artifactSha256.value,
+          quarantineDecisions,
+        );
+        const effectiveDecision = release.ok
+          ? quarantineDecisions.find(
+              (decision) =>
+                decision.decisionId === release.value.effectiveDecisionId,
+            )
+          : undefined;
+        if (
+          !release.ok ||
+          !release.value.eligible ||
+          effectiveDecision === undefined ||
+          blockingFindings.some(
+            (finding) =>
+              !effectiveDecision.findingIds.includes(finding.findingId),
+          )
+        ) {
+          throw new Error(
+            "Corrected text was not saved because it introduced sensitive-data findings that are not covered by an effective same-artifact release.",
+          );
+        }
       }
-    }
-    const correction = await createEvidenceTextCorrection({
-      schemaVersion: "1.0.0",
-      artifactSha256: artifactSha256.value,
-      extractionContentSha256: artifact.extraction.extractionContentSha256,
-      correctedText,
-      correctedBy: reviewerIdentity.displayName,
-      correctedAt: dependencies.clock.now(),
-    });
-    const analysisSourceLocator = `correction:${correction.correctionContentSha256}`;
-    const proposals = [
-      ...new Map(
-        (
-          await Promise.all(
-            evidenceClassificationScopes(correctedText, artifact.mediaType).map(
-              (scope) =>
+      const correction = await createEvidenceTextCorrection({
+        schemaVersion: "1.0.0",
+        artifactSha256: artifactSha256.value,
+        extractionContentSha256: artifact.extraction.extractionContentSha256,
+        correctedText,
+        correctedBy: reviewerIdentity.displayName,
+        correctedAt: dependencies.clock.now(),
+      });
+      const analysisSourceLocator = `correction:${correction.correctionContentSha256}`;
+      const proposals = [
+        ...new Map(
+          (
+            await Promise.all(
+              evidenceClassificationScopes(
+                correctedText,
+                artifact.mediaType,
+              ).map((scope) =>
                 proposeClassifications({
                   artifactSha256: artifactSha256.value,
                   filename: artifact.path,
@@ -5494,85 +5526,104 @@ export function useCaseOrchestrator(
                     ? {}
                     : { textLocator: scope.textLocator }),
                 }),
-            ),
+              ),
+            )
           )
-        )
-          .flat()
-          .map((proposal) => [proposal.proposalKey, proposal] as const),
-      ).values(),
-    ];
-    const nextClassificationItems: ClassificationReviewItem[] = [
-      ...reviewState.classificationItems.filter(
-        (item) => item.proposal.artifactSha256 !== artifactSha256.value,
-      ),
-      ...proposals.map(
-        (proposal) =>
-          reviewState.classificationItems.find(
-            (item) => item.proposal.proposalKey === proposal.proposalKey,
-          ) ?? {
-            displayName: artifact.path,
-            proposal,
-            effectiveStatus: "provisional" as const,
-            reviewer: null,
-            rationale: null,
-            provenanceCount: 0,
-          },
-      ),
-    ];
-    const dateCandidates = await extractDateCandidates(
-      artifactSha256.value,
-      correctedText,
-      analysisSourceLocator,
-    );
-    const nextDateItems: DateCandidateReviewItem[] = [
-      ...reviewState.dateCandidateItems.filter(
+            .flat()
+            .map((proposal) => [proposal.proposalKey, proposal] as const),
+        ).values(),
+      ];
+      const nextClassificationItems: ClassificationReviewItem[] = [
+        ...reviewState.classificationItems.filter(
+          (item) => item.proposal.artifactSha256 !== artifactSha256.value,
+        ),
+        ...proposals.map(
+          (proposal) =>
+            reviewState.classificationItems.find(
+              (item) => item.proposal.proposalKey === proposal.proposalKey,
+            ) ?? {
+              displayName: artifact.path,
+              proposal,
+              effectiveStatus: "provisional" as const,
+              reviewer: null,
+              rationale: null,
+              provenanceCount: 0,
+            },
+        ),
+      ];
+      const dateCandidates = await extractDateCandidates(
+        artifactSha256.value,
+        correctedText,
+        analysisSourceLocator,
+      );
+      const nextDateItems: DateCandidateReviewItem[] = [
+        ...reviewState.dateCandidateItems.filter(
+          (item) => item.candidate.artifactSha256 !== artifactSha256.value,
+        ),
+        ...dateCandidates.map(
+          (candidate) =>
+            reviewState.dateCandidateItems.find(
+              (item) => item.candidate.candidateKey === candidate.candidateKey,
+            ) ?? {
+              displayName: artifact.path,
+              candidate,
+              selected: false,
+              reviewer: null,
+            },
+        ),
+      ];
+      const nextRelationshipItems = reviewState.relationshipItems.filter(
+        (item) =>
+          item.relationship.fromSha256 !== artifactSha256.value &&
+          item.relationship.toSha256 !== artifactSha256.value,
+      );
+      const nextPopulationItems = reviewState.populationItems.filter(
         (item) => item.candidate.artifactSha256 !== artifactSha256.value,
-      ),
-      ...dateCandidates.map(
-        (candidate) =>
-          reviewState.dateCandidateItems.find(
-            (item) => item.candidate.candidateKey === candidate.candidateKey,
-          ) ?? {
-            displayName: artifact.path,
-            candidate,
-            selected: false,
-            reviewer: null,
-          },
-      ),
-    ];
-    const nextRelationshipItems = reviewState.relationshipItems.filter(
-      (item) =>
-        item.relationship.fromSha256 !== artifactSha256.value &&
-        item.relationship.toSha256 !== artifactSha256.value,
-    );
-    const nextPopulationItems = reviewState.populationItems.filter(
-      (item) => item.candidate.artifactSha256 !== artifactSha256.value,
-    );
-    const nextState: CaseReviewState = {
-      ...reviewState,
-      classificationItems: nextClassificationItems,
-      dateCandidateItems: nextDateItems,
-      relationshipItems: nextRelationshipItems,
-      populationItems: nextPopulationItems,
-    };
-    await persistEvidenceCorrection(selectedCase.caseId, correction);
-    await persistCaseReviewState(
-      selectedCase.caseId,
-      evidenceSnapshotId,
-      nextState,
-    );
-    if (activeCaseId.current !== selectedCase.caseId) return;
-    invalidateArchitectureBuild();
-    caseReviewState.current = nextState;
-    setClassificationItems(nextClassificationItems);
-    setDateCandidateItems(nextDateItems);
-    setRelationshipItems(nextRelationshipItems);
-    setPopulationItems(nextPopulationItems);
-    if (viewerRequest === evidenceViewerSequence.current) {
-      setEvidenceViewerArtifact({ ...artifact, correction });
-      setEvidenceViewerError(null);
+      );
+      const nextState: CaseReviewState = {
+        ...reviewState,
+        classificationItems: nextClassificationItems,
+        dateCandidateItems: nextDateItems,
+        relationshipItems: nextRelationshipItems,
+        populationItems: nextPopulationItems,
+      };
+      requireCurrent();
+      await persistEvidenceCorrection(
+        selectedCase.caseId,
+        correction,
+        requireCurrent,
+        () => {
+          writeState.attempted = true;
+        },
+      );
+      requireCurrent();
+      await persistCaseReviewState(
+        selectedCase.caseId,
+        evidenceSnapshotId,
+        nextState,
+        requireCurrent,
+      );
+      requireCurrent();
+      invalidateArchitectureBuild();
+      caseReviewState.current = nextState;
+      setClassificationItems(nextClassificationItems);
+      setDateCandidateItems(nextDateItems);
+      setRelationshipItems(nextRelationshipItems);
+      setPopulationItems(nextPopulationItems);
+      if (viewerRequest === evidenceViewerSequence.current) {
+        setEvidenceViewerArtifact({ ...artifact, correction });
+        setEvidenceViewerError(null);
+      }
+      await refreshGovernedEvidenceRecords(selectedCase.caseId);
+    } catch (error) {
+      if (writeState.attempted)
+        throw new Error(
+          "The correction or review pointer may have been saved before the operation stopped. Reopen the case and inspect the saved correction and review state before retrying.",
+        );
+      throw error;
+    } finally {
+      correctionSaveInFlight.current = false;
     }
-    await refreshGovernedEvidenceRecords(selectedCase.caseId);
   };
 
   const processPackage = async (

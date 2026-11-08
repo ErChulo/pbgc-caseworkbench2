@@ -134,13 +134,11 @@ test("opens the verified synthetic evidence from the built file", async ({
     "Synthetic Reviewer",
     url,
   );
-  await page
-    .getByLabel("Add evidence files")
-    .setInputFiles({
-      name: "first.txt",
-      mimeType: "text/plain",
-      buffer: contentA,
-    });
+  await page.getByLabel("Add evidence files").setInputFiles({
+    name: "first.txt",
+    mimeType: "text/plain",
+    buffer: contentA,
+  });
   await expect(page.getByText("File inventory complete")).toBeVisible();
   await open(page, "first.txt");
   await expect(
