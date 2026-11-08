@@ -11,12 +11,12 @@ import {
   type OfficialFieldCatalogIndex,
 } from "../../../../src/domain/field-catalog/models";
 
+// An authorized local copy can be supplied when the checkout contains an LFS
+// pointer. The parser still checks the exact approved size and SHA-256.
 const workbookPath = resolve(
   process.cwd(),
-  "reference",
-  "field-catalogs",
-  "atpbgc",
-  "data_dictionary_complete.xlsm",
+  process.env.PBGC_DATA_DICTIONARY_PATH ??
+    "reference/field-catalogs/atpbgc/data_dictionary_complete.xlsm",
 );
 
 let approvedBytes: Uint8Array;
