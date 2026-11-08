@@ -222,9 +222,18 @@ export function App({
             className="button button-secondary button-small"
             type="button"
             onClick={orchestrator.returnToWorkspaceHome}
+            disabled={orchestrator.intakeBusy}
+            aria-describedby={
+              orchestrator.intakeBusy ? "intake-switch-note" : undefined
+            }
           >
             Return to workspace home
           </button>
+          {orchestrator.intakeBusy && (
+            <p id="intake-switch-note" role="status">
+              Stop or finish file intake before switching cases.
+            </p>
+          )}
         </div>
       ) : null}
       <main id="main-content" className="app-main" tabIndex={-1}>
@@ -279,6 +288,8 @@ export function App({
           summary={orchestrator.evidencePackageSummary}
           restoreMessage={orchestrator.evidenceRestoreMessage}
           onOpenEvidence={orchestrator.openEvidence}
+          onBegin={orchestrator.beginEvidenceIntake}
+          onFinish={orchestrator.finishEvidenceIntake}
           onProcess={(files, signal, update) =>
             orchestrator.processPackage(files, signal, update)
           }

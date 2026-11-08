@@ -19,6 +19,8 @@ export function PackageIntake({
   summary,
   restoreMessage,
   onOpenEvidence,
+  onBegin,
+  onFinish,
   onProcess,
 }: {
   readonly enabled: boolean;
@@ -26,6 +28,8 @@ export function PackageIntake({
   readonly summary: PackageIntakeResult | null;
   readonly restoreMessage?: string | null;
   readonly onOpenEvidence: (item: ArtifactInventoryItem) => Promise<void>;
+  readonly onBegin: () => boolean;
+  readonly onFinish: () => void;
   readonly onProcess: (
     files: readonly File[],
     signal: AbortSignal,
@@ -38,6 +42,12 @@ export function PackageIntake({
 
   const processFiles = async (files: FileList | null) => {
     if (files === null || files.length === 0) return;
+    if (!onBegin()) {
+      setError(
+        "File intake cannot start while another intake is active or the case is unavailable.",
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     const nextController = new AbortController();
@@ -51,11 +61,12 @@ export function PackageIntake({
       });
     } catch {
       setError(
-        "File intake failed safely. Previously preserved files remain unchanged.",
+        "File intake did not finish. Some files or records may have been saved. Inspect the case before retrying.",
       );
     } finally {
       controller.current = null;
       setBusy(false);
+      onFinish();
     }
   };
 

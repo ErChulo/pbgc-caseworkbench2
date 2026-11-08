@@ -1028,6 +1028,9 @@ export interface CaseOrchestrator {
   readonly evidenceViewerArtifact: EvidenceViewerArtifact | null;
   readonly evidenceViewerLoading: boolean;
   readonly evidenceViewerError: string | null;
+  readonly intakeBusy: boolean;
+  readonly beginEvidenceIntake: () => boolean;
+  readonly finishEvidenceIntake: () => void;
   readonly setSharedReviewer: (value: string) => void;
   readonly setSharedRationale: (value: string) => void;
   readonly setEvidenceReviewView: (view: EvidenceReviewView) => void;
@@ -1224,6 +1227,8 @@ export function useCaseOrchestrator(
   const [evidenceViewerArtifact, setEvidenceViewerArtifact] =
     useState<EvidenceViewerArtifact | null>(null);
   const [evidenceViewerLoading, setEvidenceViewerLoading] = useState(false);
+  const [intakeBusy, setIntakeBusy] = useState(false);
+  const intakeInFlight = useRef(false);
   const evidenceViewerSequence = useRef(0);
   const correctionSaveInFlight = useRef(false);
   const [evidenceViewerError, setEvidenceViewerError] = useState<string | null>(
@@ -1637,6 +1642,7 @@ export function useCaseOrchestrator(
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
+    if (intakeInFlight.current) return;
     caseOutputGuard.changed();
     outputReferencesRevision.current += 1;
     if (activeCase?.caseId !== caseRecord.caseId) {
@@ -1651,6 +1657,7 @@ export function useCaseOrchestrator(
   };
 
   const selectWorkspace = async (): Promise<void> => {
+    if (intakeInFlight.current) return;
     setBusy(true);
     setWorkspaceError(null);
     try {
@@ -1729,6 +1736,7 @@ export function useCaseOrchestrator(
   };
 
   const openCase = (caseId: string): void => {
+    if (intakeInFlight.current) return;
     setBusy(true);
     setError(null);
     const activeRegistry = registry.current;
@@ -1749,6 +1757,7 @@ export function useCaseOrchestrator(
   };
 
   const returnToWorkspaceHome = (): void => {
+    if (intakeInFlight.current) return;
     activeCaseId.current = null;
     resetCaseScopedState(true);
     setActiveCase(null);
@@ -5626,14 +5635,35 @@ export function useCaseOrchestrator(
     }
   };
 
+  const beginEvidenceIntake = (): boolean => {
+    if (
+      intakeInFlight.current ||
+      workspace.current === null ||
+      activeCaseId.current !== activeCase?.caseId
+    )
+      return false;
+    intakeInFlight.current = true;
+    setIntakeBusy(true);
+    return true;
+  };
+  const finishEvidenceIntake = (): void => {
+    intakeInFlight.current = false;
+    setIntakeBusy(false);
+  };
+
   const processPackage = async (
     files: readonly File[],
     signal: AbortSignal,
     update: (items: readonly ArtifactInventoryItem[]) => void,
   ): Promise<PackageIntakeResult> => {
     const activeWorkspace = workspace.current;
-    if (activeWorkspace === null || activeCase === null) {
-      throw new Error("Controlled workspace is unavailable.");
+    if (
+      activeWorkspace === null ||
+      activeCase === null ||
+      !intakeInFlight.current ||
+      activeCaseId.current !== activeCase.caseId
+    ) {
+      throw new Error("Controlled workspace or active intake is unavailable.");
     }
     closeEvidence();
     const priorEntries = priorSnapshot.current?.entries ?? [];
@@ -6540,6 +6570,9 @@ export function useCaseOrchestrator(
     evidenceViewerArtifact,
     evidenceViewerLoading,
     evidenceViewerError,
+    intakeBusy,
+    beginEvidenceIntake,
+    finishEvidenceIntake,
     setSharedReviewer,
     setSharedRationale,
     setEvidenceReviewView,
