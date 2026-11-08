@@ -23,3 +23,5 @@ Same-session exclusion now covers the principal review snapshot writes, intake, 
 Review writes now use bounded readback and restored review snapshots no longer carry an old identity into a new snapshot hash. Previously invalid saved snapshots still need governed recovery; see `review-write-readback-2026-11-05.md`. The full synthetic Chromium suite passed 112 tests on the isolated build, not in the office.
 
 Intake checkpoint persistence now checks bounded snapshot, manifest, event and pointer readback, and pins observed manifest bytes during a session; see `intake-checkpoint-readback-2026-11-05.md`. Partial writes, initial local-byte trust, cross-window changes and governed recovery remain open. The latest synthetic Chromium run passed 116 tests with 3 skipped; it does not establish office readiness.
+
+A later intake readback pass also detects changes to the event history during the review write, alongside the checkpoint and pointer checks. The latest full synthetic Chromium run passed 120 tests with 3 skipped; cross-window atomicity and recovery remain unresolved.

@@ -191,3 +191,69 @@ test("blocks a changed manifest pointer from the offline built file", async ({
   expect(requests).toEqual([]);
   expect(outboundRequests).toEqual([]);
 });
+
+for (const target of ["event", "snapshot", "manifest", "pointer"] as const) {
+  test(`blocks a ${target} changed during the later review write`, async ({
+    offlinePage: page,
+  }) => {
+    await createSyntheticCase(page, `PBGC-LATE-INTAKE-${target.toUpperCase()}`);
+    const caseId = await page.getByTestId("current-case-id").textContent();
+    if (!caseId) throw new Error("Case ID missing");
+    await page.evaluate(
+      ({ id, kind }) => {
+        const g = globalThis as unknown as {
+          __syntheticWriteGate?: (path: string) => Promise<void>;
+          __syntheticFiles: Map<string, Uint8Array>;
+          __lateIntakeChange?: boolean;
+        };
+        g.__syntheticWriteGate = (path) => {
+          if (path === `cases/${id}/reviews/current.json`) {
+            const files = g.__syntheticFiles;
+            const pointerPath = `cases/${id}/manifests/current.json`;
+            const pointerBytes = files.get(pointerPath);
+            if (!pointerBytes) throw new Error("Intake pointer missing");
+            const pointer = JSON.parse(
+              new TextDecoder().decode(pointerBytes),
+            ) as {
+              checkpointSnapshotId: string;
+            };
+            const targetPath =
+              kind === "event"
+                ? `cases/${id}/intake/events.jsonl`
+                : kind === "pointer"
+                  ? pointerPath
+                  : `cases/${id}/${kind === "snapshot" ? "snapshots" : "manifests"}/${pointer.checkpointSnapshotId}.json`;
+            if (!files.has(targetPath)) throw new Error("Target missing");
+            files.set(
+              targetPath,
+              new TextEncoder().encode("late synthetic change"),
+            );
+            g.__lateIntakeChange = true;
+            delete g.__syntheticWriteGate;
+          }
+          return Promise.resolve();
+        };
+      },
+      { id: caseId, kind: target },
+    );
+    await page.getByLabel("Add evidence files").setInputFiles({
+      name: "synthetic.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic evidence."),
+    });
+    await expect(
+      page.getByText(
+        /Intake did not finish. Some files or records may have been saved/,
+      ),
+    ).toBeVisible();
+    await expect(page.getByLabel("Add evidence files")).toBeDisabled();
+    await expect(page.getByText("File inventory complete")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () =>
+          (globalThis as unknown as { __lateIntakeChange?: boolean })
+            .__lateIntakeChange,
+      ),
+    ).toBe(true);
+  });
+}

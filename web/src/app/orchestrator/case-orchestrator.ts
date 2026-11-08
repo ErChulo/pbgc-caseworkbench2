@@ -7157,6 +7157,12 @@ export function useCaseOrchestrator(
       CASE_RESTORE_POINTER_MAX_BYTES,
     );
     await verifyCheckpointFiles();
+    await verifyLocalBytes(
+      activeWorkspace,
+      intakeEventPath,
+      expectedEvents,
+      CASE_RESTORE_RECORD_MAX_BYTES,
+    );
 
     invalidateArchitectureBuild();
     priorSnapshot.current = checkpointReference.snapshot;
