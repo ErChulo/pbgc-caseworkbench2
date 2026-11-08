@@ -257,3 +257,65 @@ for (const target of ["event", "snapshot", "manifest", "pointer"] as const) {
     ).toBe(true);
   });
 }
+
+for (const fault of ["missing", "mismatch", "oversized"] as const) {
+  test(`blocks case restoration with a ${fault} standalone snapshot`, async ({
+    offlinePage: page,
+  }) => {
+    const caseNumber = `PBGC-SNAPSHOT-RESTORE-${fault.toUpperCase()}`;
+    await createSyntheticCase(page, caseNumber);
+    const picker = page.getByLabel("Add evidence files");
+    await picker.setInputFiles({
+      name: "synthetic.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("Synthetic evidence."),
+    });
+    await expect(page.getByText("File inventory complete")).toBeVisible();
+    await expect(picker).toBeEnabled();
+    const caseId = await page.getByTestId("current-case-id").textContent();
+    if (!caseId) throw new Error("Case ID missing");
+    await page
+      .getByRole("button", { name: "Return to workspace home" })
+      .click();
+    const path = await page.evaluate(
+      ({ id, kind }) => {
+        const files = (
+          globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+        ).__syntheticFiles;
+        const pointer = files.get(`cases/${id}/manifests/current.json`);
+        if (!pointer) throw new Error("Pointer missing");
+        const parsed = JSON.parse(new TextDecoder().decode(pointer)) as {
+          checkpointSnapshotId: string;
+        };
+        const path = `cases/${id}/snapshots/${parsed.checkpointSnapshotId}.json`;
+        if (!files.has(path)) throw new Error("Snapshot missing before test");
+        if (kind === "missing") files.delete(path);
+        else if (kind === "oversized")
+          files.set(path, new Uint8Array(16 * 1024 * 1024 + 1));
+        else files.set(path, new TextEncoder().encode('{"entries":[]}'));
+        return path;
+      },
+      { id: caseId, kind: fault },
+    );
+    await page.getByRole("button", { name: `Open ${caseNumber}` }).click();
+    await expect(
+      page.getByText(
+        /standalone inventory snapshot is missing or does not match/,
+      ),
+    ).toBeVisible();
+    await expect(picker).toBeDisabled();
+    const size = await page.evaluate((snapshotPath) => {
+      const files = (
+        globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
+      ).__syntheticFiles;
+      return files.get(snapshotPath)?.byteLength ?? null;
+    }, path);
+    expect(size).toBe(
+      fault === "missing"
+        ? null
+        : fault === "oversized"
+          ? 16 * 1024 * 1024 + 1
+          : new TextEncoder().encode('{"entries":[]}').length,
+    );
+  });
+}

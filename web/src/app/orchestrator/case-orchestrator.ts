@@ -4540,6 +4540,8 @@ export function useCaseOrchestrator(
     "Evidence restoration is unavailable because the referenced checkpoint manifest is not valid. No files were changed.";
   const INVALID_CONTENT_RESTORE_MESSAGE =
     "Evidence restoration is unavailable because preserved evidence could not be verified. No files were changed.";
+  const INVALID_SNAPSHOT_RESTORE_MESSAGE =
+    "Evidence restoration is unavailable because the standalone inventory snapshot is missing or does not match the checkpoint. No files were changed.";
 
   const loadEvidenceManifest = async (
     caseRecord: CaseRecord,
@@ -4628,6 +4630,30 @@ export function useCaseOrchestrator(
       recomputedSnapshotId !== current.snapshot.snapshotId
     ) {
       reportRestoreFailure(INVALID_CHECKPOINT_RESTORE_MESSAGE);
+      return;
+    }
+    const standaloneSnapshot = await activeWorkspace.openChunkReader(
+      `cases/${caseRecord.caseId}/snapshots/${current.snapshot.snapshotId}.json`,
+    );
+    if (!standaloneSnapshot.ok) {
+      reportRestoreFailure(INVALID_SNAPSHOT_RESTORE_MESSAGE);
+      return;
+    }
+    try {
+      const snapshotValue = JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(
+          await readBoundedLocalBytes(
+            standaloneSnapshot.value,
+            CASE_RESTORE_RECORD_MAX_BYTES,
+          ),
+        ),
+      ) as unknown;
+      if (canonicalize(snapshotValue) !== canonicalize(current.snapshot)) {
+        reportRestoreFailure(INVALID_SNAPSHOT_RESTORE_MESSAGE);
+        return;
+      }
+    } catch {
+      reportRestoreFailure(INVALID_SNAPSHOT_RESTORE_MESSAGE);
       return;
     }
     for (const entry of current.snapshot.entries) {
