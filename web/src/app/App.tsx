@@ -222,9 +222,13 @@ export function App({
             className="button button-secondary button-small"
             type="button"
             onClick={orchestrator.returnToWorkspaceHome}
-            disabled={orchestrator.intakeBusy}
+            disabled={orchestrator.intakeBusy || orchestrator.caseRestoring}
             aria-describedby={
-              orchestrator.intakeBusy ? "intake-switch-note" : undefined
+              orchestrator.intakeBusy
+                ? "intake-switch-note"
+                : orchestrator.caseRestoring
+                  ? "restore-switch-note"
+                  : undefined
             }
           >
             Return to workspace home
@@ -232,6 +236,13 @@ export function App({
           {orchestrator.intakeBusy && (
             <p id="intake-switch-note" role="status">
               Stop or finish file intake before switching cases.
+            </p>
+          )}
+          {orchestrator.caseRestoring && (
+            <p id="restore-switch-note" role="status">
+              Restoring case evidence and reviews. Wait before switching cases
+              or making changes. If restoration does not finish, reload the app
+              and inspect the workspace before retrying.
             </p>
           )}
         </div>
@@ -280,269 +291,285 @@ export function App({
             }}
           />
         ) : null}
-        <PackageIntake
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          items={orchestrator.evidenceItems}
-          summary={orchestrator.evidencePackageSummary}
-          restoreMessage={orchestrator.evidenceRestoreMessage}
-          onOpenEvidence={orchestrator.openEvidence}
-          onBegin={orchestrator.beginEvidenceIntake}
-          onFinish={orchestrator.finishEvidenceIntake}
-          onProcess={(files, signal, update) =>
-            orchestrator.processPackage(files, signal, update)
-          }
-        />
-        <EvidenceViewer
-          artifact={orchestrator.evidenceViewerArtifact}
-          loading={orchestrator.evidenceViewerLoading}
-          error={orchestrator.evidenceViewerError}
-          onSaveCorrection={orchestrator.saveEvidenceCorrection}
-          onClose={orchestrator.closeEvidence}
-        />
-        <DraftV1SummaryPanel
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          draft={orchestrator.draftV1Summary}
-          message={orchestrator.draftV1SummaryMessage}
-          onGenerate={orchestrator.generateDraftV1Summary}
-        />
-        <PlanSummaryPanel
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          record={orchestrator.planSummaryRecord}
-          message={orchestrator.planSummaryMessage}
-          reviewer={orchestrator.sharedReviewer}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onInitialize={orchestrator.initializePlanSummary}
-          onApproveAttribute={orchestrator.approvePlanSummaryAttribute}
-        />
-        <FormulaGovernancePanel
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          architecture={orchestrator.v1Architecture}
-          formulaApprovalRecords={orchestrator.formulaApprovalRecords}
-          planRules={orchestrator.previewRules}
-          message={orchestrator.architectureBuildMessage}
-          onApproveFormula={orchestrator.approveFormula}
-        />
-        <ProvisionalOraclePanel
-          key={`${orchestrator.activeCase?.caseId ?? "none"}:${orchestrator.v1Workbook?.workbookContentSha256 ?? "none"}`}
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          workbookAvailable={orchestrator.v1Workbook !== null}
-          formulaCells={orchestrator.v1Workbook?.formulaCells ?? []}
-          onImport={orchestrator.importProvisionalOracle}
-          onRestore={orchestrator.restoreProvisionalOracle}
-          onFind={orchestrator.findProvisionalOracles}
-        />
-        <QuarantineQueue
-          items={orchestrator.quarantineItems}
-          reviewer={orchestrator.sharedReviewer}
-          rationale={orchestrator.sharedRationale}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onRationaleChange={orchestrator.setSharedRationale}
-          onDecision={async (item, action, reviewer, rationale) => {
-            await orchestrator.recordQuarantineDecision(
-              item,
-              action,
-              reviewer,
-              rationale,
-            );
-          }}
-        />
-        <ArtifactEligibilityReview
-          items={orchestrator.eligibilityItems}
-          reviewer={orchestrator.sharedReviewer}
-          rationale={orchestrator.sharedRationale}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onRationaleChange={orchestrator.setSharedRationale}
-          onDecision={async (item, action, reviewer, rationale) => {
-            await orchestrator.recordArtifactEligibilityDecision(
-              item,
-              action,
-              reviewer,
-              rationale,
-            );
-          }}
-        />
-        <ClassificationReview
-          items={orchestrator.classificationItems}
-          dateCandidates={orchestrator.dateCandidateItems}
-          reviewer={orchestrator.sharedReviewer}
-          rationale={orchestrator.sharedRationale}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onRationaleChange={orchestrator.setSharedRationale}
-          onDecision={async (item, action, reviewer, rationale) => {
-            await orchestrator.recordClassificationDecision(
-              item,
-              action,
-              reviewer,
-              rationale,
-            );
-          }}
-          onDateSelect={async (item, reviewer, rationale) => {
-            await orchestrator.recordDateSelection(item, reviewer, rationale);
-          }}
-        />
-        <div
-          className="evidence-review-stage"
-          aria-labelledby="evidence-review-stage-title"
-        >
-          <div className="evidence-stage-heading">
-            <div>
-              <p className="section-label">Feature 001 reviewer workspace</p>
-              <h2 id="evidence-review-stage-title">
-                Evidence and plan-rule review
-              </h2>
-            </div>
-            <p>
-              {orchestrator.activeCase === null
-                ? "Typed synthetic demo candidates"
-                : "Case-derived evidence review"}
-            </p>
-          </div>
-          {orchestrator.activeCase === null ? (
-            <div className="notice session-preview-controls">
-              <p>
-                <strong>
-                  Synthetic session preview with production persistence.
-                </strong>
-                Governed operations use typed demo candidates. Plan-rule records
-                persist to the active local case workspace when one is selected;
-                otherwise they remain preview-only. Reset or browser refresh
-                restores the initial synthetic preview state.
-              </p>
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={orchestrator.resetEvidenceSessionPreview}
-              >
-                Reset session preview
-              </button>
-            </div>
-          ) : null}
-          <nav
-            className="evidence-review-nav"
-            aria-label="Evidence review stages"
-          >
-            {EVIDENCE_REVIEW_ROUTES.map(([route, label]) => (
-              <button
-                key={route}
-                type="button"
-                className="button button-secondary"
-                aria-current={
-                  orchestrator.evidenceReviewView === route ? "page" : undefined
-                }
-                aria-controls="evidence-review-content"
-                onClick={() => {
-                  orchestrator.setEvidenceReviewView(route);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <p className="visually-hidden" role="status" aria-live="polite">
-            Showing{" "}
-            {
-              EVIDENCE_REVIEW_ROUTES.find(
-                ([route]) => route === orchestrator.evidenceReviewView,
-              )?.[1]
+        <div hidden={orchestrator.caseRestoring}>
+          <PackageIntake
+            enabled={
+              orchestrator.workspaceReady &&
+              orchestrator.activeCase !== null &&
+              !orchestrator.evidenceRestoreBlocked
             }
-            .
-          </p>
-          <div id="evidence-review-content">{evidenceReviewContent}</div>
+            restoreBlocked={orchestrator.evidenceRestoreBlocked}
+            items={orchestrator.evidenceItems}
+            summary={orchestrator.evidencePackageSummary}
+            restoreMessage={orchestrator.evidenceRestoreMessage}
+            onOpenEvidence={orchestrator.openEvidence}
+            onBegin={orchestrator.beginEvidenceIntake}
+            onFinish={orchestrator.finishEvidenceIntake}
+            onProcess={(files, signal, update) =>
+              orchestrator.processPackage(files, signal, update)
+            }
+          />
+          <div hidden={orchestrator.evidenceRestoreBlocked}>
+            <EvidenceViewer
+              artifact={orchestrator.evidenceViewerArtifact}
+              loading={orchestrator.evidenceViewerLoading}
+              error={orchestrator.evidenceViewerError}
+              onSaveCorrection={orchestrator.saveEvidenceCorrection}
+              onClose={orchestrator.closeEvidence}
+            />
+            <DraftV1SummaryPanel
+              enabled={
+                orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              draft={orchestrator.draftV1Summary}
+              message={orchestrator.draftV1SummaryMessage}
+              onGenerate={orchestrator.generateDraftV1Summary}
+            />
+            <PlanSummaryPanel
+              enabled={
+                orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              record={orchestrator.planSummaryRecord}
+              message={orchestrator.planSummaryMessage}
+              reviewer={orchestrator.sharedReviewer}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onInitialize={orchestrator.initializePlanSummary}
+              onApproveAttribute={orchestrator.approvePlanSummaryAttribute}
+            />
+            <FormulaGovernancePanel
+              enabled={
+                orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              architecture={orchestrator.v1Architecture}
+              formulaApprovalRecords={orchestrator.formulaApprovalRecords}
+              planRules={orchestrator.previewRules}
+              message={orchestrator.architectureBuildMessage}
+              onApproveFormula={orchestrator.approveFormula}
+            />
+            <ProvisionalOraclePanel
+              key={`${orchestrator.activeCase?.caseId ?? "none"}:${orchestrator.v1Workbook?.workbookContentSha256 ?? "none"}`}
+              enabled={
+                orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              workbookAvailable={orchestrator.v1Workbook !== null}
+              formulaCells={orchestrator.v1Workbook?.formulaCells ?? []}
+              onImport={orchestrator.importProvisionalOracle}
+              onRestore={orchestrator.restoreProvisionalOracle}
+              onFind={orchestrator.findProvisionalOracles}
+            />
+            <QuarantineQueue
+              items={orchestrator.quarantineItems}
+              reviewer={orchestrator.sharedReviewer}
+              rationale={orchestrator.sharedRationale}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onRationaleChange={orchestrator.setSharedRationale}
+              onDecision={async (item, action, reviewer, rationale) => {
+                await orchestrator.recordQuarantineDecision(
+                  item,
+                  action,
+                  reviewer,
+                  rationale,
+                );
+              }}
+            />
+            <ArtifactEligibilityReview
+              items={orchestrator.eligibilityItems}
+              reviewer={orchestrator.sharedReviewer}
+              rationale={orchestrator.sharedRationale}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onRationaleChange={orchestrator.setSharedRationale}
+              onDecision={async (item, action, reviewer, rationale) => {
+                await orchestrator.recordArtifactEligibilityDecision(
+                  item,
+                  action,
+                  reviewer,
+                  rationale,
+                );
+              }}
+            />
+            <ClassificationReview
+              items={orchestrator.classificationItems}
+              dateCandidates={orchestrator.dateCandidateItems}
+              reviewer={orchestrator.sharedReviewer}
+              rationale={orchestrator.sharedRationale}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onRationaleChange={orchestrator.setSharedRationale}
+              onDecision={async (item, action, reviewer, rationale) => {
+                await orchestrator.recordClassificationDecision(
+                  item,
+                  action,
+                  reviewer,
+                  rationale,
+                );
+              }}
+              onDateSelect={async (item, reviewer, rationale) => {
+                await orchestrator.recordDateSelection(
+                  item,
+                  reviewer,
+                  rationale,
+                );
+              }}
+            />
+            <div
+              className="evidence-review-stage"
+              aria-labelledby="evidence-review-stage-title"
+            >
+              <div className="evidence-stage-heading">
+                <div>
+                  <p className="section-label">
+                    Feature 001 reviewer workspace
+                  </p>
+                  <h2 id="evidence-review-stage-title">
+                    Evidence and plan-rule review
+                  </h2>
+                </div>
+                <p>
+                  {orchestrator.activeCase === null
+                    ? "Typed synthetic demo candidates"
+                    : "Case-derived evidence review"}
+                </p>
+              </div>
+              {orchestrator.activeCase === null ? (
+                <div className="notice session-preview-controls">
+                  <p>
+                    <strong>
+                      Synthetic session preview with production persistence.
+                    </strong>
+                    Governed operations use typed demo candidates. Plan-rule
+                    records persist to the active local case workspace when one
+                    is selected; otherwise they remain preview-only. Reset or
+                    browser refresh restores the initial synthetic preview
+                    state.
+                  </p>
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    onClick={orchestrator.resetEvidenceSessionPreview}
+                  >
+                    Reset session preview
+                  </button>
+                </div>
+              ) : null}
+              <nav
+                className="evidence-review-nav"
+                aria-label="Evidence review stages"
+              >
+                {EVIDENCE_REVIEW_ROUTES.map(([route, label]) => (
+                  <button
+                    key={route}
+                    type="button"
+                    className="button button-secondary"
+                    aria-current={
+                      orchestrator.evidenceReviewView === route
+                        ? "page"
+                        : undefined
+                    }
+                    aria-controls="evidence-review-content"
+                    onClick={() => {
+                      orchestrator.setEvidenceReviewView(route);
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </nav>
+              <p className="visually-hidden" role="status" aria-live="polite">
+                Showing{" "}
+                {
+                  EVIDENCE_REVIEW_ROUTES.find(
+                    ([route]) => route === orchestrator.evidenceReviewView,
+                  )?.[1]
+                }
+                .
+              </p>
+              <div id="evidence-review-content">{evidenceReviewContent}</div>
+            </div>
+            <RelationshipReview
+              items={orchestrator.relationshipItems}
+              reviewer={orchestrator.sharedReviewer}
+              rationale={orchestrator.sharedRationale}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onRationaleChange={orchestrator.setSharedRationale}
+              onDecision={async (item, action, reviewer, rationale) => {
+                await orchestrator.recordRelationshipDecision(
+                  item,
+                  action,
+                  reviewer,
+                  rationale,
+                );
+              }}
+            />
+            <PopulationReview
+              caseId={orchestrator.activeCase?.caseId ?? null}
+              reviewRevision={orchestrator.populationReviewRevision}
+              onPreviewRecord={orchestrator.previewPopulationRecord}
+              items={orchestrator.populationItems}
+              reviewer={orchestrator.sharedReviewer}
+              rationale={orchestrator.sharedRationale}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onRationaleChange={orchestrator.setSharedRationale}
+              onDecision={async (item, action, reviewer, rationale) => {
+                await orchestrator.recordPopulationDecision(
+                  item,
+                  action,
+                  reviewer,
+                  rationale,
+                );
+              }}
+            />
+            <ManifestExport
+              summary={orchestrator.manifestSummary}
+              onExport={async () => {
+                await orchestrator.exportCurrentManifest();
+              }}
+            />
+            <ArchitecturePolicyReview
+              items={orchestrator.architecturePolicyItems}
+              reviewer={orchestrator.sharedReviewer}
+              rationale={orchestrator.sharedRationale}
+              onReviewerChange={orchestrator.setSharedReviewer}
+              onRationaleChange={orchestrator.setSharedRationale}
+              onApprove={async (item) => {
+                await orchestrator.recordArchitecturePolicyApproval(
+                  item,
+                  orchestrator.sharedReviewer,
+                  orchestrator.sharedRationale,
+                );
+              }}
+            />
+            <CaseControlsReview
+              enabled={
+                orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              message={orchestrator.caseControlsMessage}
+              approved={orchestrator.caseControls}
+              onApprove={orchestrator.recordCaseControls}
+            />
+            <ArchitectureStage
+              enabled={
+                orchestrator.workspaceReady && orchestrator.activeCase !== null
+              }
+              message={orchestrator.architectureBuildMessage}
+              onBuild={orchestrator.recordArchitectureSelection}
+              v1Ready={orchestrator.v1Ready}
+              onDownload={orchestrator.downloadV1Workbook}
+              diagnosticReady={orchestrator.v1DiagnosticReady}
+              onDownloadDiagnostic={orchestrator.downloadV1Diagnostic}
+            />
+            <CaseOutputPackagePanel
+              payload={finalOutputPayload}
+              linkedArtifacts={orchestrator.caseOutputArtifacts}
+              busy={orchestrator.caseOutputBusy}
+              restoreBlocked={orchestrator.caseOutputRestoreBlocked}
+              exportMessage={orchestrator.caseOutputExportMessage}
+              linkMessage={orchestrator.caseOutputLinkMessage}
+              onLinkArtifact={async (draft) => {
+                await orchestrator.linkCaseOutputArtifact(draft);
+              }}
+              onExport={orchestrator.exportFinalCaseworkOutputPackage}
+            />
+          </div>
         </div>
-        <RelationshipReview
-          items={orchestrator.relationshipItems}
-          reviewer={orchestrator.sharedReviewer}
-          rationale={orchestrator.sharedRationale}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onRationaleChange={orchestrator.setSharedRationale}
-          onDecision={async (item, action, reviewer, rationale) => {
-            await orchestrator.recordRelationshipDecision(
-              item,
-              action,
-              reviewer,
-              rationale,
-            );
-          }}
-        />
-        <PopulationReview
-          caseId={orchestrator.activeCase?.caseId ?? null}
-          reviewRevision={orchestrator.populationReviewRevision}
-          onPreviewRecord={orchestrator.previewPopulationRecord}
-          items={orchestrator.populationItems}
-          reviewer={orchestrator.sharedReviewer}
-          rationale={orchestrator.sharedRationale}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onRationaleChange={orchestrator.setSharedRationale}
-          onDecision={async (item, action, reviewer, rationale) => {
-            await orchestrator.recordPopulationDecision(
-              item,
-              action,
-              reviewer,
-              rationale,
-            );
-          }}
-        />
-        <ManifestExport
-          summary={orchestrator.manifestSummary}
-          onExport={async () => {
-            await orchestrator.exportCurrentManifest();
-          }}
-        />
-        <ArchitecturePolicyReview
-          items={orchestrator.architecturePolicyItems}
-          reviewer={orchestrator.sharedReviewer}
-          rationale={orchestrator.sharedRationale}
-          onReviewerChange={orchestrator.setSharedReviewer}
-          onRationaleChange={orchestrator.setSharedRationale}
-          onApprove={async (item) => {
-            await orchestrator.recordArchitecturePolicyApproval(
-              item,
-              orchestrator.sharedReviewer,
-              orchestrator.sharedRationale,
-            );
-          }}
-        />
-        <CaseControlsReview
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          message={orchestrator.caseControlsMessage}
-          approved={orchestrator.caseControls}
-          onApprove={orchestrator.recordCaseControls}
-        />
-        <ArchitectureStage
-          enabled={
-            orchestrator.workspaceReady && orchestrator.activeCase !== null
-          }
-          message={orchestrator.architectureBuildMessage}
-          onBuild={orchestrator.recordArchitectureSelection}
-          v1Ready={orchestrator.v1Ready}
-          onDownload={orchestrator.downloadV1Workbook}
-          diagnosticReady={orchestrator.v1DiagnosticReady}
-          onDownloadDiagnostic={orchestrator.downloadV1Diagnostic}
-        />
-        <CaseOutputPackagePanel
-          payload={finalOutputPayload}
-          linkedArtifacts={orchestrator.caseOutputArtifacts}
-          busy={orchestrator.caseOutputBusy}
-          restoreBlocked={orchestrator.caseOutputRestoreBlocked}
-          exportMessage={orchestrator.caseOutputExportMessage}
-          linkMessage={orchestrator.caseOutputLinkMessage}
-          onLinkArtifact={async (draft) => {
-            await orchestrator.linkCaseOutputArtifact(draft);
-          }}
-          onExport={orchestrator.exportFinalCaseworkOutputPackage}
-        />
       </main>
     </div>
   );

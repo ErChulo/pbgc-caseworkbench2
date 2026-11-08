@@ -15,6 +15,7 @@ export interface PackageIntakeResult {
 
 export function PackageIntake({
   enabled,
+  restoreBlocked = false,
   items,
   summary,
   restoreMessage,
@@ -24,6 +25,7 @@ export function PackageIntake({
   onProcess,
 }: {
   readonly enabled: boolean;
+  readonly restoreBlocked?: boolean;
   readonly items: readonly ArtifactInventoryItem[];
   readonly summary: PackageIntakeResult | null;
   readonly restoreMessage?: string | null;
@@ -114,7 +116,9 @@ export function PackageIntake({
       </label>
       {!enabled && (
         <p className="form-message form-message-warning">
-          Create or resume a case before adding files.
+          {restoreBlocked
+            ? "File intake and case actions are blocked because case restoration could not be verified. Inspect the workspace and reopen the case."
+            : "Create or resume a case before adding files."}
         </p>
       )}
       {busy && (
@@ -160,7 +164,10 @@ export function PackageIntake({
           {summary.snapshotId && <code>Snapshot {summary.snapshotId}</code>}
         </div>
       )}
-      <ArtifactInventory items={items} onOpen={onOpenEvidence} />
+      <ArtifactInventory
+        items={items}
+        {...(restoreBlocked ? {} : { onOpen: onOpenEvidence })}
+      />
     </section>
   );
 }

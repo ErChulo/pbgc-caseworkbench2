@@ -1031,6 +1031,8 @@ export interface CaseOrchestrator {
   readonly evidenceViewerLoading: boolean;
   readonly evidenceViewerError: string | null;
   readonly intakeBusy: boolean;
+  readonly caseRestoring: boolean;
+  readonly evidenceRestoreBlocked: boolean;
   readonly beginEvidenceIntake: () => boolean;
   readonly finishEvidenceIntake: () => void;
   readonly setSharedReviewer: (value: string) => void;
@@ -1231,6 +1233,10 @@ export function useCaseOrchestrator(
   const [evidenceViewerLoading, setEvidenceViewerLoading] = useState(false);
   const [intakeBusy, setIntakeBusy] = useState(false);
   const intakeInFlight = useRef(false);
+  const caseRestoringRef = useRef(false);
+  const [caseRestoring, setCaseRestoring] = useState(false);
+  const evidenceRestoreBlockedRef = useRef(false);
+  const [evidenceRestoreBlocked, setEvidenceRestoreBlocked] = useState(false);
   const evidenceViewerSequence = useRef(0);
   const correctionSaveInFlight = useRef(false);
   const [evidenceViewerError, setEvidenceViewerError] = useState<string | null>(
@@ -1574,6 +1580,8 @@ export function useCaseOrchestrator(
 
   const resetCaseScopedState = (previewMode: boolean): void => {
     draftV1Sequence.current += 1;
+    evidenceRestoreBlockedRef.current = false;
+    setEvidenceRestoreBlocked(false);
     evidenceViewerSequence.current += 1;
     outputRestoreSequence.current += 1;
     outputRestoringRef.current = false;
@@ -1647,13 +1655,17 @@ export function useCaseOrchestrator(
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
-    if (intakeInFlight.current) return;
+    if (intakeInFlight.current || caseRestoringRef.current) return;
     caseOutputGuard.changed();
     outputReferencesRevision.current += 1;
     if (activeCase?.caseId !== caseRecord.caseId) {
       resetCaseScopedState(false);
     }
     activeCaseId.current = caseRecord.caseId;
+    caseRestoringRef.current = true;
+    setCaseRestoring(true);
+    evidenceRestoreBlockedRef.current = false;
+    setEvidenceRestoreBlocked(false);
     setActiveCase(caseRecord);
     void loadCaseOutputArtifactReferences(caseRecord);
     void loadDraftV1SummaryArtifact(caseRecord);
@@ -1662,7 +1674,7 @@ export function useCaseOrchestrator(
   };
 
   const selectWorkspace = async (): Promise<void> => {
-    if (intakeInFlight.current) return;
+    if (intakeInFlight.current || caseRestoringRef.current) return;
     setBusy(true);
     setWorkspaceError(null);
     try {
@@ -1741,7 +1753,7 @@ export function useCaseOrchestrator(
   };
 
   const openCase = (caseId: string): void => {
-    if (intakeInFlight.current) return;
+    if (intakeInFlight.current || caseRestoringRef.current) return;
     setBusy(true);
     setError(null);
     const activeRegistry = registry.current;
@@ -1762,7 +1774,7 @@ export function useCaseOrchestrator(
   };
 
   const returnToWorkspaceHome = (): void => {
-    if (intakeInFlight.current) return;
+    if (intakeInFlight.current || caseRestoringRef.current) return;
     activeCaseId.current = null;
     resetCaseScopedState(true);
     setActiveCase(null);
@@ -3270,6 +3282,8 @@ export function useCaseOrchestrator(
     if (activeWorkspace === null) return;
     const failReviewRestore = (): void => {
       if (activeCaseId.current === caseRecord.caseId) {
+        evidenceRestoreBlockedRef.current = true;
+        setEvidenceRestoreBlocked(true);
         setEvidenceRestoreMessage(
           "Evidence review restoration is unavailable because persisted review state could not be verified. No files were changed.",
         );
@@ -4055,17 +4069,31 @@ export function useCaseOrchestrator(
   const loadPersistedCaseState = async (
     caseRecord: CaseRecord,
   ): Promise<void> => {
-    await loadEvidenceManifest(caseRecord);
-    if (
-      activeCaseId.current === caseRecord.caseId &&
-      priorSnapshot.current !== null
-    ) {
-      await loadCaseReviewState(caseRecord, priorSnapshot.current.snapshotId);
-      if (lastCheckpoint.current?.artifacts.length) {
-        await refreshGovernedEvidenceRecords(caseRecord.caseId);
-      } else {
-        await loadGovernedEvidenceRecords(caseRecord);
+    const restoreBlocked = (): boolean => evidenceRestoreBlockedRef.current;
+    try {
+      await loadEvidenceManifest(caseRecord);
+      if (restoreBlocked()) return;
+      if (
+        activeCaseId.current === caseRecord.caseId &&
+        priorSnapshot.current !== null
+      ) {
+        await loadCaseReviewState(caseRecord, priorSnapshot.current.snapshotId);
+        if (restoreBlocked()) return;
+        if (lastCheckpoint.current?.artifacts.length) {
+          await refreshGovernedEvidenceRecords(caseRecord.caseId);
+        } else {
+          await loadGovernedEvidenceRecords(caseRecord);
+        }
       }
+    } catch {
+      evidenceRestoreBlockedRef.current = true;
+      setEvidenceRestoreBlocked(true);
+      setEvidenceRestoreMessage(
+        "Case restoration did not finish. Some local records may have changed. Inspect the workspace before retrying.",
+      );
+    } finally {
+      caseRestoringRef.current = false;
+      setCaseRestoring(false);
     }
   };
 
@@ -4158,6 +4186,8 @@ export function useCaseOrchestrator(
     if (activeWorkspace === null) return;
     const reportRestoreFailure = (message: string): void => {
       if (activeCaseId.current === caseRecord.caseId) {
+        evidenceRestoreBlockedRef.current = true;
+        setEvidenceRestoreBlocked(true);
         setEvidenceRestoreMessage(message);
       }
     };
@@ -5710,6 +5740,8 @@ export function useCaseOrchestrator(
   const beginEvidenceIntake = (): boolean => {
     if (
       intakeInFlight.current ||
+      caseRestoringRef.current ||
+      evidenceRestoreBlockedRef.current ||
       workspace.current === null ||
       activeCaseId.current !== activeCase?.caseId
     )
@@ -6643,6 +6675,8 @@ export function useCaseOrchestrator(
     evidenceViewerLoading,
     evidenceViewerError,
     intakeBusy,
+    caseRestoring,
+    evidenceRestoreBlocked,
     beginEvidenceIntake,
     finishEvidenceIntake,
     setSharedReviewer,
