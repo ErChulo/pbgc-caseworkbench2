@@ -1,3 +1,7 @@
+import {
+  MAX_INTAKE_INSPECTION_BYTES,
+  readVerifiedIntakeBytes,
+} from "../../adapters/filesystem/verified-intake-bytes";
 import { buildCheckedXlsx } from "../../domain/workbook-builder/checked-xlsx";
 import {
   preserveProvisionalOracle,
@@ -5613,6 +5617,20 @@ export function useCaseOrchestrator(
       }
       const file = fileByItemId.get(item.id);
       if (!file) continue;
+      if (
+        !Number.isSafeInteger(file.size) ||
+        file.size < 0 ||
+        file.size > MAX_INTAKE_INSPECTION_BYTES
+      ) {
+        failures += 1;
+        items = replaceItem(items, item.id, {
+          status: "failed",
+          message:
+            "File exceeds the 32 MiB local inspection limit. It was not inspected or added to the snapshot.",
+        });
+        update(items);
+        continue;
+      }
       items = replaceItem(items, item.id, {
         status: "hashing",
         message: "Reading fixed-size local chunks.",
@@ -5658,9 +5676,24 @@ export function useCaseOrchestrator(
         update(items);
         continue;
       }
+      const verifiedBytes = await readVerifiedIntakeBytes(
+        activeWorkspace,
+        hashed.value.sha256,
+        file.size,
+      );
+      if (!verifiedBytes.ok) {
+        failures += 1;
+        items = replaceItem(items, item.id, {
+          status: "failed",
+          sha256: hashed.value.sha256,
+          message: verifiedBytes.message,
+        });
+        update(items);
+        continue;
+      }
       const duplicate = seenHashes.has(hashed.value.sha256);
       seenHashes.add(hashed.value.sha256);
-      const bytes = new Uint8Array(await file.arrayBuffer());
+      const bytes = verifiedBytes.bytes;
       const binaryRisk = await screenBinaryRisk(
         bytes,
         hashed.value.sha256,
