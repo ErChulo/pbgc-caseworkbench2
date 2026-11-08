@@ -12,7 +12,7 @@ import type {
   RuleSetGovernance,
   TriggerCondition,
 } from "./models";
-import { parseLoadedRuleSets, parseRuleSetText } from "./rule-parser";
+import { parseLoadedRuleSets } from "./rule-parser";
 
 export type { FieldNameGlossaryEntry, IoBClassificationRule } from "./models";
 
@@ -529,19 +529,6 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function nodeBuiltin(id: string): unknown {
-  const processValue = (globalThis as { process?: unknown }).process as
-    { getBuiltinModule?: (name: string) => unknown } | undefined;
-  const module =
-    processValue !== undefined &&
-    typeof processValue.getBuiltinModule === "function"
-      ? processValue.getBuiltinModule(id)
-      : undefined;
-  if (module === undefined)
-    throw new Error(`Node builtin ${id} is unavailable.`);
-  return module;
-}
-
 async function digest(value: string): Promise<Sha256> {
   return sha256Hex(value);
 }
@@ -614,92 +601,4 @@ export async function effectivePolicyApproval(
   return replay.value.status === "approved"
     ? replay
     : { ok: false, error: "policy has no effective non-revoked approval" };
-}
-
-export async function loadRuleSet(
-  rulePath: string,
-  kind: RuleSet["kind"],
-  mode: "candidate" | "production" = "candidate",
-  approvalContext?: PolicyApprovalContext,
-): Promise<Result<RuleSet, RuleLoadError>> {
-  try {
-    const { readFile } = await import("node:fs/promises");
-    const content = await readFile(rulePath, "utf8");
-    const parsed = await parseRuleSetText(rulePath, content, kind);
-    if (!parsed.ok) return parsed;
-    const approval =
-      mode === "production"
-        ? await effectivePolicyApproval(parsed.value, approvalContext)
-        : ({ ok: true, value: undefined } as const);
-    return approval.ok
-      ? { ok: true, value: parsed.value }
-      : {
-          ok: false,
-          error: {
-            code: "RULE_NOT_APPROVED",
-            path: rulePath,
-            message: approval.error,
-          },
-        };
-  } catch (error: unknown) {
-    if (
-      error !== null &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "ENOENT"
-    )
-      return {
-        ok: false,
-        error: { code: "RULE_FILE_NOT_FOUND", path: rulePath },
-      };
-    return {
-      ok: false,
-      error: {
-        code: "RULE_PARSE_ERROR",
-        path: rulePath,
-        message:
-          error instanceof Error ? error.message : "Unknown rule-loading error",
-      },
-    };
-  }
-}
-
-export async function loadRuleSets(
-  baseDir: string,
-  mode: "candidate" | "production" = "candidate",
-  approvalContext?: PolicyApprovalContext,
-): Promise<Result<LoadedRuleSets, RuleLoadError>> {
-  const definitions = [
-    ["scenarioSelection", "scenario-selection"],
-    ["tabSelection", "tab-selection"],
-    ["iobClassification", "iob-classification"],
-    ["fieldNameGlossary", "field-name-glossary"],
-  ] as const;
-  const loaded: Partial<LoadedRuleSets> = {};
-  for (const [property, kind] of definitions) {
-    const result = await loadRuleSet(
-      resolveRulePath(baseDir, kind),
-      kind,
-      mode,
-      approvalContext,
-    );
-    if (!result.ok) return result;
-    Object.assign(loaded, { [property]: result.value });
-  }
-  return { ok: true, value: loaded as LoadedRuleSets };
-}
-
-export function resolveRulePath(baseDir: string, ruleName: string): string {
-  const processValue = (globalThis as { process?: unknown }).process as
-    { getBuiltinModule?: (name: string) => unknown } | undefined;
-  if (
-    processValue !== undefined &&
-    typeof processValue.getBuiltinModule === "function"
-  ) {
-    const { resolve } = nodeBuiltin("node:path") as {
-      resolve: (...segments: string[]) => string;
-    };
-    return resolve(baseDir, `${ruleName}.yaml`);
-  }
-  return `${baseDir.replace(/\/$/u, "")}/${ruleName}.yaml`;
 }

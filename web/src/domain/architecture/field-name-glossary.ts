@@ -1,9 +1,4 @@
-import type { Result } from "../shared/types";
-import {
-  loadRuleSet,
-  type FieldNameGlossaryEntry,
-  type RuleLoadError,
-} from "./rule-loader";
+import type { FieldNameGlossaryEntry } from "./models";
 
 export interface FieldNameGlossary {
   readonly entries: readonly FieldNameGlossaryEntry[];
@@ -63,26 +58,5 @@ export function createFieldNameGlossary(
         )
         .map((entry) => entry.workbookPattern);
     },
-  };
-}
-
-export async function loadFieldNameGlossary(
-  rulePath: string,
-): Promise<Result<FieldNameGlossary, RuleLoadError>> {
-  const result = await loadRuleSet(rulePath, "field-name-glossary");
-  if (!result.ok) return result;
-  if (result.value.kind !== "field-name-glossary") {
-    return {
-      ok: false,
-      error: {
-        code: "RULE_VALIDATION_ERROR",
-        path: rulePath,
-        message: "Loaded rule-set kind does not match field-name-glossary.",
-      },
-    };
-  }
-  return {
-    ok: true,
-    value: createFieldNameGlossary(result.value.entries),
   };
 }

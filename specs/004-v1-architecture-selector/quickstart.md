@@ -24,7 +24,7 @@ This quickstart demonstrates the architecture selector producing a deterministic
 import { loadPlanRules } from "../domain/plan-rules";
 import { loadPopulationGovernanceInputs } from "../domain/population";
 import { loadCaseControls } from "../domain/case";
-import { loadRuleSets } from "../domain/architecture/rule-loader";
+import { loadRuleSets } from "../adapters/node/architecture-rule-files";
 
 const planRules = await loadPlanRules(workspace);
 const population = await loadPopulationGovernanceInputs(workspace);

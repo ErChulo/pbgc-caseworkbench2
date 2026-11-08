@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
+import { rejectBrowserBuiltins } from "./web/tools/reject-browser-builtins";
 
 const renameEntryHtml = {
   name: "rename-entry-html",
@@ -36,7 +37,12 @@ const currentDirectory = dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   root: resolve(currentDirectory, "web"),
   base: "./",
-  plugins: [react(), viteSingleFile(), renameEntryHtml],
+  plugins: [
+    rejectBrowserBuiltins(),
+    react(),
+    viteSingleFile(),
+    renameEntryHtml,
+  ],
   build: {
     outDir: resolve(currentDirectory, "dist"),
     emptyOutDir: true,

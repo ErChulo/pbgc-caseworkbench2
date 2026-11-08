@@ -5,11 +5,13 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   effectivePolicyApproval,
+  policyContentHash,
+} from "../../../../src/domain/architecture/rule-loader";
+import {
   loadRuleSet,
   loadRuleSets,
-  policyContentHash,
   resolveRulePath,
-} from "../../../../src/domain/architecture/rule-loader";
+} from "../../../../src/adapters/node/architecture-rule-files";
 import {
   architecturePolicyDecisionContentHash,
   type ArchitecturePolicyApproval,
