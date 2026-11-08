@@ -223,9 +223,13 @@ export function App({
             className="button button-secondary button-small"
             type="button"
             onClick={orchestrator.returnToWorkspaceHome}
-            disabled={orchestrator.intakeBusy || orchestrator.caseRestoring}
+            disabled={
+              orchestrator.intakeBusy ||
+              orchestrator.safetyReviewBusy ||
+              orchestrator.caseRestoring
+            }
             aria-describedby={
-              orchestrator.intakeBusy
+              orchestrator.intakeBusy || orchestrator.safetyReviewBusy
                 ? "intake-switch-note"
                 : orchestrator.caseRestoring
                   ? "restore-switch-note"
@@ -234,9 +238,11 @@ export function App({
           >
             Return to workspace home
           </button>
-          {orchestrator.intakeBusy && (
+          {(orchestrator.intakeBusy || orchestrator.safetyReviewBusy) && (
             <p id="intake-switch-note" role="status">
-              Stop or finish file intake before switching cases.
+              {orchestrator.intakeBusy
+                ? "Stop or finish file intake before switching cases."
+                : "Finish safety review before switching cases."}
             </p>
           )}
           {orchestrator.caseRestoring && (
@@ -298,7 +304,8 @@ export function App({
             enabled={
               orchestrator.workspaceReady &&
               orchestrator.activeCase !== null &&
-              !orchestrator.evidenceRestoreBlocked
+              !orchestrator.evidenceRestoreBlocked &&
+              !orchestrator.safetyReviewBusy
             }
             restoreBlocked={orchestrator.evidenceRestoreBlocked}
             items={orchestrator.evidenceItems}
@@ -362,6 +369,9 @@ export function App({
               onFind={orchestrator.findProvisionalOracles}
             />
             <QuarantineQueue
+              disabled={
+                orchestrator.intakeBusy || orchestrator.safetyReviewBusy
+              }
               items={orchestrator.quarantineItems}
               reviewer={orchestrator.sharedReviewer}
               rationale={orchestrator.sharedRationale}
@@ -377,6 +387,9 @@ export function App({
               }}
             />
             <ArtifactEligibilityReview
+              disabled={
+                orchestrator.intakeBusy || orchestrator.safetyReviewBusy
+              }
               items={orchestrator.eligibilityItems}
               reviewer={orchestrator.sharedReviewer}
               rationale={orchestrator.sharedRationale}

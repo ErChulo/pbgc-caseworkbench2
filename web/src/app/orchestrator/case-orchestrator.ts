@@ -1,3 +1,7 @@
+import {
+  decisionCoversFindings,
+  gateEligibilityByCurrentFindings,
+} from "./quarantine-eligibility-gate";
 import { verifyEmptyPlanSummaryDraft } from "../../domain/plan-summary/empty-draft-verification";
 import {
   EVIDENCE_TEXT_RECORD_MAX_BYTES,
@@ -74,7 +78,7 @@ import {
   readUnresolvedItems,
   writeCurrentEvidenceCatalog,
 } from "../../adapters/filesystem/evidence-record-workspace";
-import { canonicalize } from "../../domain/manifests/canonical-json";
+import { canonicalize, hashTyped } from "../../domain/manifests/canonical-json";
 import { preserveContent } from "../../adapters/filesystem/content-store";
 import {
   createPackageSnapshot,
@@ -1044,6 +1048,7 @@ export interface CaseOrchestrator {
   readonly evidenceViewerLoading: boolean;
   readonly evidenceViewerError: string | null;
   readonly intakeBusy: boolean;
+  readonly safetyReviewBusy: boolean;
   readonly caseRestoring: boolean;
   readonly evidenceRestoreBlocked: boolean;
   readonly beginEvidenceIntake: () => boolean;
@@ -1246,6 +1251,8 @@ export function useCaseOrchestrator(
   const [evidenceViewerLoading, setEvidenceViewerLoading] = useState(false);
   const [intakeBusy, setIntakeBusy] = useState(false);
   const intakeInFlight = useRef(false);
+  const safetyReviewInFlight = useRef(false);
+  const [safetyReviewBusy, setSafetyReviewBusy] = useState(false);
   const caseRestoringRef = useRef(false);
   const [caseRestoring, setCaseRestoring] = useState(false);
   const evidenceRestoreBlockedRef = useRef(false);
@@ -1670,7 +1677,12 @@ export function useCaseOrchestrator(
   };
 
   const activateCase = (caseRecord: CaseRecord) => {
-    if (intakeInFlight.current || caseRestoringRef.current) return;
+    if (
+      intakeInFlight.current ||
+      safetyReviewInFlight.current ||
+      caseRestoringRef.current
+    )
+      return;
     caseOutputGuard.changed();
     outputReferencesRevision.current += 1;
     if (activeCase?.caseId !== caseRecord.caseId) {
@@ -1689,7 +1701,12 @@ export function useCaseOrchestrator(
   };
 
   const selectWorkspace = async (): Promise<void> => {
-    if (intakeInFlight.current || caseRestoringRef.current) return;
+    if (
+      intakeInFlight.current ||
+      safetyReviewInFlight.current ||
+      caseRestoringRef.current
+    )
+      return;
     setBusy(true);
     setWorkspaceError(null);
     try {
@@ -1768,7 +1785,12 @@ export function useCaseOrchestrator(
   };
 
   const openCase = (caseId: string): void => {
-    if (intakeInFlight.current || caseRestoringRef.current) return;
+    if (
+      intakeInFlight.current ||
+      safetyReviewInFlight.current ||
+      caseRestoringRef.current
+    )
+      return;
     setBusy(true);
     setError(null);
     const activeRegistry = registry.current;
@@ -1789,7 +1811,12 @@ export function useCaseOrchestrator(
   };
 
   const returnToWorkspaceHome = (): void => {
-    if (intakeInFlight.current || caseRestoringRef.current) return;
+    if (
+      intakeInFlight.current ||
+      safetyReviewInFlight.current ||
+      caseRestoringRef.current
+    )
+      return;
     activeCaseId.current = null;
     resetCaseScopedState(true);
     setActiveCase(null);
@@ -2234,7 +2261,7 @@ export function useCaseOrchestrator(
     setRuleAuthoringBusy(false);
   };
 
-  const recordQuarantineDecision = async (
+  const recordQuarantineDecisionUnchecked = async (
     item: QuarantineQueueItem,
     action:
       "release" | "inherit-release" | "final-quarantine" | "reject" | "revoke",
@@ -2246,8 +2273,31 @@ export function useCaseOrchestrator(
     }
     const artifactSha256 = parseSha256(item.artifactSha256);
     if (!artifactSha256.ok) throw new Error("Artifact hash is invalid.");
+    if (intakeInFlight.current)
+      throw new Error(
+        "Wait for evidence intake to finish before reviewing safety findings.",
+      );
+    const currentItem = caseReviewState.current.quarantineItems.find(
+      (candidate) => candidate.artifactSha256 === item.artifactSha256,
+    );
+    if (currentItem !== item)
+      throw new Error(
+        "Safety findings changed. Review the current queue before deciding.",
+      );
+    if (item.provisionalState === "rescreen-required")
+      throw new Error(
+        "New findings require a governed review-history migration.",
+      );
     const history = quarantineHistory.current.get(item.artifactSha256) ?? [];
     const prior = history.at(-1) ?? null;
+    if (
+      action === "inherit-release" &&
+      !decisionCoversFindings(prior ?? undefined, item.findingIds)
+    ) {
+      throw new Error(
+        "The prior release does not cover the current findings. A new review is required.",
+      );
+    }
     const resultingStatus =
       action === "release" || action === "inherit-release"
         ? ("released" as const)
@@ -2313,11 +2363,15 @@ export function useCaseOrchestrator(
     const nextEligibilityItems = caseReviewState.current.eligibilityItems.map(
       (candidate) =>
         candidate.artifactSha256 === artifactSha256.value
-          ? {
-              ...candidate,
-              quarantineReleased: replay.value.eligible,
-              projection: eligibilityReplay.value,
-            }
+          ? gateEligibilityByCurrentFindings(
+              candidate,
+              nextItems.find(
+                (value) => value.artifactSha256 === candidate.artifactSha256,
+              ),
+              nextHistory,
+              currentEligibilityHistory,
+              eligibilityReplay.value,
+            )
           : candidate,
     );
     const nextState: CaseReviewState = {
@@ -2343,7 +2397,7 @@ export function useCaseOrchestrator(
     await refreshGovernedEvidenceRecords(activeCase.caseId);
   };
 
-  const recordArtifactEligibilityDecision = async (
+  const recordArtifactEligibilityDecisionUnchecked = async (
     item: ArtifactEligibilityReviewItem,
     action: "approve" | "block" | "revoke" | "supersede",
     reviewer: string,
@@ -2352,6 +2406,17 @@ export function useCaseOrchestrator(
     if (activeCase === null || priorSnapshot.current === null) {
       throw new Error("Active evidence checkpoint is unavailable.");
     }
+    if (intakeInFlight.current)
+      throw new Error(
+        "Wait for evidence intake to finish before reviewing eligibility.",
+      );
+    const currentItem = caseReviewState.current.eligibilityItems.find(
+      (candidate) => candidate.artifactSha256 === item.artifactSha256,
+    );
+    if (currentItem !== item)
+      throw new Error(
+        "Eligibility or safety findings changed. Review the current queue before deciding.",
+      );
     const artifactSha256 = parseSha256(item.artifactSha256);
     if (!artifactSha256.ok) throw new Error("Artifact hash is invalid.");
     const history = eligibilityHistory.current.get(item.artifactSha256) ?? [];
@@ -2373,7 +2438,14 @@ export function useCaseOrchestrator(
     if (
       action === "approve" &&
       item.requiresQuarantineRelease &&
-      (!quarantine.value.eligible || releaseDecision === undefined)
+      (!quarantine.value.eligible ||
+        releaseDecision === undefined ||
+        !decisionCoversFindings(
+          releaseDecision,
+          caseReviewState.current.quarantineItems.find(
+            (candidate) => candidate.artifactSha256 === item.artifactSha256,
+          )?.findingIds ?? ["missing-safety-findings"],
+        ))
     ) {
       throw new Error(
         "An effective same-artifact quarantine release is required before eligibility approval.",
@@ -2427,13 +2499,15 @@ export function useCaseOrchestrator(
     const nextItems = caseReviewState.current.eligibilityItems.map(
       (candidate) =>
         candidate.artifactSha256 === artifactSha256.value
-          ? {
-              ...candidate,
-              quarantineReleased:
-                candidate.requiresQuarantineRelease &&
-                quarantine.value.eligible,
-              projection: replay.value,
-            }
+          ? gateEligibilityByCurrentFindings(
+              candidate,
+              caseReviewState.current.quarantineItems.find(
+                (value) => value.artifactSha256 === candidate.artifactSha256,
+              ),
+              quarantineDecisions,
+              nextHistory,
+              replay.value,
+            )
           : candidate,
     );
     const nextQuarantineItems = caseReviewState.current.quarantineItems.map(
@@ -2467,6 +2541,37 @@ export function useCaseOrchestrator(
     setEligibilityItems(nextItems);
     await refreshGovernedEvidenceRecords(activeCase.caseId);
   };
+
+  const runSafetyReview = async (
+    operation: () => Promise<void>,
+  ): Promise<void> => {
+    if (
+      safetyReviewInFlight.current ||
+      intakeInFlight.current ||
+      caseRestoringRef.current ||
+      evidenceRestoreBlockedRef.current
+    ) {
+      throw new Error(
+        "Finish the current intake, restoration, or safety review before recording a decision.",
+      );
+    }
+    safetyReviewInFlight.current = true;
+    setSafetyReviewBusy(true);
+    try {
+      await operation();
+    } finally {
+      safetyReviewInFlight.current = false;
+      setSafetyReviewBusy(false);
+    }
+  };
+  const recordQuarantineDecision: typeof recordQuarantineDecisionUnchecked =
+    async (...args) =>
+      runSafetyReview(() => recordQuarantineDecisionUnchecked(...args));
+  const recordArtifactEligibilityDecision: typeof recordArtifactEligibilityDecisionUnchecked =
+    async (...args) =>
+      runSafetyReview(() =>
+        recordArtifactEligibilityDecisionUnchecked(...args),
+      );
 
   const recordClassificationDecision = async (
     item: ClassificationReviewItem,
@@ -3448,7 +3553,9 @@ export function useCaseOrchestrator(
         const prior = history.at(-1) ?? null;
         const effectiveHumanStatus =
           replay.value.effectiveStatus === "provisional" ||
-          replay.value.effectiveStatus === "blocked"
+          replay.value.effectiveStatus === "blocked" ||
+          (replay.value.effectiveStatus === "released" &&
+            !decisionCoversFindings(prior ?? undefined, item.findingIds))
             ? ("none" as const)
             : replay.value.effectiveStatus;
         if (effectiveHumanStatus === "superseded") {
@@ -3457,7 +3564,16 @@ export function useCaseOrchestrator(
         restoredQuarantineHistory.set(item.artifactSha256, [...history]);
         projectedQuarantineItems.push({
           ...item,
+          provisionalState:
+            prior?.resultingStatus === "released" &&
+            !decisionCoversFindings(prior, item.findingIds)
+              ? "rescreen-required"
+              : item.provisionalState,
           effectiveHumanStatus,
+          inheritanceAvailable: decisionCoversFindings(
+            prior ?? undefined,
+            item.findingIds,
+          ),
           reviewer: prior?.reviewer.displayName ?? null,
           rationale: prior?.rationale ?? null,
           nextAction:
@@ -3491,12 +3607,17 @@ export function useCaseOrchestrator(
         );
         if (!replay.ok) throw new Error(replay.error.safeMessage);
         restoredEligibilityHistory.set(item.artifactSha256, [...history]);
-        projectedEligibilityItems.push({
-          ...item,
-          quarantineReleased:
-            item.requiresQuarantineRelease && quarantine.value.eligible,
-          projection: replay.value,
-        });
+        projectedEligibilityItems.push(
+          gateEligibilityByCurrentFindings(
+            item,
+            projectedQuarantineItems.find(
+              (value) => value.artifactSha256 === item.artifactSha256,
+            ),
+            quarantineDecisions,
+            history,
+            replay.value,
+          ),
+        );
       }
 
       const restoredClassificationHistory = new Map<
@@ -5968,6 +6089,7 @@ export function useCaseOrchestrator(
   const beginEvidenceIntake = (): boolean => {
     if (
       intakeInFlight.current ||
+      safetyReviewInFlight.current ||
       caseRestoringRef.current ||
       evidenceRestoreBlockedRef.current ||
       workspace.current === null ||
@@ -6418,32 +6540,53 @@ export function useCaseOrchestrator(
       }
       if (blockingFindings.length > 0) {
         {
+          const oldItem = caseReviewState.current.quarantineItems.find(
+            (candidate) => candidate.artifactSha256 === hashed.value.sha256,
+          );
+          const observedFindingIds = await Promise.all(
+            blockingFindings.map(async (finding) =>
+              "findingId" in finding && typeof finding.findingId === "string"
+                ? finding.findingId
+                : `passive-v2:${await hashTyped({ artifactSha256: hashed.value.sha256, category: finding.category, parserId: passive?.parserId ?? null, parserVersion: passive?.parserVersion ?? null, status: passive?.status ?? null }, {})}`,
+            ),
+          );
+          const findingIds = [
+            ...new Set([...(oldItem?.findingIds ?? []), ...observedFindingIds]),
+          ].sort();
+          const safetyHistory =
+            quarantineHistory.current.get(hashed.value.sha256) ?? [];
+          const uncoveredPriorRelease =
+            safetyHistory.at(-1)?.resultingStatus === "released" &&
+            !decisionCoversFindings(safetyHistory.at(-1), findingIds);
           const next: QuarantineQueueItem = {
             artifactSha256: hashed.value.sha256,
             displayName: item.path,
             accountingStatus: "pending-human-disposition",
-            provisionalState: "provisional-safety-block",
-            findingIds: Object.freeze(
-              blockingFindings.map((finding, index) =>
-                "findingId" in finding && typeof finding.findingId === "string"
-                  ? finding.findingId
-                  : `passive:${hashed.value.sha256}:${String(index)}`,
-              ),
-            ),
-            findingSummary: blockingFindings
-              .map((finding) => finding.category)
-              .join(", "),
+            provisionalState: uncoveredPriorRelease
+              ? "rescreen-required"
+              : "provisional-safety-block",
+            findingIds: Object.freeze(findingIds),
+            findingSummary: [
+              ...new Set([
+                ...(oldItem ? [oldItem.findingSummary] : []),
+                ...blockingFindings.map((finding) => finding.category),
+              ]),
+            ].join(", "),
             evidenceRequired:
               "An authorized reviewer must check the exact files and findings.",
-            nextAction:
-              "Release the safety hold, permanently quarantine, or reject with a reason.",
+            nextAction: uncoveredPriorRelease
+              ? "New findings are not covered by the earlier release. Stop and use a governed review-history migration before further decisions."
+              : "Release the safety hold, permanently quarantine, or reject with a reason.",
             effectiveHumanStatus: "none",
             reviewer: null,
             rationale: null,
-            inheritanceAvailable:
-              quarantineHistory.current.get(hashed.value.sha256)?.at(-1)
-                ?.resultingStatus === "released",
-            eligibilityDecisionCount: 0,
+            inheritanceAvailable: decisionCoversFindings(
+              safetyHistory.at(-1),
+              findingIds,
+            ),
+            eligibilityDecisionCount: (
+              eligibilityHistory.current.get(hashed.value.sha256) ?? []
+            ).length,
           };
           storeQuarantineItems([
             ...caseReviewState.current.quarantineItems.filter(
@@ -6451,6 +6594,22 @@ export function useCaseOrchestrator(
             ),
             next,
           ]);
+          storeEligibilityItems(
+            caseReviewState.current.eligibilityItems.map((candidate) =>
+              candidate.artifactSha256 === next.artifactSha256
+                ? gateEligibilityByCurrentFindings(
+                    candidate,
+                    next,
+                    safetyHistory,
+                    eligibilityHistory.current.get(next.artifactSha256) ?? [],
+                    candidate.projection,
+                  )
+                : candidate,
+            ),
+          );
+          clearGovernedEvidenceRecords(
+            "Safety findings changed. Governed evidence is blocked until the current findings and eligibility are reviewed.",
+          );
         }
       }
       const receivedEntry: SnapshotEntry = {
@@ -6918,6 +7077,7 @@ export function useCaseOrchestrator(
     evidenceViewerLoading,
     evidenceViewerError,
     intakeBusy,
+    safetyReviewBusy,
     caseRestoring,
     evidenceRestoreBlocked,
     beginEvidenceIntake,

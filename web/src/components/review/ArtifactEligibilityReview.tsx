@@ -21,6 +21,7 @@ const labels: Readonly<Record<(typeof actions)[number], string>> = {
 
 export function ArtifactEligibilityReview({
   items,
+  disabled = false,
   reviewer,
   rationale,
   onReviewerChange,
@@ -28,6 +29,7 @@ export function ArtifactEligibilityReview({
   onDecision,
 }: {
   readonly items: readonly ArtifactEligibilityReviewItem[];
+  readonly disabled?: boolean;
   readonly reviewer: string;
   readonly rationale: string;
   readonly onReviewerChange: (value: string) => void;
@@ -127,6 +129,16 @@ export function ArtifactEligibilityReview({
                 reviewer releases the exact artifact and reviewed findings.
               </p>
             ) : null}
+            {item.requiresQuarantineRelease &&
+            item.quarantineReleased &&
+            !item.projection.eligible &&
+            item.projection.provenance.length > 0 ? (
+              <p className="notice">
+                Existing eligibility history may not cover the current safety
+                findings. If it cannot be reviewed in this workflow, stop and
+                use a governed review-history migration.
+              </p>
+            ) : null}
             <div className="decision-actions">
               {actions.map((action) => (
                 <button
@@ -134,6 +146,7 @@ export function ArtifactEligibilityReview({
                   type="button"
                   className="button button-secondary"
                   disabled={
+                    disabled ||
                     reviewer.trim() === "" ||
                     rationale.trim() === "" ||
                     !actionAllowed(item, action)

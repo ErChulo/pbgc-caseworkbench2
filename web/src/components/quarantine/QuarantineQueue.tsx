@@ -87,6 +87,7 @@ function plainHumanStatus(status: string): string {
 
 export function QuarantineQueue({
   items,
+  disabled = false,
   reviewer: sharedReviewer,
   rationale: sharedRationale,
   onReviewerChange,
@@ -94,6 +95,7 @@ export function QuarantineQueue({
   onDecision,
 }: {
   readonly items: readonly QuarantineQueueItem[];
+  readonly disabled?: boolean;
   readonly reviewer: string;
   readonly rationale: string;
   readonly onReviewerChange: (value: string) => void;
@@ -236,9 +238,11 @@ export function QuarantineQueue({
                       type="button"
                       className="button button-secondary"
                       disabled={
+                        disabled ||
                         sharedReviewer.trim() === "" ||
                         sharedRationale.trim() === "" ||
                         busyHash !== null ||
+                        item.provisionalState === "rescreen-required" ||
                         (action === "revoke" &&
                           item.effectiveHumanStatus !== "released") ||
                         (action === "inherit-release" &&
