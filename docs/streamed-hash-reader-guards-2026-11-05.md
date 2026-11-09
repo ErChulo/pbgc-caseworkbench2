@@ -1,0 +1,7 @@
+# Streamed hash reader guards
+
+The shared incremental SHA-256 reader now rejects negative, fractional, non-finite and unsafe declared sizes rather than treating them as empty data. It captures the declared size once, checks that each chunk's end-of-source flag agrees with the byte position, and permits shorter reads when their offsets and end flags are consistent. Cancellation before reading, during a read, or from final progress reporting returns a cancellation rather than a digest. A legitimate zero-byte file still hashes to the standard empty SHA-256.
+
+Synthetic unit tests cover invalid sizes, inconsistent early and late end flags, short reads, a changing size property, cancellation and output-reference verification with an invalid size and the empty digest. The full suite passed 1,226 unit/integration tests across 159 files and 131 synthetic Chromium tests with 3 skipped. The isolated offline single-file build passed its verifier; type, lint, format, schema and contract checks passed. The exact approved Data Dictionary was supplied locally after SHA-256 verification; it was not committed.
+
+These guards validate the reader's accounting, not whether the reader is honest, a file is authentic, concurrent modifications are prevented, or a linked artifact is approved. They do not replace independent workbook execution, office security validation, participant routing, or governed recovery. Inconsistent reader implementations now fail closed and require correction rather than a partial digest.

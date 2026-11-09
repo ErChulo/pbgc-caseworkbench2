@@ -31,3 +31,5 @@ Restoration now blocks when the standalone inventory snapshot is missing, oversi
 Intake event envelopes and the terminal checkpoint are now checked on restore and before a subsequent append. This is not authenticated history or full replay, and cases with missing or inconsistent history need governed recovery. The latest full synthetic suite passed 1,215 unit/integration tests and 129 Chromium tests with 3 skipped; office readiness remains blocked.
 
 Intake-history bytes are now pinned for the active session and rechecked before subsequent appends; this does not authenticate the initially restored history. Latest synthetic results: 1,215 unit/integration tests and 131 Chromium tests passed, with 3 skipped. Office readiness remains blocked.
+
+Streamed hashing now rejects invalid source sizes and inconsistent end-of-source reports; see `streamed-hash-reader-guards-2026-11-05.md`. The latest synthetic suite passed 1,226 unit/integration tests and 131 Chromium tests with 3 skipped. These checks do not establish source authenticity or office readiness.

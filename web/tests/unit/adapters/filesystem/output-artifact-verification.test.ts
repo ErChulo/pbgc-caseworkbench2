@@ -108,6 +108,34 @@ describe("output artifact byte verification", () => {
     expect(result.verified).toEqual([]);
     expect(result.rejected).toEqual([broken]);
   });
+  it("rejects an invalid size even when the claimed hash is the empty digest", async () => {
+    const emptyDigest = parseSha256(
+      createHash("sha256").update("").digest("hex"),
+    );
+    if (!emptyDigest.ok) throw new Error("Bad empty digest");
+    const invalid = {
+      ...artifact(`${prefix}invalid-size`),
+      contentSha256: emptyDigest.value,
+    };
+    const result = await verifyOutputArtifactReferences(
+      {
+        openChunkReader: () =>
+          Promise.resolve({
+            ok: true as const,
+            value: {
+              sizeBytes: NaN,
+              read: () => {
+                throw new Error("Unexpected read");
+              },
+            },
+          }),
+      },
+      caseId,
+      [invalid],
+    );
+    expect(result.verified).toEqual([]);
+    expect(result.rejected).toEqual([invalid]);
+  });
   it("handles an empty list without opening anything", async () => {
     const result = await verifyOutputArtifactReferences(
       {

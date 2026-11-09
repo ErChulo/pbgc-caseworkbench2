@@ -20,26 +20,39 @@ export async function hashChunkReader<ReadError>(
     readonly onProgress?: (progress: HashProgress) => void;
   } = {},
 ): Promise<Result<HashResult, HashWorkerError>> {
+  const isCancelled = (): boolean => options.signal?.aborted === true;
   const chunkSizeBytes = options.chunkSizeBytes ?? 4 * 1024 * 1024;
   if (!Number.isSafeInteger(chunkSizeBytes) || chunkSizeBytes <= 0) {
     return failure("HASH_INVALID_CHUNK", "Hash chunk size must be positive.");
   }
+  const sizeBytes = source.sizeBytes;
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 0) {
+    return failure("HASH_READ_FAILED", "Artifact size is invalid.");
+  }
+  if (isCancelled()) {
+    return failure("HASH_CANCELLED", "Hashing was cancelled.");
+  }
   const hasher = await createSHA256();
   let offsetBytes = 0;
-  while (offsetBytes < source.sizeBytes) {
-    if (options.signal?.aborted === true) {
+  while (offsetBytes < sizeBytes) {
+    if (isCancelled()) {
       return failure("HASH_CANCELLED", "Hashing was cancelled.");
     }
     const chunk = await source.read({
       offsetBytes,
-      lengthBytes: Math.min(chunkSizeBytes, source.sizeBytes - offsetBytes),
+      lengthBytes: Math.min(chunkSizeBytes, sizeBytes - offsetBytes),
     });
+    if (isCancelled()) {
+      return failure("HASH_CANCELLED", "Hashing was cancelled.");
+    }
     if (
       !chunk.ok ||
       chunk.value.offsetBytes !== offsetBytes ||
       chunk.value.bytes.byteLength === 0 ||
       chunk.value.bytes.byteLength >
-        Math.min(chunkSizeBytes, source.sizeBytes - offsetBytes)
+        Math.min(chunkSizeBytes, sizeBytes - offsetBytes) ||
+      chunk.value.endOfSource !==
+        (offsetBytes + chunk.value.bytes.byteLength === sizeBytes)
     ) {
       return failure(
         "HASH_READ_FAILED",
@@ -50,8 +63,11 @@ export async function hashChunkReader<ReadError>(
     offsetBytes += chunk.value.bytes.byteLength;
     options.onProgress?.({
       processedBytes: offsetBytes,
-      totalBytes: source.sizeBytes,
+      totalBytes: sizeBytes,
     });
+  }
+  if (isCancelled()) {
+    return failure("HASH_CANCELLED", "Hashing was cancelled.");
   }
   const parsed = parseSha256(hasher.digest("hex"));
   if (!parsed.ok)

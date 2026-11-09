@@ -69,4 +69,125 @@ describe("T042 incremental SHA-256", () => {
     });
     expect(progress).toEqual([10, 20, 30]);
   });
+  it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects invalid source size %s rather than hashing empty data",
+    async (sizeBytes) => {
+      const result = await hashChunkReader({
+        sizeBytes,
+        read: () => {
+          throw new Error("Unexpected read");
+        },
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: "HASH_READ_FAILED" },
+      });
+    },
+  );
+
+  it.each([true, false])(
+    "rejects contradictory end-of-source flags (%s)",
+    async (early) => {
+      const bytes = new Uint8Array([1, 2]);
+      const reader = readerFromBytes(bytes);
+      const result = await hashChunkReader(
+        {
+          sizeBytes: bytes.length,
+          read: async (request) => {
+            const chunk = await reader.read(request);
+            if (!chunk.ok) return chunk;
+            return {
+              ok: true as const,
+              value: { ...chunk.value, endOfSource: early },
+            };
+          },
+        },
+        { chunkSizeBytes: 1 },
+      );
+      expect(result).toMatchObject({
+        ok: false,
+        error: { code: "HASH_READ_FAILED" },
+      });
+    },
+  );
+
+  it("accepts short reads with accurate end-of-source signals", async () => {
+    const bytes = new Uint8Array([1, 2, 3]);
+    const base = readerFromBytes(bytes);
+    const result = await hashChunkReader(
+      {
+        sizeBytes: bytes.length,
+        read: (request) => base.read({ ...request, lengthBytes: 1 }),
+      },
+      { chunkSizeBytes: 3 },
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        sizeBytes: 3,
+      },
+    });
+  });
+
+  it("pins the declared size even if the reader changes it during a read", async () => {
+    const bytes = new Uint8Array([1, 2]);
+    const base = readerFromBytes(bytes);
+    let size = bytes.length;
+    const result = await hashChunkReader(
+      {
+        get sizeBytes() {
+          return size;
+        },
+        read: async (request) => {
+          size = 1;
+          return base.read(request);
+        },
+      },
+      { chunkSizeBytes: 1 },
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        sizeBytes: 2,
+      },
+    });
+  });
+
+  it("does not return a hash when cancelled for an empty or final chunk", async () => {
+    const before = new AbortController();
+    before.abort();
+    expect(
+      await hashChunkReader(readerFromBytes(new Uint8Array()), {
+        signal: before.signal,
+      }),
+    ).toMatchObject({ ok: false, error: { code: "HASH_CANCELLED" } });
+    const during = new AbortController();
+    const reader = readerFromBytes(new Uint8Array([1]));
+    const result = await hashChunkReader(
+      {
+        sizeBytes: 1,
+        read: async (request) => {
+          const chunk = await reader.read(request);
+          during.abort();
+          return chunk;
+        },
+      },
+      { signal: during.signal },
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "HASH_CANCELLED" },
+    });
+    const progress = new AbortController();
+    expect(
+      await hashChunkReader(reader, {
+        signal: progress.signal,
+        onProgress: () => {
+          progress.abort();
+        },
+      }),
+    ).toMatchObject({ ok: false, error: { code: "HASH_CANCELLED" } });
+  });
 });
