@@ -61,7 +61,7 @@ describe("bounded passive OOXML expansion", () => {
     });
     const parsed = parseOoxmlPassive(parts, "docx");
     expect(parsed.status).toBe("partial");
-    expect(parsed.parserVersion).toBe("1.1.0");
+    expect(parsed.parserVersion).toBe("1.2.0");
     expect(parsed.riskIndicators[0]).toContain("external-relationship");
     const many: Record<string, Uint8Array> = {
       "word/document.xml": strToU8("test"),
@@ -70,7 +70,7 @@ describe("bounded passive OOXML expansion", () => {
       many[`word/p${String(i)}`] = new Uint8Array();
     const rejected = parseOoxmlPassive(zipSync(many), "docx");
     expect(rejected.status).toBe("unreadable");
-    expect(rejected.parserVersion).toBe("1.1.0");
+    expect(rejected.parserVersion).toBe("1.2.0");
   });
 
   it("rejects forged local and central sizes based on observed expansion", () => {

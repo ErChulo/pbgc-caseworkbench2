@@ -12,6 +12,8 @@ import { inspectPassive } from "../../src/adapters/parsers/passive-inspection";
 import { parsePdfPassive } from "../../src/adapters/parsers/pdf-parser";
 import { parsePlainText } from "../../src/adapters/parsers/text-parser";
 import { parseWorkbookPassive } from "../../src/adapters/parsers/workbook-parser";
+import { screenSensitiveText } from "../../src/adapters/screening/sensitive-data";
+import { parseSha256 } from "../../src/domain/shared/types";
 import {
   activePdfFixture,
   csvFixture,
@@ -178,6 +180,65 @@ describe("T064 passive inspection", () => {
       parseOoxmlPassive(docxFixture({ external: true }), "docx")
         .riskIndicators[0],
     ).toContain("external-relationship:");
+  });
+
+  it("decodes numeric XML references once and fails closed for unsupported references", () => {
+    const document = (text: string) =>
+      zipSync({
+        "word/document.xml": strToU8(
+          `<w:document><w:t>${text}</w:t></w:document>`,
+        ),
+      });
+    const result = parseOoxmlPassive(
+      document("Synthetic &#49;&#x32; &amp;#51; &lt;ok&gt;"),
+      "docx",
+    );
+    expect(result.status).toBe("success");
+    expect(result.text).toBe("Synthetic 12 &#51; <ok>");
+    for (const text of [
+      "&#0;",
+      "&#xD800;",
+      "&#x110000;",
+      "&custom;",
+      "&bad",
+      "&#xZZ;",
+    ]) {
+      expect(parseOoxmlPassive(document(text), "docx").status).toBe(
+        "unreadable",
+      );
+    }
+    const dtd = zipSync({
+      "word/document.xml": strToU8(
+        '<!DOCTYPE x [<!ENTITY custom "text">]><w:document><w:t>&custom;</w:t></w:document>',
+      ),
+    });
+    expect(parseOoxmlPassive(dtd, "docx").status).toBe("unreadable");
+    const invalidUtf8 = zipSync({
+      "word/document.xml": new Uint8Array([0xff, 0xfe]),
+    });
+    expect(parseOoxmlPassive(invalidUtf8, "docx").status).toBe("unreadable");
+  });
+
+  it("screens decoded synthetic numeric references as text", async () => {
+    const source = zipSync({
+      "word/document.xml": strToU8(
+        "<w:document><w:t>synthetic&#64;example.invalid</w:t></w:document>",
+      ),
+    });
+    const extraction = parseOoxmlPassive(source, "docx");
+    const hash = parseSha256("a".repeat(64));
+    if (!hash.ok) throw new Error("Invalid synthetic hash");
+    const result = await screenSensitiveText(extraction.text, hash.value, {
+      authorizedRealPii: false,
+      expectedFields: [],
+      maximumSensitiveMatches: 8,
+    });
+    expect(result.findings).toEqual([
+      expect.objectContaining({
+        category: "unauthorized-pii",
+        blocksDownstream: true,
+      }),
+    ]);
   });
 
   it("extracts passive PDF text and blocks active/encrypted structures", () => {

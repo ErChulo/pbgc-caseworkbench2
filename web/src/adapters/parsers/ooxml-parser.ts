@@ -1,4 +1,3 @@
-import { strFromU8 } from "fflate";
 import { readBoundedOoxmlParts } from "./bounded-ooxml-parts";
 
 import {
@@ -23,9 +22,10 @@ export function parseOoxmlPassive(
         mediaType(kind),
         "unsupported",
         `Container does not contain the expected ${kind.toUpperCase()} structure.`,
-        "1.1.0",
+        "1.2.0",
       );
     }
+    const decoder = new TextDecoder("utf-8", { fatal: true });
     const xmlEntries = names
       .filter(
         (name) =>
@@ -34,8 +34,12 @@ export function parseOoxmlPassive(
       )
       .map((name) => ({
         name,
-        xml: strFromU8(xmlParts.get(name) ?? new Uint8Array()),
+        xml: decoder.decode(xmlParts.get(name) ?? new Uint8Array()),
       }));
+    // Do not resolve custom or external entities. A DTD could change text or
+    // relationship interpretation; leave it for manual review instead.
+    if (xmlEntries.some(({ xml }) => /<!DOCTYPE\b|<!ENTITY\b/iu.test(xml)))
+      throw new Error("XML declarations with entities are unsupported.");
     const relevant = xmlEntries.filter(({ name }) =>
       kind === "docx"
         ? /^word\/(?:document|header|footer|footnotes|endnotes|comments).*\.xml$/u.test(
@@ -66,7 +70,7 @@ export function parseOoxmlPassive(
     ];
     return Object.freeze({
       parserId: "ooxml-passive",
-      parserVersion: "1.1.0",
+      parserVersion: "1.2.0",
       status: riskIndicators.length > 0 ? "partial" : "success",
       mediaType: mediaType(kind),
       text,
@@ -87,7 +91,7 @@ export function parseOoxmlPassive(
       mediaType(kind),
       "unreadable",
       "OOXML package is corrupt, encrypted, unsupported, or exceeds local inspection limits; no repair was attempted.",
-      "1.1.0",
+      "1.2.0",
     );
   }
 }
@@ -99,10 +103,36 @@ function mediaType(kind: "docx" | "pptx"): string {
 }
 
 function decodeXml(value: string): string {
-  return value
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'")
-    .replaceAll("&amp;", "&");
+  const named: Readonly<Record<string, string>> = {
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&apos;": "'",
+    "&amp;": "&",
+  };
+  // A single pass prevents &amp;#49; from being decoded twice. Reject unknown,
+  // malformed and non-XML characters rather than silently changing evidence.
+  return value.replace(
+    /&(?:#x[0-9a-fA-F]+|#[0-9]+|lt|gt|quot|apos|amp);|&/gu,
+    (reference) => {
+      if (reference === "&") throw new Error("Unsupported XML entity.");
+      if (reference in named) return named[reference] ?? "";
+      const hexadecimal = reference.startsWith("&#x");
+      const digits = reference.slice(hexadecimal ? 3 : 2, -1);
+      const point = Number.parseInt(digits, hexadecimal ? 16 : 10);
+      if (
+        !Number.isSafeInteger(point) ||
+        !(
+          point === 9 ||
+          point === 10 ||
+          point === 13 ||
+          (point >= 0x20 && point <= 0xd7ff) ||
+          (point >= 0xe000 && point <= 0xfffd) ||
+          (point >= 0x10000 && point <= 0x10ffff)
+        )
+      )
+        throw new Error("Invalid XML character reference.");
+      return String.fromCodePoint(point);
+    },
+  );
 }
