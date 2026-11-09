@@ -1,3 +1,7 @@
+import {
+  inspectIobMetadataRow,
+  type IobMetadataObservation,
+} from "../../domain/population/iob-metadata-inspection";
 import { sha256Bytes } from "../../domain/shared/digest";
 import { hasConsistentIntakeEventHistory } from "./intake-event-history";
 import {
@@ -1120,9 +1124,14 @@ export interface CaseOrchestrator {
     selection: {
       readonly sheetName: string;
       readonly sourceRow: number;
+      readonly metadataRow?: number;
       readonly bindings: readonly PopulationRecordFieldBinding[];
     },
-  ) => Promise<PopulationRecordProjection>;
+  ) => Promise<
+    PopulationRecordProjection & {
+      readonly iobMetadata?: IobMetadataObservation;
+    }
+  >;
   readonly recordPopulationDecision: (
     item: PopulationReviewItem,
     action: "approve" | "reject" | "revoke" | "supersede",
@@ -2988,9 +2997,14 @@ export function useCaseOrchestrator(
     selection: {
       readonly sheetName: string;
       readonly sourceRow: number;
+      readonly metadataRow?: number;
       readonly bindings: readonly PopulationRecordFieldBinding[];
     },
-  ): Promise<PopulationRecordProjection> => {
+  ): Promise<
+    PopulationRecordProjection & {
+      readonly iobMetadata?: IobMetadataObservation;
+    }
+  > => {
     const activeWorkspace = workspace.current;
     const snapshot = priorSnapshot.current;
     const reviewState = caseReviewState.current;
@@ -3077,7 +3091,17 @@ export function useCaseOrchestrator(
     });
     requireCurrent();
     if (!projected.ok) throw new Error(projected.message);
-    return projected.record;
+    if (capturedSelection.metadataRow === undefined) return projected.record;
+    return {
+      ...projected.record,
+      iobMetadata: inspectIobMetadataRow({
+        workbook: verified.value.workbook,
+        sheetName: capturedSelection.sheetName,
+        sourceRow: capturedSelection.sourceRow,
+        metadataRow: capturedSelection.metadataRow,
+        bindings: capturedSelection.bindings,
+      }),
+    };
   };
 
   const persistPlanRuleRecord = async (

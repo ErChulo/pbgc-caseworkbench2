@@ -324,3 +324,34 @@ it("shows routing conflicts for the inspected row without routing values", async
   expect(screen.queryByText(/target is in row one/)).not.toBeInTheDocument();
   expect(screen.getByText(/Generate a current BuildSpec/)).toBeVisible();
 });
+
+it("passes an explicitly selected metadata row, displays observations, and clears them on change", async () => {
+  const onPreview = vi
+    .fn()
+    .mockResolvedValue({
+      ...record,
+      iobMetadata: {
+        metadataRow: 12,
+        fields: [{ field: "AMOUNT", sourceAddress: "B12", state: "B" }],
+      },
+    });
+  const user = userEvent.setup();
+  render(<PopulationRecordPreview item={item} onPreview={onPreview} />);
+  await user.type(screen.getByLabelText("Source sheet name"), "Synthetic");
+  await user.type(screen.getByLabelText("Source row number"), "2");
+  await user.type(
+    screen.getByLabelText("Optional I/O/B metadata row number"),
+    "12",
+  );
+  await enterBinding(user);
+  await user.click(
+    screen.getByRole("button", { name: "Inspect source row locally" }),
+  );
+  expect(await screen.findByText('"AMOUNT" at B12: B')).toBeVisible();
+  expect(onPreview).toHaveBeenCalledWith(
+    item,
+    expect.objectContaining({ metadataRow: 12 }),
+  );
+  await user.clear(screen.getByLabelText("Optional I/O/B metadata row number"));
+  expect(screen.queryByText('"AMOUNT" at B12: B')).not.toBeInTheDocument();
+});

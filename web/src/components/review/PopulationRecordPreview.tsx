@@ -1,3 +1,4 @@
+import type { IobMetadataObservation } from "../../domain/population/iob-metadata-inspection";
 import { useEffect, useRef, useState } from "react";
 import type { OfficialFieldCatalogIndex } from "../../domain/field-catalog/models";
 import type { BuildSpecV2 } from "../../domain/build-spec/models";
@@ -98,18 +99,29 @@ export function PopulationRecordPreview({
     selection: {
       readonly sheetName: string;
       readonly sourceRow: number;
+      readonly metadataRow?: number;
       readonly bindings: readonly PopulationRecordFieldBinding[];
     },
-  ) => Promise<PopulationRecordProjection>;
+  ) => Promise<
+    PopulationRecordProjection & {
+      readonly iobMetadata?: IobMetadataObservation;
+    }
+  >;
 }) {
   const [sheet, setSheet] = useState("");
   const [row, setRow] = useState("");
+  const [metadataRow, setMetadataRow] = useState("");
   const [bindings, setBindings] = useState<
     readonly PopulationRecordFieldBinding[]
   >([emptyBinding()]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [record, setRecord] = useState<PopulationRecordProjection | null>(null);
+  const [record, setRecord] = useState<
+    | (PopulationRecordProjection & {
+        readonly iobMetadata?: IobMetadataObservation;
+      })
+    | null
+  >(null);
   const sequence = useRef(0);
   useEffect(
     () => () => {
@@ -144,9 +156,12 @@ export function PopulationRecordPreview({
         sourceRow > 1_048_576
       )
         throw new Error("Choose a data row from 2 to 1048576.");
+      if (metadataRow && !/^[1-9][0-9]*$/u.test(metadataRow))
+        throw new Error("Enter a one-based metadata row or leave it blank.");
       const result = await onPreview(item, {
         sheetName: sheet,
         sourceRow,
+        ...(metadataRow ? { metadataRow: Number(metadataRow) } : {}),
         bindings: validateBindings(bindings),
       });
       if (sequence.current === request) setRecord(result);
@@ -211,6 +226,22 @@ export function PopulationRecordPreview({
           autoComplete="off"
         />
       </label>
+      <label>
+        Optional I/O/B metadata row number
+        <input
+          inputMode="numeric"
+          value={metadataRow}
+          onChange={(event) => {
+            clear();
+            setMetadataRow(event.currentTarget.value);
+          }}
+          autoComplete="off"
+        />
+      </label>
+      <p>
+        Choose the metadata row from the source. Values are observations only
+        and do not establish routing or B semantics.
+      </p>
       {bindings.map((binding, index) => (
         <fieldset key={index}>
           <legend>Field binding {index + 1}</legend>
@@ -327,6 +358,24 @@ export function PopulationRecordPreview({
               )}
             </div>
           )}
+          {record.iobMetadata && (
+            <div>
+              <h5>Observed I/O/B metadata — not approval</h5>
+              <p>
+                Source row {record.iobMetadata.metadataRow}; exact uppercase I,
+                O, and B only. Other states need review. These observations are
+                not included in the record hash.
+              </p>
+              <ul>
+                {record.iobMetadata.fields.map((field) => (
+                  <li key={field.field}>
+                    {displayed(field.field)} at {field.sourceAddress}:{" "}
+                    {field.state}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <ul>
             {record.fields.map((field) => (
               <li key={field.field}>
@@ -348,6 +397,7 @@ export function PopulationRecordPreview({
               clear();
               setSheet("");
               setRow("");
+              setMetadataRow("");
               setBindings([emptyBinding()]);
             }}
           >

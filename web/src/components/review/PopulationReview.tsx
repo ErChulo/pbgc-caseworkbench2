@@ -1,3 +1,4 @@
+import type { IobMetadataObservation } from "../../domain/population/iob-metadata-inspection";
 import { useState } from "react";
 import type { BuildSpecV2 } from "../../domain/build-spec/models";
 import type { OfficialFieldCatalogIndex } from "../../domain/field-catalog/models";
@@ -61,9 +62,14 @@ export function PopulationReview({
     selection: {
       readonly sheetName: string;
       readonly sourceRow: number;
+      readonly metadataRow?: number;
       readonly bindings: readonly PopulationRecordFieldBinding[];
     },
-  ) => Promise<PopulationRecordProjection>;
+  ) => Promise<
+    PopulationRecordProjection & {
+      readonly iobMetadata?: IobMetadataObservation;
+    }
+  >;
   readonly reviewer: string;
   readonly rationale: string;
   readonly onReviewerChange: (value: string) => void;
