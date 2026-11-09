@@ -33,3 +33,5 @@ Intake event envelopes and the terminal checkpoint are now checked on restore an
 Intake-history bytes are now pinned for the active session and rechecked before subsequent appends; this does not authenticate the initially restored history. Latest synthetic results: 1,215 unit/integration tests and 131 Chromium tests passed, with 3 skipped. Office readiness remains blocked.
 
 Streamed hashing now rejects invalid source sizes and inconsistent end-of-source reports; see `streamed-hash-reader-guards-2026-11-05.md`. The latest synthetic suite passed 1,226 unit/integration tests and 131 Chromium tests with 3 skipped. These checks do not establish source authenticity or office readiness.
+
+Population row inspection now shows advisory exact-name matches from the session-only, hash-verified Data Dictionary; see `population-field-reference-2026-11-05.md`. This does not approve a mapping or lift routing blockers. The latest suite passed 1,227 unit/integration tests and 134 Chromium tests, including dictionary-dependent cases. Office testing with real data remains blocked.

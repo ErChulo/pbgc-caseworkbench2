@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import * as XLSX from "xlsx";
@@ -412,6 +413,36 @@ async function exercisePipeline(
   const rowReview = populationCandidate.getByRole("region", {
     name: "Local population record inspection",
   });
+  const dictionaryPath = process.env.PBGC_DATA_DICTIONARY_PATH;
+  if (dictionaryPath) {
+    await rowReview.getByLabel("Generic field 1").fill("CUSTOMER_DELETE_FLAG");
+    await expect(
+      rowReview.getByText(/Load the approved Data Dictionary/),
+    ).toBeVisible();
+    const dictionary = await readFile(resolve(dictionaryPath));
+    const dictionaryPicker = page.getByLabel("Select approved Data Dictionary");
+    await dictionaryPicker.setInputFiles({
+      name: "approved.xlsm",
+      mimeType: "application/octet-stream",
+      buffer: dictionary,
+    });
+    await expect(
+      rowReview.getByText(/11 exact reference matches in different tables/),
+    ).toBeVisible();
+    const altered = Buffer.from(dictionary);
+    altered[altered.length - 1] = (altered[altered.length - 1] ?? 0) ^ 1;
+    await dictionaryPicker.setInputFiles({
+      name: "altered.xlsm",
+      mimeType: "application/octet-stream",
+      buffer: altered,
+    });
+    await expect(
+      rowReview.getByText(/Load the approved Data Dictionary/),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/bytes do not match the approved SHA-256/),
+    ).toBeVisible();
+  }
   await rowReview.getByLabel("Source sheet name").fill("Retirees");
   await rowReview.getByLabel("Source row number").fill("2");
   for (const [index, field, column] of [

@@ -188,3 +188,77 @@ it("caps binding rows and rejects an oversized combined selection", () => {
   expect(screen.getByRole("alert")).toHaveTextContent(/no larger than 16 KiB/);
   expect(onPreview).not.toHaveBeenCalled();
 }, 20_000);
+
+it("shows local field-name reference matches without approving or blocking a binding", async () => {
+  const { APPROVED_DATA_DICTIONARY_SHA256, createOfficialFieldCatalogIndex } =
+    await import("../../../src/domain/field-catalog/models");
+  const makeRecord = (
+    fieldName: string,
+    tableName: string,
+    sourceRow: number,
+  ) => ({
+    identity: {
+      catalogSha256: APPROVED_DATA_DICTIONARY_SHA256,
+      tableName,
+      fieldName,
+    },
+    sourceSheet: "data_dictionary_complete" as const,
+    sourceRow,
+    description: "Synthetic reference",
+    rawDataType: "text",
+    rawFieldSize: 20,
+    rawCategoryText: null,
+    formulaText: "",
+    cachedFormulaText: "",
+    evaluatedByParser: false as const,
+  });
+  const built = createOfficialFieldCatalogIndex([
+    makeRecord("AMOUNT", "TABLE_A", 1),
+    makeRecord("DUPLICATE", "TABLE_A", 2),
+    makeRecord("DUPLICATE", "TABLE_B", 3),
+  ]);
+  if (!built.ok) throw new Error("Synthetic catalog invalid");
+  const onPreview = vi.fn().mockResolvedValue(record);
+  const user = userEvent.setup();
+  const view = render(
+    <PopulationRecordPreview
+      item={item}
+      onPreview={onPreview}
+      fieldCatalog={built.value}
+    />,
+  );
+  await user.type(screen.getByLabelText("Generic field 1"), "AMOUNT");
+  expect(
+    screen.getByText(/One exact reference match: table TABLE_A/),
+  ).toBeVisible();
+  await user.clear(screen.getByLabelText("Generic field 1"));
+  await user.type(screen.getByLabelText("Generic field 1"), "DUPLICATE");
+  expect(
+    screen.getByText(/2 exact reference matches in different tables/),
+  ).toBeVisible();
+  await user.clear(screen.getByLabelText("Generic field 1"));
+  await user.type(screen.getByLabelText("Generic field 1"), "amount");
+  expect(screen.getByText(/No exact field name found/)).toBeVisible();
+  expect(
+    screen.getByText(/does not rule out a governed user-defined field/),
+  ).toBeVisible();
+  view.rerender(
+    <PopulationRecordPreview
+      item={item}
+      onPreview={onPreview}
+      fieldCatalog={null}
+    />,
+  );
+  expect(
+    screen.getByText(/Load the approved Data Dictionary to check this name/),
+  ).toBeVisible();
+  await user.type(screen.getByLabelText("Source sheet name"), "Synthetic");
+  await user.type(screen.getByLabelText("Source row number"), "2");
+  await user.type(screen.getByLabelText("Source column 1"), "B");
+  await user.type(screen.getByLabelText("Exact row-one header 1"), "Amount");
+  await user.click(
+    screen.getByRole("button", { name: "Inspect source row locally" }),
+  );
+  expect(onPreview).toHaveBeenCalledOnce();
+  expect(await screen.findByText(/Source row: 2/)).toBeVisible();
+});

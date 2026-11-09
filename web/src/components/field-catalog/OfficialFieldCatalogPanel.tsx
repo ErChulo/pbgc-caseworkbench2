@@ -6,7 +6,13 @@ import {
   type OfficialFieldRecord,
 } from "../../domain/field-catalog/models";
 
-export function OfficialFieldCatalogPanel() {
+export function OfficialFieldCatalogPanel({
+  onCatalogChange,
+}: {
+  readonly onCatalogChange?: (
+    catalog: OfficialFieldCatalogIndex | null,
+  ) => void;
+} = {}) {
   const [catalog, setCatalog] = useState<OfficialFieldCatalogIndex | null>(
     null,
   );
@@ -19,6 +25,7 @@ export function OfficialFieldCatalogPanel() {
     if (file === undefined) return;
     const request = ++sequence.current;
     setCatalog(null);
+    onCatalogChange?.(null);
     setMessage(null);
     setLoading(true);
     try {
@@ -32,6 +39,7 @@ export function OfficialFieldCatalogPanel() {
       if (request !== sequence.current) return;
       if (!result.ok) throw new Error(result.error.safeMessage);
       setCatalog(result.value);
+      onCatalogChange?.(result.value);
       setMessage(
         `Approved Data Dictionary verified locally: ${String(result.value.records.length)} field records. No macros were executed.`,
       );

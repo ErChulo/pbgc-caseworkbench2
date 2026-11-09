@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { OfficialFieldCatalogIndex } from "../../domain/field-catalog/models";
 import type {
   PopulationRecordFieldBinding,
   PopulationRecordProjection,
@@ -34,6 +35,21 @@ function validateBindings(
   return bindings;
 }
 
+function fieldReference(
+  catalog: OfficialFieldCatalogIndex | null,
+  field: string,
+): string {
+  if (!field) return "Enter a field name to check the reference.";
+  if (catalog === null)
+    return "Load the approved Data Dictionary to check this name.";
+  const result = catalog.lookupFieldName(field);
+  if (result.status === "not-found")
+    return "No exact field name found in the loaded Data Dictionary. This does not rule out a governed user-defined field.";
+  if (result.status === "unique")
+    return `One exact reference match: table ${result.record.identity.tableName}.`;
+  return `${String(result.records.length)} exact reference matches in different tables. Check the table-qualified identity in the Data Dictionary lookup.`;
+}
+
 function displayed(value: string | number | boolean): string {
   return JSON.stringify(value).replace(
     /[\p{Cc}\p{Cf}\u2028\u2029]/gu,
@@ -45,8 +61,10 @@ function displayed(value: string | number | boolean): string {
 export function PopulationRecordPreview({
   item,
   onPreview,
+  fieldCatalog = null,
 }: {
   readonly item: PopulationReviewItem;
+  readonly fieldCatalog?: OfficialFieldCatalogIndex | null;
   readonly onPreview: (
     item: PopulationReviewItem,
     selection: {
@@ -133,6 +151,11 @@ export function PopulationRecordPreview({
         column, and the exact row-one header. No match or participant is chosen
         automatically.
       </p>
+      <p>
+        Field-name reference checks are exact and case-sensitive. A match does
+        not establish a field mapping or approval. The Data Dictionary stays in
+        this browser session and is not saved to the case.
+      </p>
       <label>
         Source sheet name
         <input
@@ -184,6 +207,10 @@ export function PopulationRecordPreview({
               />
             </label>
           ))}
+          <p aria-live="polite">
+            Field reference {index + 1}:{" "}
+            {fieldReference(fieldCatalog, binding.field)}
+          </p>
           <button
             type="button"
             className="button button-secondary"

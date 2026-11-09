@@ -1,3 +1,5 @@
+import { useState } from "react";
+import type { OfficialFieldCatalogIndex } from "../domain/field-catalog/models";
 import { OfficialFieldCatalogPanel } from "../components/field-catalog/OfficialFieldCatalogPanel";
 import { ProvisionalOraclePanel } from "../components/formula-governance/ProvisionalOraclePanel";
 import {
@@ -88,6 +90,8 @@ export function App({
   >[0];
 } = {}) {
   const orchestrator = useCaseOrchestrator(evidenceGovernanceDependencies);
+  const [fieldCatalog, setFieldCatalog] =
+    useState<OfficialFieldCatalogIndex | null>(null);
 
   const evidenceReviewContent =
     orchestrator.activeCase === null &&
@@ -265,7 +269,7 @@ export function App({
           <FeasibilityStatus />
         </section>
         {orchestrator.activeCase === null ? <HelpPanel /> : null}
-        <OfficialFieldCatalogPanel />
+        <OfficialFieldCatalogPanel onCatalogChange={setFieldCatalog} />
         <StageNavigation
           stages={CASWORK_STAGES}
           activeStage="intake"
@@ -548,6 +552,7 @@ export function App({
               }}
             />
             <PopulationReview
+              fieldCatalog={fieldCatalog}
               disabled={
                 orchestrator.intakeBusy ||
                 orchestrator.safetyReviewBusy ||
