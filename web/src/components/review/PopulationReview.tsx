@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { BuildSpecV2 } from "../../domain/build-spec/models";
 import type { OfficialFieldCatalogIndex } from "../../domain/field-catalog/models";
 import { PopulationRecordPreview } from "./PopulationRecordPreview";
 import type {
@@ -47,9 +48,11 @@ export function PopulationReview({
   caseId,
   reviewRevision,
   fieldCatalog = null,
+  buildSpec = null,
 }: {
   readonly items: readonly PopulationReviewItem[];
   readonly fieldCatalog?: OfficialFieldCatalogIndex | null;
+  readonly buildSpec?: BuildSpecV2 | null;
   readonly disabled?: boolean;
   readonly caseId: string | null;
   readonly reviewRevision: number;
@@ -218,6 +221,8 @@ export function PopulationReview({
                   key={`${caseId}-${item.candidate.candidateKey}-${String(reviewRevision)}`}
                   item={item}
                   fieldCatalog={fieldCatalog}
+                  buildSpec={buildSpec}
+                  caseId={caseId}
                   onPreview={onPreviewRecord}
                 />
               )}

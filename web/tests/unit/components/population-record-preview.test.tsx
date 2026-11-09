@@ -262,3 +262,65 @@ it("shows local field-name reference matches without approving or blocking a bin
   expect(onPreview).toHaveBeenCalledOnce();
   expect(await screen.findByText(/Source row: 2/)).toBeVisible();
 });
+
+it("shows routing conflicts for the inspected row without routing values", async () => {
+  const buildSpec = {
+    caseId: "case",
+    architectureLineage: {
+      population: [
+        {
+          workbookProfileContentSha256: record.workbookProfileContentSha256,
+          approvalDecisionId: record.populationDecisionId,
+        },
+      ],
+    },
+    cellMappings: [
+      {
+        mappingId: "mapping",
+        field: "AMOUNT",
+        tabName: "Synthetic",
+        cellAddress: "B1",
+        scenarioId: "scenario",
+        iobClassification: "I",
+        dataSource: {
+          sourceType: "population",
+          sourceTab: "Synthetic",
+          sourceField: "AMOUNT",
+          evidenceKey: null,
+        },
+        formulaId: null,
+      },
+    ],
+    formulas: [],
+  } as unknown as import("../../../src/domain/build-spec/models").BuildSpecV2;
+  const user = userEvent.setup();
+  const view = render(
+    <PopulationRecordPreview
+      item={item}
+      onPreview={vi.fn().mockResolvedValue(record)}
+      buildSpec={buildSpec}
+      caseId="case"
+    />,
+  );
+  await user.type(screen.getByLabelText("Source sheet name"), "Synthetic");
+  await user.type(screen.getByLabelText("Source row number"), "2");
+  await enterBinding(user);
+  await user.click(
+    screen.getByRole("button", { name: "Inspect source row locally" }),
+  );
+  expect(
+    await screen.findByText(/1 input or B mappings checked; 1 issues found/),
+  ).toBeVisible();
+  expect(screen.getByText(/target is in row one/)).toBeVisible();
+  expect(screen.getByText(/No values were routed or written/)).toBeVisible();
+  view.rerender(
+    <PopulationRecordPreview
+      item={item}
+      onPreview={vi.fn().mockResolvedValue(record)}
+      buildSpec={null}
+      caseId="case"
+    />,
+  );
+  expect(screen.queryByText(/target is in row one/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Generate a current BuildSpec/)).toBeVisible();
+});

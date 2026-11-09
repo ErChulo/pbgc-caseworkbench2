@@ -553,6 +553,7 @@ export function App({
             />
             <PopulationReview
               fieldCatalog={fieldCatalog}
+              buildSpec={orchestrator.v1BuildSpec}
               disabled={
                 orchestrator.intakeBusy ||
                 orchestrator.safetyReviewBusy ||

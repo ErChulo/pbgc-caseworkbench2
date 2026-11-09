@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { OfficialFieldCatalogIndex } from "../../domain/field-catalog/models";
+import type { BuildSpecV2 } from "../../domain/build-spec/models";
+import {
+  preflightPopulationRouting,
+  type RoutingIssueCode,
+} from "../../domain/workbook-builder/population-routing-preflight";
 import type {
   PopulationRecordFieldBinding,
   PopulationRecordProjection,
@@ -50,6 +55,25 @@ function fieldReference(
   return `${String(result.records.length)} exact reference matches in different tables. Check the table-qualified identity in the Data Dictionary lookup.`;
 }
 
+const ROUTING_ISSUES: Record<RoutingIssueCode, string> = {
+  LINEAGE_MISMATCH:
+    "The case or approved population lineage does not match this record.",
+  TARGET_INVALID: "The target cell address is invalid.",
+  TARGET_HEADER_ROW:
+    "The target is in row one, which may contain a source header.",
+  TARGET_COLLISION: "More than one mapping uses this target cell.",
+  INPUT_FORMULA_COLLISION: "An input and formula use the same target cell.",
+  FORMULA_TARGET_COLLISION: "More than one formula uses this target cell.",
+  B_SEMANTICS_REQUIRED: "B-classified input/output behavior needs review.",
+  SOURCE_UNSUPPORTED:
+    "The mapping does not identify this population sheet and field.",
+  SOURCE_FIELD_MISSING: "This field was not included in the inspected row.",
+  SOURCE_FIELD_AMBIGUOUS:
+    "This field occurs more than once in the inspected row.",
+  SOURCE_VALUE_UNAVAILABLE:
+    "The inspected source cell is blank, missing, a formula, or an error.",
+};
+
 function displayed(value: string | number | boolean): string {
   return JSON.stringify(value).replace(
     /[\p{Cc}\p{Cf}\u2028\u2029]/gu,
@@ -62,9 +86,13 @@ export function PopulationRecordPreview({
   item,
   onPreview,
   fieldCatalog = null,
+  buildSpec = null,
+  caseId = null,
 }: {
   readonly item: PopulationReviewItem;
   readonly fieldCatalog?: OfficialFieldCatalogIndex | null;
+  readonly buildSpec?: BuildSpecV2 | null;
+  readonly caseId?: string | null;
   readonly onPreview: (
     item: PopulationReviewItem,
     selection: {
@@ -133,6 +161,10 @@ export function PopulationRecordPreview({
       if (sequence.current === request) setBusy(false);
     }
   }
+  const routing =
+    record !== null && buildSpec !== null && caseId !== null
+      ? preflightPopulationRouting(buildSpec, record, caseId)
+      : null;
   return (
     <section
       className="case-output-linker"
@@ -256,6 +288,45 @@ export function PopulationRecordPreview({
             <code>{record.workbookProfileContentSha256}</code>. Record SHA-256:{" "}
             <code>{record.recordContentSha256}</code>.
           </p>
+          {routing === null ? (
+            <p>
+              Generate a current BuildSpec to inspect potential routing
+              conflicts for this row.
+            </p>
+          ) : (
+            <div>
+              <h5>Routing preflight — not authorization</h5>
+              <p>
+                {routing.inputMappingCount} input or B mappings checked;{" "}
+                {routing.issues.length} issues found. No values were routed or
+                written. A clear preflight does not approve a mapping or enable
+                workbook generation.
+              </p>
+              {routing.issues.length > 0 && (
+                <ul>
+                  {routing.issues.slice(0, 50).map((issue, index) => (
+                    <li
+                      key={`${issue.code}-${issue.mappingId ?? "lineage"}-${String(index)}`}
+                    >
+                      {ROUTING_ISSUES[issue.code]}
+                      {issue.tabName !== null && (
+                        <>
+                          {" "}
+                          Field {displayed(issue.field ?? "")}, scenario{" "}
+                          {displayed(issue.scenarioId ?? "")}, target{" "}
+                          {displayed(issue.tabName)}!
+                          {displayed(issue.cellAddress ?? "")}.
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {routing.issues.length > 50 && (
+                <p>Showing the first 50 issues.</p>
+              )}
+            </div>
+          )}
           <ul>
             {record.fields.map((field) => (
               <li key={field.field}>
