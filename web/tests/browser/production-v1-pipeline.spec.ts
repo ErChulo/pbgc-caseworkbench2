@@ -596,6 +596,14 @@ async function exercisePipeline(
   await expect(
     architecture.getByText(/O\/B mapping lacks its exact formula/u),
   ).toBeVisible();
+  await expect(
+    architecture.getByRole("heading", {
+      name: "Proposed formula target conflicts",
+    }),
+  ).toBeVisible();
+  await expect(
+    architecture.getByText(/This check does not approve the architecture/),
+  ).toBeVisible();
 
   // Formula approval cannot invent test and oracle references.
   const formulaPanel = page.getByRole("region", {
@@ -673,6 +681,11 @@ async function exercisePipeline(
   await expect(
     populationCandidate.getByText("Revoked", { exact: true }),
   ).toBeVisible();
+  await expect(
+    architecture.getByRole("heading", {
+      name: "Proposed formula target conflicts",
+    }),
+  ).toHaveCount(0);
   await expect(
     page.getByText("Select an architecture to review formula governance."),
   ).toBeVisible();

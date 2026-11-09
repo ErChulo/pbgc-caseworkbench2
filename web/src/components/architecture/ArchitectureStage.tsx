@@ -1,4 +1,6 @@
 import { useState } from "react";
+import type { V1Architecture } from "../../domain/architecture/models";
+import { findArchitectureFormulaTargetConflicts } from "../../domain/architecture/target-conflicts";
 
 // Legacy persisted selections are not an authenticated approval of a generated architecture.
 export interface ArchitectureSelection {
@@ -16,6 +18,7 @@ export interface ArchitectureStageProps {
   readonly onDownload: () => void;
   readonly diagnosticReady: boolean;
   readonly onDownloadDiagnostic: () => void;
+  readonly architecture?: V1Architecture | null;
 }
 
 export function ArchitectureStage({
@@ -26,8 +29,13 @@ export function ArchitectureStage({
   onDownload,
   diagnosticReady,
   onDownloadDiagnostic,
+  architecture = null,
 }: ArchitectureStageProps) {
   const [busy, setBusy] = useState(false);
+  const conflicts =
+    architecture === null
+      ? null
+      : findArchitectureFormulaTargetConflicts(architecture);
   const build = async () => {
     setBusy(true);
     try {
@@ -72,6 +80,31 @@ export function ArchitectureStage({
           {message}
         </p>
       ) : null}
+      {conflicts !== null && (
+        <div aria-label="Proposed formula target conflicts">
+          <h3>Proposed formula target conflicts</h3>
+          <p>
+            {conflicts.length} shared formula targets found. This check does not
+            approve the architecture or check all workbook requirements.
+          </p>
+          {conflicts.length > 0 && (
+            <ul>
+              {conflicts.slice(0, 20).map((conflict) => (
+                <li key={`${conflict.tabName}!${conflict.cellAddress}`}>
+                  {conflict.tabName}!{conflict.cellAddress}:{" "}
+                  {conflict.formulas.length} formula placements. Scenarios:{" "}
+                  {conflict.formulas
+                    .slice(0, 10)
+                    .map((formula) => formula.scenarioId)
+                    .join(", ")}
+                  {conflict.formulas.length > 10 ? ", …" : ""}.
+                </li>
+              ))}
+            </ul>
+          )}
+          {conflicts.length > 20 && <p>Showing the first 20 targets.</p>}
+        </div>
+      )}
       {diagnosticReady ? (
         <div>
           <p>

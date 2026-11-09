@@ -618,6 +618,7 @@ export function App({
               onApprove={orchestrator.recordCaseControls}
             />
             <ArchitectureStage
+              architecture={orchestrator.v1Architecture}
               enabled={
                 orchestrator.workspaceReady && orchestrator.activeCase !== null
               }
