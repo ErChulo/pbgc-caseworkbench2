@@ -326,15 +326,13 @@ it("shows routing conflicts for the inspected row without routing values", async
 });
 
 it("passes an explicitly selected metadata row, displays observations, and clears them on change", async () => {
-  const onPreview = vi
-    .fn()
-    .mockResolvedValue({
-      ...record,
-      iobMetadata: {
-        metadataRow: 12,
-        fields: [{ field: "AMOUNT", sourceAddress: "B12", state: "B" }],
-      },
-    });
+  const onPreview = vi.fn().mockResolvedValue({
+    ...record,
+    iobMetadata: {
+      metadataRow: 12,
+      fields: [{ field: "AMOUNT", sourceAddress: "B12", state: "B" }],
+    },
+  });
   const user = userEvent.setup();
   render(<PopulationRecordPreview item={item} onPreview={onPreview} />);
   await user.type(screen.getByLabelText("Source sheet name"), "Synthetic");

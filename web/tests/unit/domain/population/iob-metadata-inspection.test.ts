@@ -63,6 +63,61 @@ describe("explicit source I/O/B inspection", () => {
       ),
     ).toBe(true);
   });
+  it("distinguishes blank, errors and missing cells without exposing stored values", () => {
+    const source = {
+      ...workbook,
+      sheets: [
+        {
+          name: "Source",
+          hidden: false,
+          cells: [
+            cell("A1", "First"),
+            cell("B1", "Second"),
+            cell("C1", "Third"),
+            cell("A12", ""),
+            cell("B12", "sensitive-error", null, "e"),
+          ],
+        },
+      ],
+    } as WorkbookPopulationProfile;
+    const result = inspectIobMetadataRow({
+      ...input,
+      workbook: source,
+      bindings: bindings.slice(0, 3),
+    });
+    expect(result.fields.map((value) => value.state)).toEqual([
+      "blank",
+      "error",
+      "missing",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("sensitive-error");
+  });
+  it("rejects duplicate and malformed observed addresses", () => {
+    const duplicate = {
+      ...workbook,
+      sheets: [
+        {
+          ...workbook.sheets[0],
+          cells: [...(workbook.sheets[0]?.cells ?? []), cell("$A$12", "O")],
+        },
+      ],
+    } as WorkbookPopulationProfile;
+    expect(() =>
+      inspectIobMetadataRow({ ...input, workbook: duplicate }),
+    ).toThrow(/duplicate/);
+    const wrongSheet = {
+      ...workbook,
+      sheets: [
+        {
+          ...workbook.sheets[0],
+          cells: [{ ...cell("A1", "First"), sheet: "Other" }],
+        },
+      ],
+    } as WorkbookPopulationProfile;
+    expect(() =>
+      inspectIobMetadataRow({ ...input, workbook: wrongSheet }),
+    ).toThrow(/invalid/);
+  });
   it("blocks unsafe row, ambiguous bindings and changed headers", () => {
     expect(() => inspectIobMetadataRow({ ...input, metadataRow: 2 })).toThrow();
     expect(() => inspectIobMetadataRow({ ...input, metadataRow: 1 })).toThrow();

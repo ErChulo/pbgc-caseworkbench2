@@ -22,6 +22,7 @@ function populationWorkbook(): Uint8Array {
   const retirees = XLSX.utils.aoa_to_sheet([
     ["DOB", "NRD", "BSEX", "COMP", "FV", "CALC_INDICATOR"],
     ["1960-05-12", "2025-05-01", "M", 42000, null, null],
+    ["I", "I", "I", "B", "O", "B"],
   ]);
   // aoa_to_sheet keeps "=" strings as text, so write the formulas as
   // explicit formula cells. Leaving the cached result absent (or empty for
@@ -445,6 +446,7 @@ async function exercisePipeline(
   }
   await rowReview.getByLabel("Source sheet name").fill("Retirees");
   await rowReview.getByLabel("Source row number").fill("2");
+  await rowReview.getByLabel("Optional I/O/B metadata row number").fill("3");
   for (const [index, field, column] of [
     [1, "DOB", "A"],
     [2, "COMP", "D"],
@@ -469,12 +471,21 @@ async function exercisePipeline(
     ),
   ).toBeVisible();
   await expect(
-    rowReview.locator("li").filter({ hasText: '"COMP"' }),
+    rowReview.locator("li").filter({ hasText: "D2: value" }),
   ).toContainText("D2: value — 42000");
   await expect(
-    rowReview.locator("li").filter({ hasText: '"FV"' }),
+    rowReview.locator("li").filter({ hasText: "E2: formula" }),
   ).toContainText("E2: formula");
+  await expect(
+    rowReview.locator("li").filter({ hasText: "D3: B" }),
+  ).toBeVisible();
+  await expect(
+    rowReview.locator("li").filter({ hasText: "E3: O" }),
+  ).toBeVisible();
   await rowReview.getByRole("button", { name: "Clear local row view" }).click();
+  await expect(
+    rowReview.getByLabel("Optional I/O/B metadata row number"),
+  ).toHaveValue("");
   await expect(rowReview.getByText(/Source row: 2/)).not.toBeVisible();
   await expect(rowReview.getByLabel("Source row number")).toHaveValue("");
   await rowReview.getByLabel("Source sheet name").fill("Retirees");
@@ -482,6 +493,14 @@ async function exercisePipeline(
   await rowReview.getByLabel("Generic field 1").fill("COMP");
   await rowReview.getByLabel("Source column 1").fill("D");
   await rowReview.getByLabel("Exact row-one header 1").fill("COMP");
+  await rowReview.getByLabel("Optional I/O/B metadata row number").fill("2");
+  await rowReview
+    .getByRole("button", { name: "Inspect source row locally" })
+    .click();
+  await expect(rowReview.getByRole("alert")).toContainText(
+    "Choose a separate one-based metadata row",
+  );
+  await rowReview.getByLabel("Optional I/O/B metadata row number").fill("3");
   await page.evaluate((sha) => {
     const files = (
       globalThis as unknown as { __syntheticFiles: Map<string, Uint8Array> }
